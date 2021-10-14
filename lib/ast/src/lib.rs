@@ -4,8 +4,8 @@ mod let_stmt;
 mod program;
 mod statement;
 
-use binop::*;
-use expression::*;
-use let_stmt::*;
-use program::*;
-use statement::*;
+pub use binop::*;
+pub use expression::*;
+pub use let_stmt::*;
+pub use program::*;
+pub use statement::*;

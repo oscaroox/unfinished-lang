@@ -1,7 +1,7 @@
 use crate::Expression;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Let {
-    id: String,
-    value: Option<Expression>,
+    pub id: String,
+    pub value: Option<Expression>,
 }

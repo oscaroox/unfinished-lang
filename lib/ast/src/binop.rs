@@ -10,7 +10,7 @@ pub enum BinaryOperation {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct BinOp {
-    left: Box<Expression>,
-    op: BinaryOperation,
-    right: Box<Expression>,
+    pub left: Box<Expression>,
+    pub op: BinaryOperation,
+    pub right: Box<Expression>,
 }
