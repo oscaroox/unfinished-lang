@@ -81,7 +81,7 @@ impl Scanner {
 
     fn read_digit(&mut self) -> Token {
         let mut res = vec![];
-        let pos = Position::new(self.col, self.line);
+        let pos = (self.col, self.line);
 
         while !self.is_end() && self.is_digit(self.ch) {
             res.push(self.ch);
@@ -96,15 +96,15 @@ impl Scanner {
                 self.advance();
             }
 
-            return Token::FloatConst(res.into_iter().collect(), pos);
+            return Token::float_const(res.into_iter().collect(), pos);
         }
 
-        Token::IntConst(res.into_iter().collect(), pos)
+        Token::int_const(res.into_iter().collect(), pos)
     }
 
     fn read_string(&mut self) -> Token {
         let mut res = vec![];
-        let pos = Position::new(self.col, self.line);
+        let pos = (self.col, self.line);
         self.advance();
 
         while self.peek() != '"' && !self.is_end() {
@@ -119,19 +119,19 @@ impl Scanner {
         }
 
         if self.is_end() {
-            return Token::BadToken("Unterminated string".to_string(), pos);
+            return Token::bad_token("Unterminated string".to_string(), pos);
         }
 
         // push last char
         res.push(self.ch);
         self.advance();
 
-        Token::StringConst(res.into_iter().collect(), pos)
+        Token::string_const(res.into_iter().collect(), pos)
     }
 
     fn read_identifier(&mut self) -> Token {
         let mut res = vec![];
-        let pos = Position::new(self.col, self.line);
+        let pos = (self.col, self.line);
         while !self.is_end() && self.is_alphanumeric(self.ch) {
             res.push(self.ch);
             self.advance();
@@ -140,69 +140,69 @@ impl Scanner {
         let value: String = res.into_iter().collect();
 
         match value.as_str() {
-            "let" => Token::Let(pos),
-            "fun" => Token::Fun(pos),
-            "true" => Token::True(pos),
-            "false" => Token::False(pos),
-            "null" => Token::Null(pos),
-            _ => Token::Identifier(value, pos),
+            "let" => Token::let_token(pos),
+            "fun" => Token::fun_token(pos),
+            "true" => Token::true_token(pos),
+            "false" => Token::false_token(pos),
+            "null" => Token::null(pos),
+            _ => Token::identifier(value, pos),
         }
     }
 
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
         let curr_ch = self.ch;
-        let pos = Position::new(self.col, self.line);
+        let pos = (self.col, self.line);
         let token = match curr_ch {
             '+' => {
                 if self.peek() == '=' {
                     self.advance();
                     self.advance();
-                    return Token::AssignPlus(pos);
+                    return Token::assign_plus(pos);
                 }
-                Token::Plus(pos)
+                Token::plus(pos)
             }
             ':' => {
                 if self.peek() == '=' {
                     self.advance();
                     self.advance();
-                    return Token::AssignColon(pos);
+                    return Token::assign_colon(pos);
                 }
-                Token::Illegal(curr_ch.to_string(), pos)
+                Token::illegal(curr_ch.to_string(), pos)
             }
             '-' => {
                 if self.peek() == '=' {
                     self.advance();
                     self.advance();
-                    return Token::AssignMinus(pos);
+                    return Token::assign_minus(pos);
                 }
-                Token::Minus(pos)
+                Token::minus(pos)
             }
             '*' => {
                 if self.peek() == '=' {
                     self.advance();
                     self.advance();
-                    return Token::AssignStar(pos);
+                    return Token::assign_star(pos);
                 }
-                Token::Star(pos)
+                Token::star(pos)
             }
             '/' => {
                 if self.peek() == '=' {
                     self.advance();
                     self.advance();
-                    return Token::AssignSlash(pos);
+                    return Token::assign_slash(pos);
                 }
-                Token::Slash(pos)
+                Token::slash(pos)
             }
-            '=' => Token::Assign(pos),
-            '(' => Token::LeftParen(pos),
-            ')' => Token::RightParen(pos),
-            '{' => Token::LeftBrace(pos),
-            '}' => Token::RightBrace(pos),
-            '[' => Token::LeftBracket(pos),
-            ']' => Token::RightBracket(pos),
-            ',' => Token::Comma(pos),
-            '\0' => Token::EOF(pos),
+            '=' => Token::assign(pos),
+            '(' => Token::left_paren(pos),
+            ')' => Token::right_paren(pos),
+            '{' => Token::left_brace(pos),
+            '}' => Token::right_brace(pos),
+            '[' => Token::left_bracket(pos),
+            ']' => Token::right_bracket(pos),
+            ',' => Token::comma(pos),
+            '\0' => Token::eof(pos),
             '"' => self.read_string(),
             _ => {
                 if self.is_digit(curr_ch) {
@@ -210,7 +210,7 @@ impl Scanner {
                 } else if self.is_alpha(curr_ch) {
                     return self.read_identifier();
                 } else {
-                    Token::Illegal(curr_ch.to_string(), pos)
+                    Token::illegal(curr_ch.to_string(), pos)
                 }
             }
         };
@@ -222,7 +222,7 @@ impl Scanner {
 
 #[cfg(test)]
 mod tests {
-    use crate::token::Token;
+    use crate::{token::Token, TokenType};
 
     use super::Scanner;
 
@@ -230,46 +230,52 @@ mod tests {
         Scanner::new(src.to_string())
     }
 
+    fn assert_token(token: Token, token_type: TokenType, value: Option<&str>) {
+        assert_eq!(token.token_type, token_type);
+        if let Some(val) = value {
+            assert_eq!(token.value, val.to_string());
+        }
+    }
+
     #[test]
     fn arithmetic_tokens() {
         let mut res = scan("+-*/");
-        assert_eq!(res.next_token(), Token::plus(0, 0));
-        assert_eq!(res.next_token(), Token::minus(1, 0));
-        assert_eq!(res.next_token(), Token::star(2, 0));
-        assert_eq!(res.next_token(), Token::slash(3, 0));
-        assert_eq!(res.next_token(), Token::eof(4, 0));
+        assert_token(res.next_token(), TokenType::Plus, None);
+        assert_token(res.next_token(), TokenType::Minus, None);
+        assert_token(res.next_token(), TokenType::Star, None);
+        assert_token(res.next_token(), TokenType::Slash, None);
+        assert_token(res.next_token(), TokenType::EOF, None);
     }
 
     #[test]
     fn other_tokens() {
         let mut res = scan("{},()[]");
-        assert_eq!(res.next_token(), Token::left_brace(0, 0));
-        assert_eq!(res.next_token(), Token::right_brace(1, 0));
-        assert_eq!(res.next_token(), Token::comma(2, 0));
-        assert_eq!(res.next_token(), Token::left_paren(3, 0));
-        assert_eq!(res.next_token(), Token::right_paren(4, 0));
-        assert_eq!(res.next_token(), Token::left_bracket(5, 0));
-        assert_eq!(res.next_token(), Token::right_bracket(6, 0));
-        assert_eq!(res.next_token(), Token::eof(7, 0));
+        assert_token(res.next_token(), TokenType::LeftBrace, None);
+        assert_token(res.next_token(), TokenType::RightBrace, None);
+        assert_token(res.next_token(), TokenType::Comma, None);
+        assert_token(res.next_token(), TokenType::LeftParen, None);
+        assert_token(res.next_token(), TokenType::RightParen, None);
+        assert_token(res.next_token(), TokenType::LeftBracket, None);
+        assert_token(res.next_token(), TokenType::RightBracket, None);
+        assert_token(res.next_token(), TokenType::EOF, None);
     }
 
     #[test]
     fn illegal_tokens() {
         let mut res = scan("$@");
-        assert_eq!(res.next_token(), Token::illegal("$".to_string(), 0, 0));
-        assert_eq!(res.next_token(), Token::illegal("@".to_string(), 1, 0));
-        assert_eq!(res.next_token(), Token::eof(2, 0));
+        assert_token(res.next_token(), TokenType::Illegal, Some("$"));
+        assert_token(res.next_token(), TokenType::Illegal, Some("@"));
+        assert_token(res.next_token(), TokenType::EOF, None);
     }
 
     #[test]
     fn skip_whitespace() {
         let mut res = scan("+ - * /");
-
-        assert_eq!(res.next_token(), Token::plus(0, 0));
-        assert_eq!(res.next_token(), Token::minus(2, 0));
-        assert_eq!(res.next_token(), Token::star(4, 0));
-        assert_eq!(res.next_token(), Token::slash(6, 0));
-        assert_eq!(res.next_token(), Token::eof(7, 0));
+        assert_token(res.next_token(), TokenType::Plus, None);
+        assert_token(res.next_token(), TokenType::Minus, None);
+        assert_token(res.next_token(), TokenType::Star, None);
+        assert_token(res.next_token(), TokenType::Slash, None);
+        assert_token(res.next_token(), TokenType::EOF, None);
     }
 
     #[test]
@@ -280,90 +286,79 @@ mod tests {
 *
 /",
         );
-        assert_eq!(res.next_token(), Token::plus(0, 0));
-        assert_eq!(res.next_token(), Token::minus(0, 1));
-        assert_eq!(res.next_token(), Token::star(0, 2));
-        assert_eq!(res.next_token(), Token::slash(0, 3));
-        assert_eq!(res.next_token(), Token::eof(1, 3));
+        assert_eq!(res.next_token(), Token::plus((0, 0)));
+        assert_eq!(res.next_token(), Token::minus((0, 1)));
+        assert_eq!(res.next_token(), Token::star((0, 2)));
+        assert_eq!(res.next_token(), Token::slash((0, 3)));
+        assert_eq!(res.next_token(), Token::eof((1, 3)));
     }
 
     #[test]
     fn read_digits() {
         let mut res = scan("123 23 34.2");
 
-        assert_eq!(res.next_token(), Token::int_const("123".to_string(), 0, 0));
-        assert_eq!(res.next_token(), Token::int_const("23".to_string(), 4, 0));
-        assert_eq!(
-            res.next_token(),
-            Token::float_const("34.2".to_string(), 7, 0)
-        );
-        assert_eq!(res.next_token(), Token::eof(11, 0));
+        assert_token(res.next_token(), TokenType::IntConst, Some("123"));
+        assert_token(res.next_token(), TokenType::IntConst, Some("23"));
+        assert_token(res.next_token(), TokenType::FloatConst, Some("34.2"));
+        assert_token(res.next_token(), TokenType::EOF, None);
     }
 
     #[test]
     fn read_string() {
         let mut res = scan(r#""this is a string""#);
 
-        assert_eq!(
+        assert_token(
             res.next_token(),
-            Token::string_const("this is a string".to_string(), 0, 0)
+            TokenType::StringConst,
+            Some("this is a string"),
         );
-        assert_eq!(res.next_token(), Token::eof(18, 0));
+        assert_token(res.next_token(), TokenType::EOF, None);
     }
 
     #[test]
     fn unterminated_string() {
         let mut res = scan(r#""this is astring"#);
 
-        assert_eq!(
+        assert_token(
             res.next_token(),
-            Token::bad_token("Unterminated string".to_string(), 0, 0)
+            TokenType::BadToken,
+            Some("Unterminated string"),
         );
-        assert_eq!(res.next_token(), Token::eof(17, 0));
+        assert_token(res.next_token(), TokenType::EOF, None);
     }
 
     #[test]
     fn read_identifier() {
         let mut res = scan("test test2 _test");
 
-        assert_eq!(
-            res.next_token(),
-            Token::identifier("test".to_string(), 0, 0)
-        );
-        assert_eq!(
-            res.next_token(),
-            Token::identifier("test2".to_string(), 5, 0)
-        );
-
-        assert_eq!(
-            res.next_token(),
-            Token::identifier("_test".to_string(), 11, 0)
-        );
-        assert_eq!(res.next_token(), Token::eof(16, 0));
+        assert_token(res.next_token(), TokenType::Identifier, Some("test"));
+        assert_token(res.next_token(), TokenType::Identifier, Some("test2"));
+        assert_token(res.next_token(), TokenType::Identifier, Some("_test"));
+        assert_token(res.next_token(), TokenType::EOF, None);
     }
 
     #[test]
     fn keywords() {
         let mut res = scan("let fun true false null");
 
-        assert_eq!(res.next_token(), Token::let_token(0, 0));
-        assert_eq!(res.next_token(), Token::fun_token(4, 0));
-        assert_eq!(res.next_token(), Token::true_token(8, 0));
-        assert_eq!(res.next_token(), Token::false_token(13, 0));
-        assert_eq!(res.next_token(), Token::null(19, 0));
-        assert_eq!(res.next_token(), Token::eof(23, 0));
+        assert_token(res.next_token(), TokenType::Let, None);
+        assert_token(res.next_token(), TokenType::Fun, None);
+        assert_token(res.next_token(), TokenType::True, None);
+        assert_token(res.next_token(), TokenType::False, None);
+        assert_token(res.next_token(), TokenType::Null, None);
+        assert_token(res.next_token(), TokenType::EOF, None);
     }
 
     #[test]
     fn assignment() {
         let mut res = scan("= += -= *= /= :=");
 
-        assert_eq!(res.next_token(), Token::assign(0, 0));
-        assert_eq!(res.next_token(), Token::assign_plus(2, 0));
-        assert_eq!(res.next_token(), Token::assign_minus(5, 0));
-        assert_eq!(res.next_token(), Token::assign_star(8, 0));
-        assert_eq!(res.next_token(), Token::assign_slash(11, 0));
-        assert_eq!(res.next_token(), Token::assign_colon(14, 0));
-        assert_eq!(res.next_token(), Token::eof(16, 0));
+        assert_token(res.next_token(), TokenType::Assign, None);
+        assert_token(res.next_token(), TokenType::AssignPlus, None);
+        assert_token(res.next_token(), TokenType::AssignMinus, None);
+        assert_token(res.next_token(), TokenType::AssignStar, None);
+        assert_token(res.next_token(), TokenType::AssignSlash, None);
+        assert_token(res.next_token(), TokenType::AssignColon, None);
+        assert_token(res.next_token(), TokenType::EOF, None);
     }
 }

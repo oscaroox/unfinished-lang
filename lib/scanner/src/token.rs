@@ -1,58 +1,35 @@
-use crate::position::Position;
+use crate::Position;
+use crate::TokenType;
 
 macro_rules! impl_token {
     ($_meth:ident, $tok:ident) => {
-        pub fn $_meth(col: isize, line: isize) -> Token {
-            Token::$tok(Position::new(col, line))
+        pub fn $_meth(col_line: (isize, isize)) -> Token {
+            Token {
+                token_type: TokenType::$tok,
+                value: TokenType::$tok.to_string(),
+                pos: Position::new(col_line.0, col_line.1),
+            }
         }
     };
 }
 
 macro_rules! impl_value_token {
     ($_meth:ident, $tok:ident) => {
-        pub fn $_meth(val: String, col: isize, line: isize) -> Token {
-            Token::$tok(val, Position::new(col, line))
+        pub fn $_meth(value: String, col_line: (isize, isize)) -> Token {
+            Token {
+                token_type: TokenType::$tok,
+                value,
+                pos: Position::new(col_line.0, col_line.1),
+            }
         }
     };
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Token {
-    Identifier(String, Position),
-    IntConst(String, Position),
-    FloatConst(String, Position),
-    StringConst(String, Position),
-
-    // keywords
-    Let(Position),
-    Fun(Position),
-    True(Position),
-    False(Position),
-    Null(Position),
-
-    Plus(Position),
-    Minus(Position),
-    Star(Position),
-    Slash(Position),
-
-    Assign(Position),
-    AssignColon(Position),
-    AssignPlus(Position),
-    AssignMinus(Position),
-    AssignStar(Position),
-    AssignSlash(Position),
-
-    LeftParen(Position),
-    RightParen(Position),
-    LeftBrace(Position),
-    RightBrace(Position),
-    LeftBracket(Position),
-    RightBracket(Position),
-    Comma(Position),
-
-    Illegal(String, Position),
-    EOF(Position),
-    BadToken(String, Position),
+pub struct Token {
+    pub token_type: TokenType,
+    pub value: String,
+    pub pos: Position,
 }
 
 impl Token {
@@ -91,40 +68,12 @@ impl Token {
     impl_token!(assign_slash, AssignSlash);
 
     impl_token!(eof, EOF);
-}
 
-impl std::fmt::Display for Token {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Token::Identifier(_, _) => write!(f, "Identifier"),
-            Token::IntConst(v, _) => write!(f, "{}", v),
-            Token::FloatConst(v, _) => write!(f, "{}", v),
-            Token::StringConst(v, _) => write!(f, "{}", v),
-            Token::Let(_) => write!(f, "Let"),
-            Token::Fun(_) => write!(f, "Fun"),
-            Token::True(_) => write!(f, "True"),
-            Token::False(_) => write!(f, "False"),
-            Token::Null(_) => write!(f, "Null"),
-            Token::Plus(_) => write!(f, "+"),
-            Token::Minus(_) => write!(f, "-"),
-            Token::Star(_) => write!(f, "*"),
-            Token::Slash(_) => write!(f, "/"),
-            Token::LeftParen(_) => write!(f, "("),
-            Token::RightParen(_) => write!(f, ")"),
-            Token::Illegal(v, _) => write!(f, "{}", v),
-            Token::EOF(_) => write!(f, "EOF"),
-            Token::BadToken(_, _) => write!(f, "BadToken"),
-            Token::Assign(_) => write!(f, "="),
-            Token::AssignPlus(_) => write!(f, "+="),
-            Token::AssignMinus(_) => write!(f, "-="),
-            Token::AssignStar(_) => write!(f, "*="),
-            Token::AssignSlash(_) => write!(f, "/="),
-            Token::AssignColon(_) => write!(f, ":="),
-            Token::Comma(_) => write!(f, ","),
-            Token::LeftBrace(_) => write!(f, "{{"),
-            Token::RightBrace(_) => write!(f, "}}"),
-            Token::LeftBracket(_) => write!(f, "["),
-            Token::RightBracket(_) => write!(f, "]"),
-        }
+    pub fn is_eof(&self) -> bool {
+        self.token_type == TokenType::EOF
+    }
+
+    pub fn is_let(&self) -> bool {
+        self.token_type == TokenType::Let
     }
 }
