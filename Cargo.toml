@@ -3,5 +3,6 @@
 members = [
     "bin/unf",
     "lib/ast",
+    "lib/parser",
     "lib/scanner",
 ]
