@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
     Identifier,
     IntConst,
@@ -31,6 +31,7 @@ pub enum TokenType {
     LeftBracket,
     RightBracket,
     Comma,
+    SemiColon,
 
     Illegal,
     EOF,
@@ -66,6 +67,7 @@ impl std::fmt::Display for TokenType {
             TokenType::LeftBracket => write!(f, "["),
             TokenType::RightBracket => write!(f, "]"),
             TokenType::Comma => write!(f, ","),
+            TokenType::SemiColon => write!(f, ";"),
             TokenType::Illegal => write!(f, "ILLEGAL"),
             TokenType::EOF => write!(f, "EOF"),
             TokenType::BadToken => write!(f, "BADTOKEN"),

@@ -25,7 +25,7 @@ macro_rules! impl_value_token {
     };
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Token {
     pub token_type: TokenType,
     pub value: String,
@@ -59,6 +59,7 @@ impl Token {
     impl_token!(left_bracket, LeftBracket);
     impl_token!(right_bracket, RightBracket);
     impl_token!(comma, Comma);
+    impl_token!(semi_colon, SemiColon);
 
     impl_token!(assign, Assign);
     impl_token!(assign_colon, AssignColon);

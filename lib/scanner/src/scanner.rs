@@ -202,6 +202,7 @@ impl Scanner {
             '[' => Token::left_bracket(pos),
             ']' => Token::right_bracket(pos),
             ',' => Token::comma(pos),
+            ';' => Token::semi_colon(pos),
             '\0' => Token::eof(pos),
             '"' => self.read_string(),
             _ => {
@@ -249,10 +250,11 @@ mod tests {
 
     #[test]
     fn other_tokens() {
-        let mut res = scan("{},()[]");
+        let mut res = scan("{},;()[]");
         assert_token(res.next_token(), TokenType::LeftBrace, None);
         assert_token(res.next_token(), TokenType::RightBrace, None);
         assert_token(res.next_token(), TokenType::Comma, None);
+        assert_token(res.next_token(), TokenType::SemiColon, None);
         assert_token(res.next_token(), TokenType::LeftParen, None);
         assert_token(res.next_token(), TokenType::RightParen, None);
         assert_token(res.next_token(), TokenType::LeftBracket, None);
