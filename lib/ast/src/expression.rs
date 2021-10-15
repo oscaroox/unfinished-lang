@@ -1,8 +1,9 @@
-use crate::{BinOp, BinaryOperation};
+use crate::{BinOp, BinaryOperation, Literal};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     BinOp(BinOp),
+    Literal(Literal),
     Empty,
 }
 
@@ -13,5 +14,9 @@ impl Expression {
             op: BinaryOperation::Add,
             right: Box::new(Expression::Empty),
         })
+    }
+
+    pub fn create_literal(lit: Literal) -> Expression {
+        Expression::Literal(lit)
     }
 }
