@@ -1,13 +1,14 @@
-use crate::Position;
+use spanner::Span;
+
 use crate::TokenType;
 
 macro_rules! impl_token {
     ($_meth:ident, $tok:ident) => {
-        pub fn $_meth(col_line: (isize, isize)) -> Token {
+        pub fn $_meth(span: Span) -> Token {
             Token {
                 token_type: TokenType::$tok,
                 value: TokenType::$tok.to_string(),
-                pos: Position::new(col_line.0, col_line.1),
+                span,
             }
         }
     };
@@ -15,11 +16,11 @@ macro_rules! impl_token {
 
 macro_rules! impl_value_token {
     ($_meth:ident, $tok:ident) => {
-        pub fn $_meth(value: String, col_line: (isize, isize)) -> Token {
+        pub fn $_meth(value: String, span: Span) -> Token {
             Token {
                 token_type: TokenType::$tok,
                 value,
-                pos: Position::new(col_line.0, col_line.1),
+                span,
             }
         }
     };
@@ -29,7 +30,7 @@ macro_rules! impl_value_token {
 pub struct Token {
     pub token_type: TokenType,
     pub value: String,
-    pub pos: Position,
+    pub span: Span,
 }
 
 impl Token {
