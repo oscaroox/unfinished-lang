@@ -5,6 +5,12 @@ pub type Spanned<T> = (T, Span);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span(usize);
 
+impl std::fmt::Display for Span {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "span: {}", self.0)
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct SpanManager {
     sources: Vec<String>,
@@ -26,6 +32,10 @@ impl SpanManager {
         let i = self.spans.len();
         self.spans.push((source_ind, l, r));
         Span(i)
+    }
+
+    pub fn dbg_span(&mut self, span: Span) -> (usize, usize, usize) {
+        self.spans[span.0]
     }
 
     pub fn print(&self, span: Span) -> String {
