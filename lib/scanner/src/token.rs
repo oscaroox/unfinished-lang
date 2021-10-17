@@ -77,4 +77,18 @@ impl Token {
     pub fn is_let(&self) -> bool {
         self.token_type == TokenType::Let
     }
+
+    pub fn is_assign(&self) -> bool {
+        self.token_type == TokenType::Assign
+    }
+
+    pub fn is_semi_colon(&self) -> bool {
+        self.token_type == TokenType::SemiColon
+    }
+}
+
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
 }
