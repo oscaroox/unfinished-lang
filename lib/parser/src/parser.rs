@@ -137,6 +137,8 @@ impl<'a> Parser<'a> {
             return self.fun_expression();
         } else if self.matches(vec![TokenType::If]) {
             return self.if_expression();
+        } else if self.matches(vec![TokenType::LeftBrace]) {
+            return Ok(Expression::create_block(self.block_expression()?));
         }
         self.assignment()
     }
@@ -739,6 +741,28 @@ mod test {
                     vec![Statement::create_let("x".to_string(), Some(int(1)))],
                     Some(vec![Statement::create_let("y".to_string(), Some(int(2)))]),
                 )),
+            ],
+        );
+    }
+
+    #[test]
+    fn block_expr() {
+        parse(
+            "
+            {};
+            let b = {
+                let x = 1;
+            };
+            ",
+            vec![
+                Statement::create_expr(Expression::create_block(vec![])),
+                Statement::create_let(
+                    "b".to_string(),
+                    Some(Expression::create_block(vec![Statement::create_let(
+                        "x".to_string(),
+                        Some(int(1)),
+                    )])),
+                ),
             ],
         );
     }

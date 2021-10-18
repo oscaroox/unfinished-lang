@@ -1,5 +1,6 @@
 mod assign;
 mod binop;
+mod block;
 mod call;
 mod expression;
 mod function;
@@ -16,6 +17,7 @@ mod unaryop;
 
 pub use assign::*;
 pub use binop::*;
+pub use block::*;
 pub use call::*;
 pub use expression::*;
 pub use function::*;

@@ -1,4 +1,4 @@
-use crate::{Expression, Identifier};
+use crate::Expression;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Call {
