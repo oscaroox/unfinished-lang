@@ -50,6 +50,15 @@ impl Token {
     impl_token!(else_token, Else);
     impl_token!(null, Null);
 
+    impl_token!(and, And);
+    impl_token!(or, Or);
+    impl_token!(less_than, LessThan);
+    impl_token!(less_than_equal, LessThanEqual);
+    impl_token!(greater_than, GreaterThan);
+    impl_token!(greater_than_equal, GreaterThanEqual);
+    impl_token!(equal_equal, EqualEqual);
+    impl_token!(not_equal, NotEqual);
+
     impl_token!(plus, Plus);
     impl_token!(minus, Minus);
     impl_token!(star, Star);
@@ -63,6 +72,7 @@ impl Token {
     impl_token!(right_bracket, RightBracket);
     impl_token!(comma, Comma);
     impl_token!(semi_colon, SemiColon);
+    impl_token!(bang, Bang);
 
     impl_token!(assign, Assign);
     impl_token!(assign_colon, AssignColon);

@@ -205,7 +205,54 @@ impl<'a> Scanner<'a> {
                 }
                 Token::slash(self.span(pos, self.pos))
             }
-            '=' => Token::assign(self.span(pos, self.pos)),
+            '&' => {
+                if self.peek() == '&' {
+                    self.advance();
+                    self.advance();
+                    return Token::and(self.span(pos, self.pos));
+                }
+                Token::illegal(curr_ch.to_string(), self.span(pos, self.pos))
+            }
+            '|' => {
+                if self.peek() == '|' {
+                    self.advance();
+                    self.advance();
+                    return Token::or(self.span(pos, self.pos));
+                }
+                Token::illegal(curr_ch.to_string(), self.span(pos, self.pos))
+            }
+            '>' => {
+                if self.peek() == '=' {
+                    self.advance();
+                    self.advance();
+                    return Token::greater_than_equal(self.span(pos, self.pos));
+                }
+                Token::greater_than(self.span(pos, self.pos))
+            }
+            '<' => {
+                if self.peek() == '=' {
+                    self.advance();
+                    self.advance();
+                    return Token::less_than_equal(self.span(pos, self.pos));
+                }
+                Token::less_than(self.span(pos, self.pos))
+            }
+            '=' => {
+                if self.peek() == '=' {
+                    self.advance();
+                    self.advance();
+                    return Token::equal_equal(self.span(pos, self.pos));
+                }
+                Token::assign(self.span(pos, self.pos))
+            }
+            '!' => {
+                if self.peek() == '=' {
+                    self.advance();
+                    self.advance();
+                    return Token::not_equal(self.span(pos, self.pos));
+                }
+                Token::bang(self.span(pos, self.pos))
+            }
             '(' => Token::left_paren(self.span(pos, self.pos)),
             ')' => Token::right_paren(self.span(pos, self.pos)),
             '{' => Token::left_brace(self.span(pos, self.pos)),
@@ -272,7 +319,7 @@ mod tests {
     #[test]
     fn other_tokens() {
         test_scan(
-            "{},;()[]",
+            "{},;()[]!",
             vec![
                 (TokenType::LeftBrace, None),
                 (TokenType::RightBrace, None),
@@ -282,6 +329,7 @@ mod tests {
                 (TokenType::RightParen, None),
                 (TokenType::LeftBracket, None),
                 (TokenType::RightBracket, None),
+                (TokenType::Bang, None),
                 (TokenType::EOF, None),
             ],
         );
@@ -424,6 +472,24 @@ this_is_a_identifier";
                 (TokenType::EOF, None),
             ],
         );
+    }
+
+    #[test]
+    fn logic_tokens() {
+        test_scan(
+            "&& || < <= > >= == !=",
+            vec![
+                (TokenType::And, None),
+                (TokenType::Or, None),
+                (TokenType::LessThan, None),
+                (TokenType::LessThanEqual, None),
+                (TokenType::GreaterThan, None),
+                (TokenType::GreaterThanEqual, None),
+                (TokenType::EqualEqual, None),
+                (TokenType::NotEqual, None),
+                (TokenType::EOF, None),
+            ],
+        )
     }
 
     #[test]
