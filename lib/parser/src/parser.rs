@@ -1,4 +1,4 @@
-use ast::{Expression, Literal, Program, Statement};
+use ast::{BinaryOperation, Expression, Identifier, Literal, Program, Statement, UnaryOperation};
 use scanner::{Scanner, Token, TokenType};
 use spanner::Span;
 
@@ -66,17 +66,15 @@ impl<'a> Parser<'a> {
     }
 
     fn advance(&mut self) -> Token {
-        if !self.is_end() {
-            self.prev_token = self.curr_token.clone();
-            self.curr_token = self.peek_token.clone();
-            self.peek_token = self.scanner.next_token();
-        }
+        self.prev_token = self.curr_token.clone();
+        self.curr_token = self.peek_token.clone();
+        self.peek_token = self.scanner.next_token();
 
         self.prev_token.clone()
     }
 
     fn is_end(&self) -> bool {
-        self.peek_token.is_eof()
+        self.curr_token.is_eof()
     }
 
     fn eat(&mut self, token_type: TokenType, msg: &str) -> Result<Token, ParserError> {
@@ -87,6 +85,13 @@ impl<'a> Parser<'a> {
             msg.to_string(),
             self.curr_token.clone(),
         ))
+    }
+
+    fn eat_optional(&mut self, token_type: TokenType) -> Option<Token> {
+        if self.curr_token.token_type == token_type {
+            return Some(self.advance());
+        }
+        None
     }
 
     fn statement(&mut self) -> Result<Statement, ParserError> {
@@ -121,21 +126,179 @@ impl<'a> Parser<'a> {
     fn expression_statement(&mut self) -> Result<Statement, ParserError> {
         let expr = self.expression()?;
         self.eat(TokenType::SemiColon, "Expected ';' after expression")?;
-        Ok(Statement::create_expression(expr))
+        Ok(Statement::create_expr(expr))
     }
 
     fn expression(&mut self) -> Result<Expression, ParserError> {
-        self.primary()
+        if self.matches(vec![TokenType::Fun]) {
+            return self.fun_expression();
+        }
+        self.assignment()
+    }
+
+    fn fun_expression(&mut self) -> Result<Expression, ParserError> {
+        let mut params = vec![];
+
+        let left_param = self.eat_optional(TokenType::LeftParen);
+
+        match left_param {
+            Some(_) => {
+                if self.curr_token.token_type != TokenType::RightParen {
+                    loop {
+                        let ident = self.eat(TokenType::Identifier, "Expected parameter name")?;
+                        params.push(Identifier::new(ident.value));
+                        if !self.matches(vec![TokenType::Comma]) {
+                            break;
+                        }
+                    }
+                }
+                self.eat(TokenType::RightParen, "Expcted ')' after parameters")?;
+            }
+            _ => {}
+        }
+
+        self.eat(TokenType::LeftBrace, "Expected '{'")?;
+        let block = self.block_expression()?;
+
+        Ok(Expression::create_function(params, block))
+    }
+
+    fn block_expression(&mut self) -> Result<Vec<Statement>, ParserError> {
+        let mut stmts = vec![];
+        while self.curr_token.token_type != TokenType::RightBrace && !self.is_end() {
+            stmts.push(self.statement()?);
+        }
+        self.eat(TokenType::RightBrace, "Expected '}'")?;
+        Ok(stmts)
+    }
+
+    fn assignment(&mut self) -> Result<Expression, ParserError> {
+        let expr = self.term()?;
+        if self.matches(vec![TokenType::Assign]) {
+            let curr_token = self.curr_token.clone();
+            let rhs = self.assignment()?;
+            match expr {
+                Expression::LetRef(let_ref) => {
+                    return Ok(Expression::create_assign(let_ref.name, rhs))
+                }
+                _ => {
+                    return Err(ParserError::ExpectedToken(
+                        "Invalid assignment target".to_string(),
+                        curr_token,
+                    ))
+                }
+            }
+        }
+        Ok(expr)
+    }
+
+    fn term(&mut self) -> Result<Expression, ParserError> {
+        let mut res = self.factor()?;
+
+        while self.matches(vec![TokenType::Plus, TokenType::Minus]) {
+            let tok = self.prev_token.clone();
+            let rhs = self.factor()?;
+            let op = match tok.token_type {
+                TokenType::Plus => BinaryOperation::Add,
+                _ => BinaryOperation::Substract,
+            };
+            res = Expression::create_binop(res, op, rhs)
+        }
+
+        Ok(res)
+    }
+    fn factor(&mut self) -> Result<Expression, ParserError> {
+        let mut res = self.unary()?;
+        while self.matches(vec![TokenType::Star, TokenType::Slash]) {
+            let tok = self.prev_token.clone();
+            let rhs = self.unary()?;
+            let op = match tok.token_type {
+                TokenType::Star => BinaryOperation::Multiply,
+                _ => BinaryOperation::Divide,
+            };
+            res = Expression::create_binop(res, op, rhs)
+        }
+        Ok(res)
+    }
+
+    fn unary(&mut self) -> Result<Expression, ParserError> {
+        if self.matches(vec![TokenType::Plus, TokenType::Minus]) {
+            let tok = self.prev_token.clone();
+            let rhs = self.unary()?;
+            let op = match tok.token_type {
+                TokenType::Plus => UnaryOperation::Plus,
+                TokenType::Minus => UnaryOperation::Minus,
+                _ => return Err(ParserError::UnexpectedToken(tok.clone())),
+            };
+            return Ok(Expression::create_unaryop(op, rhs));
+        }
+        self.call()
+    }
+
+    fn call(&mut self) -> Result<Expression, ParserError> {
+        let mut expr = self.primary()?;
+
+        if self.matches(vec![TokenType::LeftParen]) {
+            let mut args = vec![];
+            if self.curr_token.token_type != TokenType::RightParen {
+                loop {
+                    args.push(self.expression()?);
+
+                    if !self.matches(vec![TokenType::Comma]) {
+                        break;
+                    }
+                }
+            }
+
+            self.eat(TokenType::RightParen, "Unterminated function call")?;
+
+            expr = Expression::create_call(expr, args);
+        }
+
+        Ok(expr)
     }
 
     fn primary(&mut self) -> Result<Expression, ParserError> {
+        let token = self.curr_token.clone();
         if self.matches(vec![TokenType::IntConst]) {
-            let token = self.prev_token.clone();
-            let val: u64 = match token.value.parse() {
+            let val: i64 = match token.value.parse() {
                 Ok(v) => v,
-                _ => panic!("not a integer"),
+                Err(msg) => panic!("not a integer {}", msg),
             };
             return Ok(Expression::create_literal(Literal::Int(val)));
+        }
+
+        if self.matches(vec![TokenType::True, TokenType::False]) {
+            let bool = match token.token_type {
+                TokenType::True => true,
+                _ => false,
+            };
+
+            return Ok(Expression::create_literal(Literal::Bool(bool)));
+        }
+
+        if self.matches(vec![TokenType::FloatConst]) {
+            let val: f64 = match token.value.parse() {
+                Ok(v) => v,
+                Err(msg) => panic!("not a float {}", msg),
+            };
+            return Ok(Expression::create_literal(Literal::Float(val)));
+        }
+
+        if self.matches(vec![TokenType::Null]) {
+            return Ok(Expression::create_literal(Literal::Null));
+        }
+
+        if self.matches(vec![TokenType::Identifier]) {
+            return Ok(Expression::create_let_ref(Identifier::new(
+                token.value.to_string(),
+            )));
+        }
+
+        if self.matches(vec![TokenType::LeftParen]) {
+            let expr = self.expression()?;
+            self.eat(TokenType::RightParen, "Unterminated grouping expression")?;
+            return Ok(Expression::create_grouping(expr));
         }
 
         Err(ParserError::UnexpectedToken(self.curr_token.clone()))
@@ -148,7 +311,9 @@ mod test {
     use crate::ParserError;
 
     use super::Parser;
-    use ast::{Expression, Literal, Program, Statement};
+    use ast::{
+        BinaryOperation, Expression, Identifier, Literal, Program, Statement, UnaryOperation,
+    };
     use scanner::Scanner;
     use spanner::SpanManager;
 
@@ -162,17 +327,85 @@ mod test {
     }
 
     fn parse(source: &str, expected: Program) {
-        let (res, _) = run_parser(source);
+        let (res, err) = run_parser(source);
+        if err.len() > 0 {
+            err.into_iter().for_each(|e| println!("{}", e));
+            panic!("parsed with errors");
+        }
         assert_eq!(res, expected);
     }
 
+    // TODO check errors
     fn parse_error(source: &str, expected: Vec<ParserError>) {
         let (res, errors) = run_parser(source);
 
         let errs: Vec<String> = errors.clone().into_iter().map(|e| e.to_string()).collect();
+        // let err: Vec<> = errors.clone().into_iter().map(|e| e.into_spanned_error());
         println!("{:?}", errs);
         println!("{:?}", res);
         assert_eq!(errors, expected)
+    }
+
+    fn int(val: i64) -> Expression {
+        Expression::Literal(Literal::Int(val))
+    }
+
+    fn float(val: f64) -> Expression {
+        Expression::Literal(Literal::Float(val))
+    }
+
+    fn bool_lit(val: bool) -> Expression {
+        Expression::create_literal(Literal::Bool(val))
+    }
+
+    fn let_ref(val: &str) -> Expression {
+        Expression::create_let_ref(Identifier::new(val.to_string()))
+    }
+
+    #[test]
+    fn number_literal() {
+        parse(
+            "1;
+        2;
+        39;
+        2347682384;
+        34.6;
+        22.732487656;
+        2.;
+        0.;",
+            vec![
+                Statement::create_expr(int(1)),
+                Statement::create_expr(int(2)),
+                Statement::create_expr(int(39)),
+                Statement::create_expr(int(2347682384)),
+                Statement::create_expr(float(34.6)),
+                Statement::create_expr(float(22.732487656)),
+                Statement::create_expr(float(2.0)),
+                Statement::create_expr(float(0.)),
+                Statement::create_expr(float(0.)),
+            ],
+        )
+    }
+
+    #[test]
+    fn bool_literal() {
+        parse(
+            "true; false;",
+            vec![
+                Statement::create_expr(Expression::Literal(Literal::Bool(true))),
+                Statement::create_expr(Expression::Literal(Literal::Bool(false))),
+            ],
+        );
+    }
+
+    #[test]
+    fn null_literal() {
+        parse(
+            "null;",
+            vec![Statement::create_expr(Expression::create_literal(
+                Literal::Null,
+            ))],
+        );
     }
 
     #[test]
@@ -187,12 +420,144 @@ mod test {
                 ),
             ],
         );
-        // parse_error(
-        //     "let = 1;",
-        //     vec![
-        //         ParserError::ExpectedToken("Expected identifier".to_string()),
-        //         ParserError::ExpectedToken("Expected ';' after let statement".to_string()),
-        //     ],
-        // );
+    }
+
+    #[test]
+    fn identifier() {
+        parse(
+            "num; num2;",
+            vec![
+                Statement::create_expr(Expression::create_let_ref(Identifier::new(
+                    "num".to_string(),
+                ))),
+                Statement::create_expr(Expression::create_let_ref(Identifier::new(
+                    "num2".to_string(),
+                ))),
+            ],
+        );
+    }
+
+    #[test]
+    fn assignment_expr() {
+        parse(
+            "num = 1;",
+            vec![Statement::create_expr(Expression::create_assign(
+                Identifier::new("num".to_string()),
+                Expression::create_literal(Literal::Int(1)),
+            ))],
+        );
+    }
+
+    #[test]
+    fn binop_expr() {
+        parse(
+            "1 + 2 * 3 / 2;",
+            vec![Statement::create_expr(Expression::create_binop(
+                Expression::Literal(Literal::Int(1)),
+                BinaryOperation::Add,
+                Expression::create_binop(
+                    Expression::create_binop(
+                        Expression::Literal(Literal::Int(2)),
+                        BinaryOperation::Multiply,
+                        Expression::Literal(Literal::Int(3)),
+                    ),
+                    BinaryOperation::Divide,
+                    Expression::Literal(Literal::Int(2)),
+                ),
+            ))],
+        );
+    }
+
+    #[test]
+    fn grouping_expr() {
+        parse(
+            "2 * (2 + 1);",
+            vec![Statement::create_expr(Expression::create_binop(
+                int(2),
+                BinaryOperation::Multiply,
+                Expression::create_grouping(Expression::create_binop(
+                    int(2),
+                    BinaryOperation::Add,
+                    int(1),
+                )),
+            ))],
+        );
+    }
+
+    #[test]
+    fn unary_expr() {
+        parse(
+            "-1; 1 + -1;",
+            vec![
+                Statement::create_expr(Expression::create_unaryop(UnaryOperation::Minus, int(1))),
+                Statement::create_expr(Expression::create_binop(
+                    int(1),
+                    BinaryOperation::Add,
+                    Expression::create_unaryop(UnaryOperation::Minus, int(1)),
+                )),
+            ],
+        );
+    }
+
+    #[test]
+    fn expression_stmt() {
+        parse(
+            "123; 23;",
+            vec![
+                Statement::create_expr(Expression::Literal(Literal::Int(123))),
+                Statement::create_expr(Expression::Literal(Literal::Int(23))),
+            ],
+        );
+    }
+
+    #[test]
+    fn function_call() {
+        parse(
+            "name(); this_is_a_func(); fnc(1, name, true);",
+            vec![
+                Statement::create_expr(Expression::create_call(let_ref("name"), vec![])),
+                Statement::create_expr(Expression::create_call(let_ref("this_is_a_func"), vec![])),
+                Statement::create_expr(Expression::create_call(
+                    let_ref("fnc"),
+                    vec![int(1), let_ref("name"), bool_lit(true)],
+                )),
+            ],
+        );
+    }
+
+    #[test]
+    fn function_expr() {
+        parse(
+            "
+        fun {};
+        fun () {};
+        fun (x, y) {};
+        fun (y, z) {
+            let name = 2;
+            123;
+        };
+        ",
+            vec![
+                Statement::create_expr(Expression::create_function(vec![], vec![])),
+                Statement::create_expr(Expression::create_function(vec![], vec![])),
+                Statement::create_expr(Expression::create_function(
+                    vec![
+                        Identifier::new("x".to_string()),
+                        Identifier::new("y".to_string()),
+                    ],
+                    vec![],
+                )),
+                Statement::create_expr(Expression::create_function(
+                    vec![
+                        Identifier::new("y".to_string()),
+                        Identifier::new("z".to_string()),
+                    ],
+                    vec![
+                        Statement::create_let("name".to_string(), Some(int(2))),
+                        Statement::create_expr(int(123)),
+                    ],
+                )),
+            ],
+        )
     }
 }

@@ -1,4 +1,7 @@
 #[derive(Debug, PartialEq, Clone)]
 pub enum Literal {
-    Int(u64),
+    Int(i64),
+    Float(f64),
+    Bool(bool),
+    Null,
 }

@@ -4,9 +4,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum ParserError {
-    #[error("{0}")]
+    #[error("{0}, {1}")]
     ExpectedToken(String, Token),
-    #[error("Unexpected token:")]
+    #[error("Unexpected token: {0}")]
     UnexpectedToken(Token),
     #[error("Expected expression after")]
     ExpectedExpression(Token),

@@ -10,7 +10,7 @@ impl Statement {
     pub fn create_let(name: String, value: Option<Expression>) -> Statement {
         Statement::Let(Let { id: name, value })
     }
-    pub fn create_expression(expr: Expression) -> Statement {
+    pub fn create_expr(expr: Expression) -> Statement {
         Statement::Expr(expr)
     }
 }
