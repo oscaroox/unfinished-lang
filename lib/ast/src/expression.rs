@@ -1,6 +1,6 @@
 use crate::{
     Assign, BinOp, BinaryOperation, Call, Function, Grouping, Identifier, IfConditional, LetRef,
-    Literal, Statement, UnaryOp, UnaryOperation,
+    Literal, Logic, LogicOperation, Statement, UnaryOp, UnaryOperation,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -11,6 +11,7 @@ pub enum Expression {
     LetRef(LetRef),
     UnaryOp(UnaryOp),
     Grouping(Grouping),
+    Logic(Logic),
     Call(Call),
     Function(Function),
     If(IfConditional),
@@ -74,6 +75,14 @@ impl Expression {
             condition: Box::new(condition),
             then,
             not_then,
+        })
+    }
+
+    pub fn create_logic(lhs: Expression, op: LogicOperation, rhs: Expression) -> Expression {
+        Expression::Logic(Logic {
+            lhs: Box::new(lhs),
+            op,
+            rhs: Box::new(rhs),
         })
     }
 }

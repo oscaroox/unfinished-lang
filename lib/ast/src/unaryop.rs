@@ -4,6 +4,7 @@ use crate::Expression;
 pub enum UnaryOperation {
     Minus,
     Plus,
+    Not,
 }
 
 #[derive(Debug, PartialEq, Clone)]

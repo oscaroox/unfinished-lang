@@ -1,4 +1,7 @@
-use ast::{BinaryOperation, Expression, Identifier, Literal, Program, Statement, UnaryOperation};
+use ast::{
+    BinaryOperation, Expression, Identifier, Literal, LogicOperation, Program, Statement,
+    UnaryOperation,
+};
 use scanner::{Scanner, Token, TokenType};
 use spanner::Span;
 
@@ -196,7 +199,7 @@ impl<'a> Parser<'a> {
     }
 
     fn assignment(&mut self) -> Result<Expression, ParserError> {
-        let expr = self.term()?;
+        let expr = self.or()?;
         if self.matches(vec![TokenType::Assign]) {
             let curr_token = self.curr_token.clone();
             let rhs = self.assignment()?;
@@ -211,6 +214,61 @@ impl<'a> Parser<'a> {
                     ))
                 }
             }
+        }
+        Ok(expr)
+    }
+
+    fn or(&mut self) -> Result<Expression, ParserError> {
+        let mut expr = self.and()?;
+        while self.matches(vec![TokenType::Or]) {
+            let rhs = self.and()?;
+            expr = Expression::create_logic(expr, LogicOperation::Or, rhs);
+        }
+
+        Ok(expr)
+    }
+
+    fn and(&mut self) -> Result<Expression, ParserError> {
+        let mut expr = self.equality()?;
+        while self.matches(vec![TokenType::And]) {
+            let rhs = self.equality()?;
+            expr = Expression::create_logic(expr, LogicOperation::And, rhs);
+        }
+
+        Ok(expr)
+    }
+
+    fn equality(&mut self) -> Result<Expression, ParserError> {
+        let mut expr = self.comparison()?;
+        while self.matches(vec![TokenType::EqualEqual, TokenType::NotEqual]) {
+            let tok = self.prev_token.clone();
+            let rhs = self.comparison()?;
+            let op = match tok.token_type {
+                TokenType::EqualEqual => LogicOperation::Equal,
+                _ => LogicOperation::NotEqual,
+            };
+            expr = Expression::create_logic(expr, op, rhs);
+        }
+        Ok(expr)
+    }
+
+    fn comparison(&mut self) -> Result<Expression, ParserError> {
+        let mut expr = self.term()?;
+        while self.matches(vec![
+            TokenType::LessThan,
+            TokenType::LessThanEqual,
+            TokenType::GreaterThan,
+            TokenType::GreaterThanEqual,
+        ]) {
+            let tok = self.prev_token.clone();
+            let rhs = self.term()?;
+            let op = match tok.token_type {
+                TokenType::LessThan => LogicOperation::LessThan,
+                TokenType::LessThanEqual => LogicOperation::LessThanEqual,
+                TokenType::GreaterThan => LogicOperation::GreaterThan,
+                _ => LogicOperation::GreaterThanEqual,
+            };
+            expr = Expression::create_logic(expr, op, rhs);
         }
         Ok(expr)
     }
@@ -245,12 +303,13 @@ impl<'a> Parser<'a> {
     }
 
     fn unary(&mut self) -> Result<Expression, ParserError> {
-        if self.matches(vec![TokenType::Plus, TokenType::Minus]) {
+        if self.matches(vec![TokenType::Plus, TokenType::Minus, TokenType::Bang]) {
             let tok = self.prev_token.clone();
             let rhs = self.unary()?;
             let op = match tok.token_type {
                 TokenType::Plus => UnaryOperation::Plus,
                 TokenType::Minus => UnaryOperation::Minus,
+                TokenType::Bang => UnaryOperation::Not,
                 _ => return Err(ParserError::UnexpectedToken(tok.clone())),
             };
             return Ok(Expression::create_unaryop(op, rhs));
@@ -335,7 +394,8 @@ mod test {
 
     use super::Parser;
     use ast::{
-        BinaryOperation, Expression, Identifier, Literal, Program, Statement, UnaryOperation,
+        BinaryOperation, Expression, Identifier, Literal, LogicOperation, Program, Statement,
+        UnaryOperation,
     };
     use scanner::Scanner;
     use spanner::SpanManager;
@@ -405,7 +465,6 @@ mod test {
                 Statement::create_expr(float(22.732487656)),
                 Statement::create_expr(float(2.0)),
                 Statement::create_expr(float(0.)),
-                Statement::create_expr(float(0.)),
             ],
         )
     }
@@ -472,6 +531,73 @@ mod test {
     }
 
     #[test]
+    fn logic_expr() {
+        parse(
+            "1 && 2; 2 || 1;",
+            vec![
+                Statement::create_expr(Expression::create_logic(
+                    int(1),
+                    LogicOperation::And,
+                    int(2),
+                )),
+                Statement::create_expr(Expression::create_logic(
+                    int(2),
+                    LogicOperation::Or,
+                    int(1),
+                )),
+            ],
+        );
+    }
+
+    #[test]
+    fn equality_expr() {
+        parse(
+            "1 == 2; 2 != 1;",
+            vec![
+                Statement::create_expr(Expression::create_logic(
+                    int(1),
+                    LogicOperation::Equal,
+                    int(2),
+                )),
+                Statement::create_expr(Expression::create_logic(
+                    int(2),
+                    LogicOperation::NotEqual,
+                    int(1),
+                )),
+            ],
+        );
+    }
+
+    #[test]
+    fn comparison_expr() {
+        parse(
+            "1 < 2; 2 <= 1;3 > 1; 3 >= 1;",
+            vec![
+                Statement::create_expr(Expression::create_logic(
+                    int(1),
+                    LogicOperation::LessThan,
+                    int(2),
+                )),
+                Statement::create_expr(Expression::create_logic(
+                    int(2),
+                    LogicOperation::LessThanEqual,
+                    int(1),
+                )),
+                Statement::create_expr(Expression::create_logic(
+                    int(3),
+                    LogicOperation::GreaterThan,
+                    int(1),
+                )),
+                Statement::create_expr(Expression::create_logic(
+                    int(3),
+                    LogicOperation::GreaterThanEqual,
+                    int(1),
+                )),
+            ],
+        );
+    }
+
+    #[test]
     fn binop_expr() {
         parse(
             "1 + 2 * 3 / 2;",
@@ -510,7 +636,7 @@ mod test {
     #[test]
     fn unary_expr() {
         parse(
-            "-1; 1 + -1;",
+            "-1; 1 + -1; !1;",
             vec![
                 Statement::create_expr(Expression::create_unaryop(UnaryOperation::Minus, int(1))),
                 Statement::create_expr(Expression::create_binop(
@@ -518,6 +644,7 @@ mod test {
                     BinaryOperation::Add,
                     Expression::create_unaryop(UnaryOperation::Minus, int(1)),
                 )),
+                Statement::create_expr(Expression::create_unaryop(UnaryOperation::Not, int(1))),
             ],
         );
     }
