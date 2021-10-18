@@ -1,6 +1,6 @@
 use crate::{
-    Assign, BinOp, BinaryOperation, Call, Function, Grouping, Identifier, LetRef, Literal,
-    Statement, UnaryOp, UnaryOperation,
+    Assign, BinOp, BinaryOperation, Call, Function, Grouping, Identifier, IfConditional, LetRef,
+    Literal, Statement, UnaryOp, UnaryOperation,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -13,6 +13,7 @@ pub enum Expression {
     Grouping(Grouping),
     Call(Call),
     Function(Function),
+    If(IfConditional),
     Empty,
 }
 
@@ -62,5 +63,17 @@ impl Expression {
 
     pub fn create_function(params: Vec<Identifier>, body: Vec<Statement>) -> Expression {
         Expression::Function(Function { params, body })
+    }
+
+    pub fn create_if(
+        condition: Expression,
+        then: Vec<Statement>,
+        not_then: Option<Vec<Statement>>,
+    ) -> Expression {
+        Expression::If(IfConditional {
+            condition: Box::new(condition),
+            then,
+            not_then,
+        })
     }
 }

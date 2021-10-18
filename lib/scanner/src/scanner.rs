@@ -151,6 +151,8 @@ impl<'a> Scanner<'a> {
         match value.as_str() {
             "let" => Token::let_token(span),
             "fun" => Token::fun_token(span),
+            "if" => Token::if_token(span),
+            "else" => Token::else_token(span),
             "true" => Token::true_token(span),
             "false" => Token::false_token(span),
             "null" => Token::null(span),
@@ -427,13 +429,15 @@ this_is_a_identifier";
     #[test]
     fn keywords() {
         test_scan(
-            "let fun true false null",
+            "let fun true false null if else",
             vec![
                 (TokenType::Let, None),
                 (TokenType::Fun, None),
                 (TokenType::True, None),
                 (TokenType::False, None),
                 (TokenType::Null, None),
+                (TokenType::If, None),
+                (TokenType::Else, None),
                 (TokenType::EOF, None),
             ],
         );

@@ -8,6 +8,8 @@ pub enum TokenType {
     // keywords
     Let,
     Fun,
+    If,
+    Else,
     True,
     False,
     Null,
@@ -47,6 +49,8 @@ impl std::fmt::Display for TokenType {
             TokenType::StringConst => write!(f, "STRINGCONST"),
             TokenType::Let => write!(f, "LET"),
             TokenType::Fun => write!(f, "FUN"),
+            TokenType::If => write!(f, "IF"),
+            TokenType::Else => write!(f, "ELSE"),
             TokenType::True => write!(f, "TRUE"),
             TokenType::False => write!(f, "FALSE"),
             TokenType::Null => write!(f, "NULL"),

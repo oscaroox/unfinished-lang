@@ -132,6 +132,8 @@ impl<'a> Parser<'a> {
     fn expression(&mut self) -> Result<Expression, ParserError> {
         if self.matches(vec![TokenType::Fun]) {
             return self.fun_expression();
+        } else if self.matches(vec![TokenType::If]) {
+            return self.if_expression();
         }
         self.assignment()
     }
@@ -170,6 +172,27 @@ impl<'a> Parser<'a> {
         }
         self.eat(TokenType::RightBrace, "Expected '}'")?;
         Ok(stmts)
+    }
+
+    fn if_expression(&mut self) -> Result<Expression, ParserError> {
+        let left_paren = self.eat_optional(TokenType::LeftParen);
+        let expr = self.expression()?;
+
+        if left_paren.is_some() {
+            self.eat(TokenType::RightParen, "Expected ')'")?;
+        };
+
+        self.eat(TokenType::LeftBrace, "Expected '{' after if condition")?;
+
+        let then = self.block_expression()?;
+
+        let mut not_then = None;
+        if self.matches(vec![TokenType::Else]) {
+            self.eat(TokenType::LeftBrace, "Expcted  '{' after else")?;
+            not_then = Some(self.block_expression()?);
+        }
+
+        Ok(Expression::create_if(expr, then, not_then))
     }
 
     fn assignment(&mut self) -> Result<Expression, ParserError> {
@@ -559,5 +582,37 @@ mod test {
                 )),
             ],
         )
+    }
+
+    #[test]
+    fn if_expr() {
+        parse(
+            "
+            if (true) {};
+            if true {};
+            if false {};
+            if (false) {} else {};
+            if 123 {
+                let x = 1;
+            } else {
+                let y = 2;
+            };
+            ",
+            vec![
+                Statement::create_expr(Expression::create_if(bool_lit(true), vec![], None)),
+                Statement::create_expr(Expression::create_if(bool_lit(true), vec![], None)),
+                Statement::create_expr(Expression::create_if(bool_lit(false), vec![], None)),
+                Statement::create_expr(Expression::create_if(
+                    bool_lit(false),
+                    vec![],
+                    Some(vec![]),
+                )),
+                Statement::create_expr(Expression::create_if(
+                    int(123),
+                    vec![Statement::create_let("x".to_string(), Some(int(1)))],
+                    Some(vec![Statement::create_let("y".to_string(), Some(int(2)))]),
+                )),
+            ],
+        );
     }
 }
