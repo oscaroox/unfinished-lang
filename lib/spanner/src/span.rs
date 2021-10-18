@@ -40,12 +40,12 @@ impl SpanManager {
         Span(i)
     }
 
-    pub fn dbg_span(&mut self, span: Span) -> (usize, usize, usize) {
+    pub fn resolve_span(&self, span: Span) -> (usize, usize, usize) {
         self.spans[span.0]
     }
 
     pub fn print(&self, span: Span) -> String {
-        let (source_ind, l, r) = self.spans[span.0];
+        let (source_ind, l, r) = self.resolve_span(span);
         let source = &self.sources[source_ind];
         let mut out = String::new();
 
