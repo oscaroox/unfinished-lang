@@ -11,3 +11,4 @@ thiserror = "1.0"
 colored = "2"
 ast = { path = "../ast" }
 scanner = { path = "../scanner" }
+spanner = { path = "../spanner" }

@@ -5,6 +5,12 @@ pub type Spanned<T> = (T, Span);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span(usize);
 
+impl Span {
+    pub fn dummy() -> Span {
+        Span { 0: 9999999999 }
+    }
+}
+
 impl std::fmt::Display for Span {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "span: {}", self.0)
@@ -78,10 +84,12 @@ impl SpanManager {
         out += "\n|";
 
         // highlight line
-        out += &" ".repeat(line_before.len() + 2);
+        out += &" ".repeat(line_before.len());
 
         let mut line = String::from("^");
-        line += &".".repeat(std::cmp::max(1, tok.len()));
+        if tok.len() > 0 {
+            line += &".".repeat(std::cmp::max(1, tok.len()));
+        }
         out += &line.red().to_string();
 
         out += &" ".repeat(line_after.len());
