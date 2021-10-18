@@ -39,11 +39,11 @@ impl<'a> Scanner<'a> {
     }
 
     fn is_digit(&self, ch: char) -> bool {
-        ('0'..'9').contains(&ch)
+        "0123456789".contains(ch)
     }
 
     fn is_alpha(&self, ch: char) -> bool {
-        ch == '_' || ('a'..'z').contains(&ch) || ('A'..'Z').contains(&ch)
+        ch == '_' || ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch)
     }
 
     fn is_alphanumeric(&self, ch: char) -> bool {
@@ -93,9 +93,15 @@ impl<'a> Scanner<'a> {
         if self.ch == '.' {
             res.push(self.ch);
             self.advance();
+
             while !self.is_end() && self.is_digit(self.ch) {
                 res.push(self.ch);
                 self.advance();
+            }
+            if let Some(last) = res.last() {
+                if *last == '.' {
+                    res.push('0')
+                }
             }
 
             return Token::float_const(res.into_iter().collect(), self.span(pos, self.pos));
@@ -320,16 +326,16 @@ this_is_a_identifier";
         let fun_kw = scanner.next_token();
         let ident = scanner.next_token();
 
-        let (_, l, r) = manager.dbg_span(plus.span);
+        let (_, l, r) = manager.resolve_span(plus.span);
         assert_eq!(l, 0);
         assert_eq!(r, 0);
-        let (_, l, r) = manager.dbg_span(let_kw.span);
+        let (_, l, r) = manager.resolve_span(let_kw.span);
         assert_eq!(l, 2);
         assert_eq!(r, 5);
-        let (_, l, r) = manager.dbg_span(fun_kw.span);
+        let (_, l, r) = manager.resolve_span(fun_kw.span);
         assert_eq!(l, 6);
         assert_eq!(r, 9);
-        let (_, l, r) = manager.dbg_span(ident.span);
+        let (_, l, r) = manager.resolve_span(ident.span);
         assert_eq!(l, 10);
         assert_eq!(r, 30);
     }
@@ -337,12 +343,48 @@ this_is_a_identifier";
     #[test]
     fn read_digits() {
         test_scan(
-            "123 23 34.2",
+            "123 23 34.2 1 + -1",
             vec![
                 (TokenType::IntConst, Some("123")),
                 (TokenType::IntConst, Some("23")),
                 (TokenType::FloatConst, Some("34.2")),
+                (TokenType::IntConst, Some("1")),
+                (TokenType::Plus, Some("+")),
+                (TokenType::Minus, Some("-")),
+                (TokenType::IntConst, Some("1")),
                 (TokenType::EOF, None),
+            ],
+        );
+    }
+
+    #[test]
+    fn newline() {
+        test_scan(
+            "2;
+            0;
+            29;
+            34;
+            4.15;
+            1;
+            2.;
+            0.;",
+            vec![
+                (TokenType::IntConst, Some("2")),
+                (TokenType::SemiColon, None),
+                (TokenType::IntConst, Some("0")),
+                (TokenType::SemiColon, None),
+                (TokenType::IntConst, Some("29")),
+                (TokenType::SemiColon, None),
+                (TokenType::IntConst, Some("34")),
+                (TokenType::SemiColon, None),
+                (TokenType::FloatConst, Some("4.15")),
+                (TokenType::SemiColon, None),
+                (TokenType::IntConst, Some("1")),
+                (TokenType::SemiColon, None),
+                (TokenType::FloatConst, Some("2.0")),
+                (TokenType::SemiColon, None),
+                (TokenType::FloatConst, Some("0.0")),
+                (TokenType::SemiColon, None),
             ],
         );
     }
