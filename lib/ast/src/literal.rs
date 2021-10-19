@@ -3,5 +3,6 @@ pub enum Literal {
     Int(i64),
     Float(f64),
     Bool(bool),
+    String(String),
     Null,
 }

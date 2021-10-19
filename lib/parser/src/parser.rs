@@ -373,6 +373,10 @@ impl<'a> Parser<'a> {
             return Ok(Expression::create_literal(Literal::Null));
         }
 
+        if self.matches(vec![TokenType::StringConst]) {
+            return Ok(Expression::create_literal(Literal::String(token.value)));
+        }
+
         if self.matches(vec![TokenType::Identifier]) {
             return Ok(Expression::create_let_ref(Identifier::new(
                 token.value.to_string(),
@@ -478,6 +482,21 @@ mod test {
             vec![
                 Statement::create_expr(Expression::Literal(Literal::Bool(true))),
                 Statement::create_expr(Expression::Literal(Literal::Bool(false))),
+            ],
+        );
+    }
+
+    #[test]
+    fn string_literal() {
+        parse(
+            r#""this is a string"; "string";"#,
+            vec![
+                Statement::create_expr(Expression::create_literal(Literal::String(
+                    "this is a string".to_string(),
+                ))),
+                Statement::create_expr(Expression::create_literal(Literal::String(
+                    "string".to_string(),
+                ))),
             ],
         );
     }
