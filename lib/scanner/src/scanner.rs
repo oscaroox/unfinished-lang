@@ -393,7 +393,7 @@ this_is_a_identifier";
     #[test]
     fn read_digits() {
         test_scan(
-            "123 23 34.2 1 + -1",
+            "123 23 34.2 1 + -1 1234567890",
             vec![
                 (TokenType::IntConst, Some("123")),
                 (TokenType::IntConst, Some("23")),
@@ -402,6 +402,7 @@ this_is_a_identifier";
                 (TokenType::Plus, Some("+")),
                 (TokenType::Minus, Some("-")),
                 (TokenType::IntConst, Some("1")),
+                (TokenType::IntConst, Some("1234567890")),
                 (TokenType::EOF, None),
             ],
         );
@@ -463,12 +464,18 @@ this_is_a_identifier";
 
     #[test]
     fn read_identifier() {
+        let alpha = "abcdefghijklmnopqrstuvwxyz";
+        let capital_alpha = alpha.to_uppercase();
+
         test_scan(
-            "test test2 _test",
+            format!("test test2 _test {} {}", alpha, capital_alpha).as_str(),
             vec![
                 (TokenType::Identifier, Some("test")),
                 (TokenType::Identifier, Some("test2")),
                 (TokenType::Identifier, Some("_test")),
+                (TokenType::Identifier, Some("_test")),
+                (TokenType::Identifier, Some("abcdefghijklmnopqrstuvwxyz")),
+                (TokenType::Identifier, Some("ABCDEFGHIJKLMNOPQRSTUVWXYZ")),
                 (TokenType::EOF, None),
             ],
         );
