@@ -162,7 +162,6 @@ impl<'a> Parser<'a> {
 
     fn fun_expression(&mut self) -> Result<Expression, ParserError> {
         let mut params = vec![];
-
         let left_param = self.eat_optional(TokenType::LeftParen);
 
         if let Some(_) = left_param {
@@ -179,6 +178,14 @@ impl<'a> Parser<'a> {
                 }
             }
             self.eat(TokenType::RightParen, "Expected ')' after parameters")?;
+        }
+
+        if self.matches(vec![TokenType::Arrow]) {
+            let expression = self.expression()?;
+            return Ok(Expression::create_function(
+                params,
+                vec![Statement::create_expr(expression)],
+            ));
         }
 
         self.eat(TokenType::LeftBrace, "Expected '{'")?;
@@ -406,6 +413,26 @@ impl<'a> Parser<'a> {
             )));
         }
 
+        if self.matches(vec![TokenType::LeftBracket]) {
+            let mut exprs = vec![];
+            if self.curr_token.token_type != TokenType::RightBracket {
+                loop {
+                    let expr = self.expression()?;
+                    exprs.push(expr);
+
+                    if !self.matches(vec![TokenType::Comma])
+                        || self.curr_token.token_type == TokenType::RightBracket
+                    {
+                        break;
+                    }
+                }
+            }
+
+            self.eat(TokenType::RightBracket, "Expcted ']'")?;
+
+            return Ok(Expression::create_literal(Literal::Array(exprs)));
+        }
+
         if self.matches(vec![TokenType::LeftParen]) {
             let expr = self.expression()?;
             self.eat(TokenType::RightParen, "Unterminated grouping expression")?;
@@ -470,8 +497,16 @@ mod test {
         Expression::create_literal(Literal::Bool(val))
     }
 
+    fn null() -> Expression {
+        Expression::create_literal(Literal::Null)
+    }
+
     fn let_ref(val: &str) -> Expression {
         Expression::create_let_ref(Identifier::new(val.to_string()))
+    }
+
+    fn string_lit(val: &str) -> Expression {
+        Expression::create_literal(Literal::String(val.to_string()))
     }
 
     #[test]
@@ -520,6 +555,31 @@ mod test {
                 Statement::create_expr(Expression::create_literal(Literal::String(
                     "string".to_string(),
                 ))),
+            ],
+        );
+    }
+
+    #[test]
+    fn array_literal() {
+        parse(
+            r#"
+            [1, 3, 4, true, false, "string", 2.0, null];
+            [{}];
+            "#,
+            vec![
+                Statement::create_expr(Expression::create_literal(Literal::Array(vec![
+                    int(1),
+                    int(3),
+                    int(4),
+                    bool_lit(true),
+                    bool_lit(false),
+                    string_lit("string"),
+                    float(2.0),
+                    null(),
+                ]))),
+                Statement::create_expr(Expression::create_literal(Literal::Array(vec![
+                    Expression::create_block(vec![]),
+                ]))),
             ],
         );
     }
