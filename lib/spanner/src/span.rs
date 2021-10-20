@@ -45,9 +45,14 @@ impl SpanManager {
     }
 
     pub fn print(&self, span: Span) -> String {
-        let (source_ind, l, r) = self.resolve_span(span);
+        let (source_ind, mut l, mut r) = self.resolve_span(span);
         let source = &self.sources[source_ind];
         let mut out = String::new();
+
+        if l < source.len() && r < source.len() {
+            l += 1;
+            r += 1;
+        }
 
         assert!(l <= r);
 
@@ -72,7 +77,7 @@ impl SpanManager {
                 out += line;
                 out += "\n";
             }
-            out += "| ";
+            out += "";
         } else {
             out += "| ";
         }
@@ -88,7 +93,7 @@ impl SpanManager {
 
         let mut line = String::from("^");
         if tok.len() > 0 {
-            line += &".".repeat(std::cmp::max(1, tok.len()));
+            line += &".".repeat(std::cmp::max(1, tok.len() - 1));
         }
         out += &line.red().to_string();
 
@@ -101,6 +106,8 @@ impl SpanManager {
                 out += "| ";
                 out += line;
                 out += "\n|";
+            } else {
+                out += "|";
             }
         }
 

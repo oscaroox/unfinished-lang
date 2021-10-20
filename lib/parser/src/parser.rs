@@ -84,10 +84,17 @@ impl<'a> Parser<'a> {
         if self.curr_token.token_type == token_type {
             return Ok(self.advance());
         }
-        Err(ParserError::ExpectedToken(
-            msg.to_string(),
-            self.curr_token.clone(),
-        ))
+
+        let tok = match self.curr_token.is_eof() {
+            true => self.prev_token.clone(),
+            false => self.curr_token.clone(),
+        };
+
+        Err(ParserError::ExpectedToken(msg.to_string(), tok))
+    }
+
+    fn error(&mut self, msg: String, token: Token) -> ParserError {
+        ParserError::ExpectedToken(msg, token)
     }
 
     fn eat_optional(&mut self, token_type: TokenType) -> Option<Token> {
@@ -105,31 +112,41 @@ impl<'a> Parser<'a> {
     }
 
     fn let_statement(&mut self) -> Result<Statement, ParserError> {
-        let identifier = self.eat(TokenType::Identifier, "Expected identifier")?;
+        let identifier = self.eat(
+            TokenType::Identifier,
+            format!("Expected identifier, found '{}'", self.curr_token.clone()).as_str(),
+        )?;
 
         let mut init = None;
         if self.matches(vec![TokenType::Assign]) {
             let expr = match self.expression() {
                 Ok(expr) => expr,
-                Err(err) => {
-                    if self.curr_token.is_assign() && self.peek_token.is_eof()
-                        || self.curr_token.is_semi_colon()
-                    {
-                        return Err(ParserError::ExpectedExpression(self.curr_token.clone()));
+                Err(err) => match err {
+                    ParserError::UnexpectedToken(_) => {
+                        return Err(ParserError::ExpectedToken(
+                            "Expected expression".to_string(),
+                            self.curr_token.clone(),
+                        ));
                     }
-                    return Err(err);
-                }
+                    e => return Err(e),
+                },
             };
             init = Some(expr);
         }
+
         self.eat(TokenType::SemiColon, "Expected ';' after let statement")?;
         Ok(Statement::create_let(identifier.value, init))
     }
 
     fn expression_statement(&mut self) -> Result<Statement, ParserError> {
         let expr = self.expression()?;
-        self.eat(TokenType::SemiColon, "Expected ';' after expression")?;
-        Ok(Statement::create_expr(expr))
+        match self.eat(TokenType::SemiColon, "Expected ';' after expression") {
+            Ok(_) => Ok(Statement::create_expr(expr)),
+            Err(err) => match err {
+                ParserError::ExpectedToken(msg, _) => Err(self.error(msg, self.prev_token.clone())),
+                _ => Err(err),
+            },
+        }
     }
 
     fn expression(&mut self) -> Result<Expression, ParserError> {
@@ -152,14 +169,14 @@ impl<'a> Parser<'a> {
             Some(_) => {
                 if self.curr_token.token_type != TokenType::RightParen {
                     loop {
-                        let ident = self.eat(TokenType::Identifier, "Expected parameter name")?;
+                        let ident = self.eat(TokenType::Identifier, "Expected identifier")?;
                         params.push(Identifier::new(ident.value));
                         if !self.matches(vec![TokenType::Comma]) {
                             break;
                         }
                     }
                 }
-                self.eat(TokenType::RightParen, "Expcted ')' after parameters")?;
+                self.eat(TokenType::RightParen, "Expected ')' after parameters")?;
             }
             _ => {}
         }
@@ -193,7 +210,7 @@ impl<'a> Parser<'a> {
 
         let mut not_then = None;
         if self.matches(vec![TokenType::Else]) {
-            self.eat(TokenType::LeftBrace, "Expcted  '{' after else")?;
+            self.eat(TokenType::LeftBrace, "Expected  '{' after else")?;
             not_then = Some(self.block_expression()?);
         }
 
@@ -210,7 +227,7 @@ impl<'a> Parser<'a> {
                     return Ok(Expression::create_assign(let_ref.name, rhs))
                 }
                 _ => {
-                    return Err(ParserError::ExpectedToken(
+                    return Err(ParserError::Error(
                         "Invalid assignment target".to_string(),
                         curr_token,
                     ))
@@ -312,7 +329,7 @@ impl<'a> Parser<'a> {
                 TokenType::Plus => UnaryOperation::Plus,
                 TokenType::Minus => UnaryOperation::Minus,
                 TokenType::Bang => UnaryOperation::Not,
-                _ => return Err(ParserError::UnexpectedToken(tok.clone())),
+                _ => return Err(ParserError::Error("".to_string(), tok.clone())),
             };
             return Ok(Expression::create_unaryop(op, rhs));
         }
@@ -323,8 +340,11 @@ impl<'a> Parser<'a> {
         let mut expr = self.primary()?;
 
         if self.matches(vec![TokenType::LeftParen]) {
+            let paren = self.prev_token.clone();
+            println!("{:#?}", paren);
             let mut args = vec![];
-            if self.curr_token.token_type != TokenType::RightParen {
+
+            if self.curr_token.token_type != TokenType::RightParen && !self.is_end() {
                 loop {
                     args.push(self.expression()?);
 
@@ -334,7 +354,10 @@ impl<'a> Parser<'a> {
                 }
             }
 
-            self.eat(TokenType::RightParen, "Unterminated function call")?;
+            match self.eat_optional(TokenType::RightParen) {
+                Some(_) => {}
+                None => return Err(self.error("Unterminated function call".to_string(), paren)),
+            }
 
             expr = Expression::create_call(expr, args);
         }

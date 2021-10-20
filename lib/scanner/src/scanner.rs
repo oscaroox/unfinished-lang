@@ -73,12 +73,9 @@ impl<'a> Scanner<'a> {
     fn skip_whitespace(&mut self) {
         while !self.is_end() && self.is_whitespace(self.ch) || self.is_newline(self.ch) {
             if self.is_newline(self.ch) {
-                // TODO: shouldnt the col be set back to 0?
                 self.line += 1;
-                self.advance();
-            } else {
-                self.advance();
             }
+            self.advance();
         }
     }
 
@@ -114,6 +111,10 @@ impl<'a> Scanner<'a> {
         let mut res = vec![];
         let pos = self.pos;
         self.advance();
+
+        if self.ch == '"' {
+            return Token::string_const("".to_string(), self.span(pos, self.pos));
+        }
 
         while self.peek() != '"' && !self.is_end() {
             res.push(self.ch);
@@ -164,6 +165,7 @@ impl<'a> Scanner<'a> {
         self.skip_whitespace();
         let curr_ch = self.ch;
         let pos = self.pos;
+
         let token = match curr_ch {
             '+' => {
                 if self.peek() == '=' {
@@ -317,6 +319,16 @@ mod tests {
     }
 
     #[test]
+    fn eof() {
+        test_scan(
+            "
+            
+            ",
+            vec![(TokenType::EOF, None)],
+        );
+    }
+
+    #[test]
     fn other_tokens() {
         test_scan(
             "{},;()[]!",
@@ -436,6 +448,7 @@ this_is_a_identifier";
                 (TokenType::SemiColon, None),
                 (TokenType::FloatConst, Some("0.0")),
                 (TokenType::SemiColon, None),
+                (TokenType::EOF, None),
             ],
         );
     }
@@ -443,9 +456,11 @@ this_is_a_identifier";
     #[test]
     fn read_string() {
         test_scan(
-            r#""this is a string""#,
+            r#""this is a string" "";"#,
             vec![
                 (TokenType::StringConst, Some("this is a string")),
+                (TokenType::StringConst, Some("")),
+                (TokenType::SemiColon, None),
                 (TokenType::EOF, None),
             ],
         );
@@ -472,7 +487,6 @@ this_is_a_identifier";
             vec![
                 (TokenType::Identifier, Some("test")),
                 (TokenType::Identifier, Some("test2")),
-                (TokenType::Identifier, Some("_test")),
                 (TokenType::Identifier, Some("_test")),
                 (TokenType::Identifier, Some("abcdefghijklmnopqrstuvwxyz")),
                 (TokenType::Identifier, Some("ABCDEFGHIJKLMNOPQRSTUVWXYZ")),

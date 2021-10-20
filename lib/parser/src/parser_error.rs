@@ -4,12 +4,12 @@ use thiserror::Error;
 
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum ParserError {
-    #[error("{0}, {1}")]
+    #[error("{0}, found '{1}'")]
     ExpectedToken(String, Token),
+    #[error("{0} {1}")]
+    Error(String, Token),
     #[error("Unexpected token: {0}")]
     UnexpectedToken(Token),
-    #[error("Expected expression after")]
-    ExpectedExpression(Token),
 }
 
 impl ParserError {
@@ -17,8 +17,8 @@ impl ParserError {
         let msg = self.to_string();
         match self {
             ParserError::ExpectedToken(_, tok)
-            | ParserError::ExpectedExpression(tok)
-            | ParserError::UnexpectedToken(tok) => SpannedError::new1(msg, tok.span),
+            | ParserError::UnexpectedToken(tok)
+            | ParserError::Error(_, tok) => SpannedError::new1(msg, tok.span),
         }
     }
 }
