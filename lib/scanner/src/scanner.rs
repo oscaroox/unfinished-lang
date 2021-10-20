@@ -244,6 +244,10 @@ impl<'a> Scanner<'a> {
                     self.advance();
                     self.advance();
                     return Token::equal_equal(self.span(pos, self.pos));
+                } else if self.peek() == '>' {
+                    self.advance();
+                    self.advance();
+                    return Token::arrow(self.span(pos, self.pos));
                 }
                 Token::assign(self.span(pos, self.pos))
             }
@@ -331,7 +335,7 @@ mod tests {
     #[test]
     fn other_tokens() {
         test_scan(
-            "{},;()[]!",
+            "{},;()[]! =>",
             vec![
                 (TokenType::LeftBrace, None),
                 (TokenType::RightBrace, None),
@@ -342,6 +346,7 @@ mod tests {
                 (TokenType::LeftBracket, None),
                 (TokenType::RightBracket, None),
                 (TokenType::Bang, None),
+                (TokenType::Arrow, None),
                 (TokenType::EOF, None),
             ],
         );

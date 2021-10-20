@@ -22,6 +22,7 @@ pub enum TokenType {
     GreaterThanEqual,
     EqualEqual,
     NotEqual,
+    Arrow,
 
     Plus,
     Minus,
@@ -72,6 +73,7 @@ impl std::fmt::Display for TokenType {
             TokenType::GreaterThanEqual => write!(f, ">="),
             TokenType::EqualEqual => write!(f, "=="),
             TokenType::NotEqual => write!(f, "!="),
+            TokenType::Arrow => write!(f, "=>"),
             TokenType::Plus => write!(f, "+"),
             TokenType::Minus => write!(f, "-"),
             TokenType::Star => write!(f, "*"),

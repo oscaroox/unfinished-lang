@@ -58,6 +58,7 @@ impl Token {
     impl_token!(greater_than_equal, GreaterThanEqual);
     impl_token!(equal_equal, EqualEqual);
     impl_token!(not_equal, NotEqual);
+    impl_token!(arrow, Arrow);
 
     impl_token!(plus, Plus);
     impl_token!(minus, Minus);
@@ -93,6 +94,10 @@ impl Token {
 
     pub fn is_assign(&self) -> bool {
         self.token_type == TokenType::Assign
+    }
+
+    pub fn is_arrow(&self) -> bool {
+        self.token_type == TokenType::Arrow
     }
 
     pub fn is_semi_colon(&self) -> bool {
