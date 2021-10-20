@@ -112,10 +112,7 @@ impl<'a> Parser<'a> {
     }
 
     fn let_statement(&mut self) -> Result<Statement, ParserError> {
-        let identifier = self.eat(
-            TokenType::Identifier,
-            format!("Expected identifier, found '{}'", self.curr_token.clone()).as_str(),
-        )?;
+        let identifier = self.eat(TokenType::Identifier, "Expected identifier")?;
 
         let mut init = None;
         if self.matches(vec![TokenType::Assign]) {
@@ -132,6 +129,11 @@ impl<'a> Parser<'a> {
                 },
             };
             init = Some(expr);
+        } else if !self.curr_token.is_semi_colon() {
+            return Err(ParserError::ExpectedToken(
+                "Expected '='".to_string(),
+                self.curr_token.clone(),
+            ));
         }
 
         self.eat(TokenType::SemiColon, "Expected ';' after let statement")?;
@@ -226,13 +228,33 @@ impl<'a> Parser<'a> {
 
     fn assignment(&mut self) -> Result<Expression, ParserError> {
         let expr = self.or()?;
-        if self.matches(vec![TokenType::Assign]) {
+        if self.matches(vec![
+            TokenType::Assign,
+            TokenType::AssignPlus,
+            TokenType::AssignMinus,
+            TokenType::AssignSlash,
+            TokenType::AssignStar,
+        ]) {
             let curr_token = self.curr_token.clone();
+            let assignment_tok = self.prev_token.clone();
             let rhs = self.assignment()?;
-            match expr {
-                Expression::LetRef(let_ref) => {
-                    return Ok(Expression::create_assign(let_ref.name, rhs))
-                }
+
+            match &expr {
+                Expression::LetRef(let_ref) => match assignment_tok.token_type {
+                    TokenType::Assign => {
+                        return Ok(Expression::create_assign(let_ref.name.clone(), rhs))
+                    }
+                    _ => {
+                        return Ok(Expression::create_assign(
+                            let_ref.name.clone(),
+                            Expression::create_binop(
+                                Expression::create_let_ref(let_ref.name.clone()),
+                                BinaryOperation::fromToken(assignment_tok.clone()),
+                                rhs,
+                            ),
+                        ))
+                    }
+                },
                 _ => {
                     return Err(ParserError::Error(
                         "Invalid assignment target".to_string(),
@@ -626,11 +648,36 @@ mod test {
     #[test]
     fn assignment_expr() {
         parse(
-            "num = 1;",
-            vec![Statement::create_expr(Expression::create_assign(
-                Identifier::new("num".to_string()),
-                Expression::create_literal(Literal::Int(1)),
-            ))],
+            "
+            num = 1;
+            num += 1;
+            num -= 1;
+            num *= 1;
+            num /= 1;
+ 
+            ",
+            vec![
+                Statement::create_expr(Expression::create_assign(
+                    Identifier::new("num".to_string()),
+                    Expression::create_literal(Literal::Int(1)),
+                )),
+                Statement::create_expr(Expression::create_assign(
+                    Identifier::new("num".to_string()),
+                    Expression::create_binop(let_ref("num"), BinaryOperation::Add, int(1)),
+                )),
+                Statement::create_expr(Expression::create_assign(
+                    Identifier::new("num".to_string()),
+                    Expression::create_binop(let_ref("num"), BinaryOperation::Substract, int(1)),
+                )),
+                Statement::create_expr(Expression::create_assign(
+                    Identifier::new("num".to_string()),
+                    Expression::create_binop(let_ref("num"), BinaryOperation::Multiply, int(1)),
+                )),
+                Statement::create_expr(Expression::create_assign(
+                    Identifier::new("num".to_string()),
+                    Expression::create_binop(let_ref("num"), BinaryOperation::Divide, int(1)),
+                )),
+            ],
         );
     }
 
