@@ -165,20 +165,20 @@ impl<'a> Parser<'a> {
 
         let left_param = self.eat_optional(TokenType::LeftParen);
 
-        match left_param {
-            Some(_) => {
-                if self.curr_token.token_type != TokenType::RightParen {
-                    loop {
-                        let ident = self.eat(TokenType::Identifier, "Expected identifier")?;
-                        params.push(Identifier::new(ident.value));
-                        if !self.matches(vec![TokenType::Comma]) {
-                            break;
-                        }
+        if let Some(_) = left_param {
+            if self.curr_token.token_type != TokenType::RightParen {
+                loop {
+                    let ident = self.eat(TokenType::Identifier, "Expected identifier")?;
+                    params.push(Identifier::new(ident.value));
+
+                    if !self.matches(vec![TokenType::Comma])
+                        || self.curr_token.token_type == TokenType::RightParen
+                    {
+                        break;
                     }
                 }
-                self.eat(TokenType::RightParen, "Expected ')' after parameters")?;
             }
-            _ => {}
+            self.eat(TokenType::RightParen, "Expected ')' after parameters")?;
         }
 
         self.eat(TokenType::LeftBrace, "Expected '{'")?;

@@ -58,7 +58,7 @@ impl<'a> Scanner<'a> {
         ch == ' ' || ch == '\t'
     }
 
-    fn span(&mut self, left: usize, right: usize) -> Span {
+    pub fn span(&mut self, left: usize, right: usize) -> Span {
         self.span_maker.span(left, right)
     }
 
