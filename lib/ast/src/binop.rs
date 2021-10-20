@@ -11,7 +11,7 @@ pub enum BinaryOperation {
 }
 
 impl BinaryOperation {
-    pub fn fromToken(token: Token) -> BinaryOperation {
+    pub fn from_token(token: Token) -> BinaryOperation {
         match token.token_type {
             TokenType::Plus | TokenType::AssignPlus => BinaryOperation::Add,
             TokenType::Minus | TokenType::AssignMinus => BinaryOperation::Substract,

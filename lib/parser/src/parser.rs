@@ -249,7 +249,7 @@ impl<'a> Parser<'a> {
                             let_ref.name.clone(),
                             Expression::create_binop(
                                 Expression::create_let_ref(let_ref.name.clone()),
-                                BinaryOperation::fromToken(assignment_tok.clone()),
+                                BinaryOperation::from_token(assignment_tok.clone()),
                                 rhs,
                             ),
                         ))
