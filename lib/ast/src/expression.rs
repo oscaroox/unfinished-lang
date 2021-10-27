@@ -16,7 +16,6 @@ pub enum Expression {
     Function(Function),
     Block(Block),
     If(IfConditional),
-    Empty,
 }
 
 impl Expression {
@@ -56,15 +55,19 @@ impl Expression {
         })
     }
 
-    pub fn create_call(name: Expression, args: Vec<Expression>) -> Expression {
+    pub fn create_call(callee: Expression, args: Vec<Expression>) -> Expression {
         Expression::Call(Call {
-            name: Box::new(name),
+            callee: Box::new(callee),
             arguments: args,
         })
     }
 
-    pub fn create_function(params: Vec<Identifier>, body: Vec<Statement>) -> Expression {
-        Expression::Function(Function { params, body })
+    pub fn create_function(
+        name: Option<String>,
+        params: Vec<Identifier>,
+        body: Vec<Statement>,
+    ) -> Expression {
+        Expression::Function(Function { name, params, body })
     }
 
     pub fn create_if(

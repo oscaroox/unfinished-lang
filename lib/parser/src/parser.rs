@@ -117,7 +117,14 @@ impl<'a> Parser<'a> {
         let mut init = None;
         if self.matches(vec![TokenType::Assign]) {
             let expr = match self.expression() {
-                Ok(expr) => expr,
+                Ok(expr) => match expr {
+                    Expression::Function(fun) => Expression::create_function(
+                        Some(identifier.value.to_string()),
+                        fun.params,
+                        fun.body,
+                    ),
+                    _ => expr,
+                },
                 Err(err) => match err {
                     ParserError::UnexpectedToken(_) => {
                         return Err(ParserError::ExpectedToken(
@@ -152,9 +159,10 @@ impl<'a> Parser<'a> {
     }
 
     fn expression(&mut self) -> Result<Expression, ParserError> {
-        if self.matches(vec![TokenType::Fun]) {
-            return self.fun_expression();
-        } else if self.matches(vec![TokenType::If]) {
+        // if self.matches(vec![TokenType::Fun]) {
+        //     return self.fun_expression();
+        // } else
+        if self.matches(vec![TokenType::If]) {
             return self.if_expression();
         } else if self.matches(vec![TokenType::LeftBrace]) {
             return Ok(Expression::create_block(self.block_expression()?));
@@ -185,6 +193,7 @@ impl<'a> Parser<'a> {
         if self.matches(vec![TokenType::Arrow]) {
             let expression = self.expression()?;
             return Ok(Expression::create_function(
+                None,
                 params,
                 vec![Statement::create_expr(expression)],
             ));
@@ -193,7 +202,7 @@ impl<'a> Parser<'a> {
         self.eat(TokenType::LeftBrace, "Expected '{'")?;
         let block = self.block_expression()?;
 
-        Ok(Expression::create_function(params, block))
+        Ok(Expression::create_function(None, params, block))
     }
 
     fn block_expression(&mut self) -> Result<Vec<Statement>, ParserError> {
@@ -370,7 +379,7 @@ impl<'a> Parser<'a> {
 
         if self.matches(vec![TokenType::LeftParen]) {
             let paren = self.prev_token.clone();
-            println!("{:#?}", paren);
+
             let mut args = vec![];
 
             if self.curr_token.token_type != TokenType::RightParen && !self.is_end() {
@@ -433,6 +442,10 @@ impl<'a> Parser<'a> {
             return Ok(Expression::create_let_ref(Identifier::new(
                 token.value.to_string(),
             )));
+        }
+
+        if self.matches(vec![TokenType::Fun]) {
+            return self.fun_expression();
         }
 
         if self.matches(vec![TokenType::LeftBracket]) {
@@ -839,9 +852,10 @@ mod test {
         };
         ",
             vec![
-                Statement::create_expr(Expression::create_function(vec![], vec![])),
-                Statement::create_expr(Expression::create_function(vec![], vec![])),
+                Statement::create_expr(Expression::create_function(None, vec![], vec![])),
+                Statement::create_expr(Expression::create_function(None, vec![], vec![])),
                 Statement::create_expr(Expression::create_function(
+                    None,
                     vec![
                         Identifier::new("x".to_string()),
                         Identifier::new("y".to_string()),
@@ -849,6 +863,7 @@ mod test {
                     vec![],
                 )),
                 Statement::create_expr(Expression::create_function(
+                    None,
                     vec![
                         Identifier::new("y".to_string()),
                         Identifier::new("z".to_string()),
@@ -860,6 +875,17 @@ mod test {
                 )),
             ],
         )
+    }
+
+    #[test]
+    fn function_call_expr() {
+        parse(
+            "fun (){}();",
+            vec![Statement::create_expr(Expression::create_call(
+                Expression::create_function(None, vec![], vec![]),
+                vec![],
+            ))],
+        );
     }
 
     #[test]

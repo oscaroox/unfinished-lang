@@ -1,5 +1,5 @@
 #[derive(Debug, PartialEq, Clone)]
-pub struct Identifier(String);
+pub struct Identifier(pub String);
 
 impl Identifier {
     pub fn new(name: String) -> Identifier {
