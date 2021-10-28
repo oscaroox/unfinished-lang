@@ -1,6 +1,12 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::{
+    cell::{Ref, RefCell},
+    collections::HashMap,
+    env,
+    fmt::Debug,
+    rc::Rc,
+};
 
-use crate::Value;
+use crate::{environment::Environment, Value};
 use ast::{
     Assign, BinOp, BinaryOperation, Block, Call, Expression, Function, IfConditional, Let, Literal,
     Logic, LogicOperation, Program, Statement, UnaryOp, UnaryOperation,
@@ -10,7 +16,7 @@ pub enum RuntimeError {}
 
 #[derive(Debug)]
 pub struct Interpreter {
-    env: HashMap<String, Value>,
+    env: Rc<RefCell<Environment>>,
 }
 
 type InterpreterResult = Result<Value, RuntimeError>;
@@ -18,7 +24,7 @@ type InterpreterResult = Result<Value, RuntimeError>;
 impl Interpreter {
     pub fn new() -> Interpreter {
         Interpreter {
-            env: Default::default(),
+            env: Rc::new(RefCell::new(Environment::new())),
         }
     }
 
@@ -34,11 +40,16 @@ impl Interpreter {
         Ok(res)
     }
 
-    fn execute_block(&mut self, stmts: &Program) -> InterpreterResult {
+    fn execute_block(&mut self, stmts: &Program, environment: Environment) -> InterpreterResult {
         let mut res = Value::Null;
+        let parent_env = self.env.clone();
+        self.env = Rc::new(RefCell::new(environment));
+
         for stmt in stmts.iter() {
             res = self.execute_statement(stmt)?;
         }
+
+        self.env = parent_env;
         Ok(res)
     }
 
@@ -56,7 +67,7 @@ impl Interpreter {
             None => Value::Null,
         };
 
-        self.env.insert(name, val);
+        self.env.borrow_mut().define(name, val);
 
         Ok(Value::Empty)
     }
@@ -81,6 +92,7 @@ impl Interpreter {
         let callee = self.expression(&call.callee)?;
         if let Value::Function(fun) = callee {
             let mut args = vec![];
+            let mut env = Environment::with_outer(self.env.clone());
             for arg in &call.arguments {
                 let val = self.expression(arg)?;
                 args.push(val);
@@ -90,7 +102,11 @@ impl Interpreter {
                 panic!("Expected {} arguments got {}", fun.params.len(), args.len())
             }
 
-            let res = self.execute_block(&fun.body)?;
+            for (arg, param) in args.iter().zip(fun.params.iter()) {
+                env.define(param.0.to_string(), arg.clone());
+            }
+
+            let res = self.execute_block(&fun.body, env)?;
             return Ok(res);
         }
         panic!("You can only call functions");
@@ -101,11 +117,8 @@ impl Interpreter {
             function.name.clone(),
             function.params.clone(),
             function.body.clone(),
+            self.env.clone(),
         );
-
-        if let Some(name) = &function.name {
-            self.env.insert(name.to_string(), fun.clone());
-        };
 
         Ok(fun)
     }
@@ -160,16 +173,18 @@ impl Interpreter {
     }
 
     fn eval_block(&mut self, block: &Block) -> InterpreterResult {
-        return self.execute_block(&block.stmts);
+        let env = Environment::with_outer(self.env.clone());
+        return self.execute_block(&block.stmts, env);
     }
 
     fn eval_if_conditional(&mut self, ifcond: &IfConditional) -> InterpreterResult {
         let cond = self.expression(&ifcond.condition)?;
+        let env = Environment::with_outer(self.env.clone());
         if cond.is_truthy() {
-            return self.execute_block(&ifcond.then);
+            return self.execute_block(&ifcond.then, env);
         }
         if let Some(el) = &ifcond.not_then {
-            return self.execute_block(el);
+            return self.execute_block(el, env);
         }
 
         Ok(Value::Null)
@@ -177,7 +192,7 @@ impl Interpreter {
 
     fn eval_let_reference(&mut self, letref: &ast::LetRef) -> InterpreterResult {
         let ident = letref.name.0.to_string();
-        match self.env.get(&ident) {
+        match self.env.borrow().get(&ident) {
             Some(var) => Ok(var.clone()),
             None => panic!("undefined variable {}", ident),
         }
@@ -202,10 +217,10 @@ impl Interpreter {
 
     fn eval_assignment(&mut self, assign: &Assign) -> InterpreterResult {
         let name = assign.name.0.clone();
-        match self.env.get(&name) {
-            Some(_) => {
-                let val = self.expression(&assign.rhs)?;
-                self.env.insert(name, val.clone());
+        let val = self.expression(&assign.rhs)?;
+        match self.env.borrow_mut().assign(name, val) {
+            Some(val) => {
+                // self.env.borrow_mut().define(name, val.clone());
                 Ok(val)
             }
             None => panic!("Assignment to unknown variable"),
@@ -377,6 +392,22 @@ mod test {
         run(("if true { 1; };", Value::Int(1)));
         run(("if false { 1; } else { 2; };", Value::Int(2)));
         run(("let x = if false { 1; } else { 2; }; x;", Value::Int(2)));
+        run((
+            "
+        let x = 1;
+        if false { x = 22; } else { x = 99; }; 
+        x;
+        ",
+            Value::Int(99),
+        ));
+        run((
+            "
+        let x = 1;
+        if true { let x = 22; } else { x = 99; }; 
+        x;
+        ",
+            Value::Int(1),
+        ));
     }
 
     #[test]

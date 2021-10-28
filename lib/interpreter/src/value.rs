@@ -1,4 +1,8 @@
+use std::{cell::RefCell, rc::Rc};
+
 use ast::{Identifier, Literal, Statement};
+
+use crate::environment::Environment;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -17,6 +21,7 @@ pub struct FunctionValue {
     pub name: Option<String>,
     pub params: Vec<Identifier>,
     pub body: Vec<Statement>,
+    pub closure: Rc<RefCell<Environment>>,
 }
 
 impl Value {
@@ -27,8 +32,18 @@ impl Value {
         }
     }
 
-    pub fn function(name: Option<String>, params: Vec<Identifier>, body: Vec<Statement>) -> Value {
-        Value::Function(FunctionValue { name, params, body })
+    pub fn function(
+        name: Option<String>,
+        params: Vec<Identifier>,
+        body: Vec<Statement>,
+        closure: Rc<RefCell<Environment>>,
+    ) -> Value {
+        Value::Function(FunctionValue {
+            name,
+            params,
+            body,
+            closure,
+        })
     }
 }
 
