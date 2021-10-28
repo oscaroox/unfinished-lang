@@ -264,6 +264,13 @@ impl<'a> Parser<'a> {
                         ))
                     }
                 },
+                Expression::Index(idx) => {
+                    return Ok(Expression::create_set_index(
+                        *idx.lhs.clone(),
+                        *idx.index.clone(),
+                        rhs,
+                    ))
+                }
                 _ => {
                     return Err(ParserError::Error(
                         "Invalid assignment target".to_string(),
@@ -857,6 +864,18 @@ mod test {
                 )),
             ],
         )
+    }
+
+    #[test]
+    fn array_index_assignment() {
+        parse(
+            "array[0] = 1;",
+            vec![expr(Expression::create_set_index(
+                let_ref("array"),
+                int(0),
+                int(1),
+            ))],
+        );
     }
 
     #[test]

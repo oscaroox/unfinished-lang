@@ -1,6 +1,6 @@
 use crate::{
     Assign, BinOp, BinaryOperation, Block, Call, Function, Grouping, Identifier, IfConditional,
-    Index, LetRef, Literal, Logic, LogicOperation, Statement, UnaryOp, UnaryOperation,
+    Index, LetRef, Literal, Logic, LogicOperation, SetIndex, Statement, UnaryOp, UnaryOperation,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -9,6 +9,7 @@ pub enum Expression {
     Literal(Literal),
     Assign(Assign),
     Index(Index),
+    SetIndex(SetIndex),
     LetRef(LetRef),
     UnaryOp(UnaryOp),
     Grouping(Grouping),
@@ -67,6 +68,14 @@ impl Expression {
         Expression::Index(Index {
             lhs: Box::new(lhs),
             index: Box::new(index),
+        })
+    }
+
+    pub fn create_set_index(lhs: Expression, index: Expression, value: Expression) -> Expression {
+        Expression::SetIndex(SetIndex {
+            lhs: Box::new(lhs),
+            index: Box::new(index),
+            value: Box::new(value),
         })
     }
 

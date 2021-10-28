@@ -9,7 +9,7 @@ use std::{
 use crate::{builtin::get_builtins, environment::Environment, Value};
 use ast::{
     Assign, BinOp, BinaryOperation, Block, Call, Expression, Function, IfConditional, Index, Let,
-    Literal, Logic, LogicOperation, Program, Statement, UnaryOp, UnaryOperation,
+    Literal, Logic, LogicOperation, Program, SetIndex, Statement, UnaryOp, UnaryOperation,
 };
 
 #[derive(Debug)]
@@ -97,6 +97,41 @@ impl Interpreter {
             Expression::Block(expr) => self.eval_block(expr),
             Expression::If(expr) => self.eval_if_conditional(expr),
             Expression::Index(expr) => self.eval_index(expr),
+            Expression::SetIndex(expr) => self.eval_set_index(expr),
+        }
+    }
+
+    fn eval_set_index(&mut self, set_index: &SetIndex) -> InterpreterResult {
+        let lhs = self.expression(&set_index.lhs)?;
+        let index = self.expression(&set_index.index)?;
+        let value = self.expression(&set_index.value)?;
+
+        match (&lhs, &index, &value) {
+            (Value::Array(arr), Value::Int(i), _) => {
+                let idx = *i as usize;
+                if arr.len() < idx {
+                    panic!(
+                        "Index out of bound array len: {} index was: {}",
+                        arr.len(),
+                        idx
+                    );
+                }
+
+                match &*set_index.lhs {
+                    Expression::LetRef(let_ref) => {
+                        let mut newarr = arr.clone();
+                        newarr[idx] = value.clone();
+
+                        self.env
+                            .borrow_mut()
+                            .assign(let_ref.name.0.to_string(), Value::Array(newarr));
+                    }
+                    _ => {}
+                }
+
+                Ok(value)
+            }
+            _ => panic!("Invalid set index on {}", lhs),
         }
     }
 
@@ -471,5 +506,10 @@ mod test {
         run(("[[123], 2][0][0];", Value::Int(123)));
         run(("[[123], 2][0];", Value::Array(vec![Value::Int(123)])));
         run((r#"["test"][0];"#, Value::String("test".to_string())));
+    }
+
+    #[test]
+    pub fn eval_set_array_index() {
+        run(("let x = [123]; x[0] = 1; x[0];", Value::Int(1)));
     }
 }

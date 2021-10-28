@@ -13,6 +13,7 @@ mod let_stmt;
 mod literal;
 mod logic;
 mod program;
+mod set_index;
 mod statement;
 mod unaryop;
 
@@ -31,5 +32,6 @@ pub use let_stmt::*;
 pub use literal::*;
 pub use logic::*;
 pub use program::*;
+pub use set_index::*;
 pub use statement::*;
 pub use unaryop::*;
