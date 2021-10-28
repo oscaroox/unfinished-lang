@@ -23,6 +23,12 @@ impl Environment {
         }
     }
 
+    pub fn extend(&mut self, vals: HashMap<String, Value>) {
+        for (k, v) in vals.iter() {
+            self.values.insert(k.to_string(), Some(v.clone()));
+        }
+    }
+
     pub fn define(&mut self, name: String, value: Value) {
         self.values.insert(name, Some(value));
     }

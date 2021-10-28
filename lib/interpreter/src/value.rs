@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use ast::{Identifier, Literal, Statement};
 
-use crate::environment::Environment;
+use crate::{builtin::Builtin, environment::Environment};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -12,6 +12,7 @@ pub enum Value {
     Bool(bool),
     Array(Vec<Value>),
     Function(FunctionValue),
+    NativeFunction(NativeFunction),
     Null,
     Empty,
 }
@@ -22,6 +23,13 @@ pub struct FunctionValue {
     pub params: Vec<Identifier>,
     pub body: Vec<Statement>,
     pub closure: Rc<RefCell<Environment>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct NativeFunction {
+    pub name: String,
+    pub arity: u8,
+    pub builtin: Builtin,
 }
 
 impl Value {
@@ -43,6 +51,14 @@ impl Value {
             params,
             body,
             closure,
+        })
+    }
+
+    pub fn native_function(name: impl Into<String>, arity: u8, builtin: Builtin) -> Value {
+        Value::NativeFunction(NativeFunction {
+            name: name.into(),
+            arity,
+            builtin,
         })
     }
 }
@@ -75,6 +91,9 @@ impl std::fmt::Display for Value {
                     "anonymous".to_string()
                 };
                 write!(f, "<fun {}/>", n)
+            }
+            Value::NativeFunction(v) => {
+                write!(f, "<nativeFun {}>", v.name)
             }
         }
     }

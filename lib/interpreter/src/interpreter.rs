@@ -6,12 +6,13 @@ use std::{
     rc::Rc,
 };
 
-use crate::{environment::Environment, Value};
+use crate::{builtin::get_builtins, environment::Environment, Value};
 use ast::{
     Assign, BinOp, BinaryOperation, Block, Call, Expression, Function, IfConditional, Index, Let,
     Literal, Logic, LogicOperation, Program, Statement, UnaryOp, UnaryOperation,
 };
 
+#[derive(Debug)]
 pub enum RuntimeError {}
 
 #[derive(Debug)]
@@ -23,9 +24,19 @@ type InterpreterResult = Result<Value, RuntimeError>;
 
 impl Interpreter {
     pub fn new() -> Interpreter {
+        let globals = Rc::new(RefCell::new(Environment::new()));
+        let builtins = get_builtins();
+        globals.borrow_mut().extend(builtins);
+
         Interpreter {
-            env: Rc::new(RefCell::new(Environment::new())),
+            env: Rc::new(RefCell::new(Environment::with_outer(globals.clone()))),
         }
+    }
+
+    pub fn with_env(env: Rc<RefCell<Environment>>) -> Interpreter {
+        let builtins = get_builtins();
+        env.borrow_mut().extend(builtins);
+        Interpreter { env }
     }
 
     pub fn run(&mut self, stmts: Program) -> Result<Value, RuntimeError> {
@@ -104,26 +115,34 @@ impl Interpreter {
 
     fn eval_call(&mut self, call: &Call) -> InterpreterResult {
         let callee = self.expression(&call.callee)?;
-        if let Value::Function(fun) = callee {
-            let mut args = vec![];
-            let mut env = Environment::with_outer(self.env.clone());
-            for arg in &call.arguments {
-                let val = self.expression(arg)?;
-                args.push(val);
-            }
-
-            if args.len() != fun.params.len() {
-                panic!("Expected {} arguments got {}", fun.params.len(), args.len())
-            }
-
-            for (arg, param) in args.iter().zip(fun.params.iter()) {
-                env.define(param.0.to_string(), arg.clone());
-            }
-
-            let res = self.execute_block(&fun.body, env)?;
-            return Ok(res);
+        let mut args = vec![];
+        let mut env = Environment::with_outer(self.env.clone());
+        for arg in &call.arguments {
+            let val = self.expression(arg)?;
+            args.push(val);
         }
-        panic!("You can only call functions");
+
+        match callee {
+            Value::Function(fun) => {
+                if args.len() != fun.params.len() {
+                    panic!("Expected {} arguments got {}", fun.params.len(), args.len())
+                }
+
+                for (arg, param) in args.iter().zip(fun.params.iter()) {
+                    env.define(param.0.to_string(), arg.clone());
+                }
+
+                self.execute_block(&fun.body, env)
+            }
+            Value::NativeFunction(v) => {
+                if args.len() != v.arity.into() {
+                    panic!("Expected {} arguments got {}", v.arity, args.len())
+                }
+
+                v.builtin.call(args)
+            }
+            _ => panic!("You can only call functions"),
+        }
     }
 
     fn eval_function(&mut self, function: &Function) -> InterpreterResult {
@@ -437,6 +456,11 @@ mod test {
         run(("fun (){1;}();", Value::Int(1)));
         run(("let fn = fun (){1;}; fn();", Value::Int(1)));
         run(("let fn = fun (x){x;}; fn(123);", Value::Int(123)));
+    }
+
+    #[test]
+    pub fn eval_native_function() {
+        run(("println(1);", Value::Null));
     }
 
     #[test]
