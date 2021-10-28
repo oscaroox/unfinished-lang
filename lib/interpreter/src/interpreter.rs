@@ -8,8 +8,8 @@ use std::{
 
 use crate::{environment::Environment, Value};
 use ast::{
-    Assign, BinOp, BinaryOperation, Block, Call, Expression, Function, IfConditional, Let, Literal,
-    Logic, LogicOperation, Program, Statement, UnaryOp, UnaryOperation,
+    Assign, BinOp, BinaryOperation, Block, Call, Expression, Function, IfConditional, Index, Let,
+    Literal, Logic, LogicOperation, Program, Statement, UnaryOp, UnaryOperation,
 };
 
 pub enum RuntimeError {}
@@ -75,9 +75,9 @@ impl Interpreter {
     fn expression(&mut self, expression: &Expression) -> Result<Value, RuntimeError> {
         match expression {
             Expression::BinOp(expr) => self.eval_binop(expr),
-            Expression::Literal(lit) => self.eval_literal(lit),
+            Expression::Literal(expr) => self.eval_literal(expr),
             Expression::Assign(expr) => self.eval_assignment(expr),
-            Expression::LetRef(letref) => self.eval_let_reference(letref),
+            Expression::LetRef(expr) => self.eval_let_reference(expr),
             Expression::UnaryOp(expr) => self.eval_unaryop(expr),
             Expression::Grouping(expr) => self.expression(&expr.expr),
             Expression::Logic(expr) => self.eval_logic_expression(expr),
@@ -85,6 +85,20 @@ impl Interpreter {
             Expression::Function(expr) => self.eval_function(expr),
             Expression::Block(expr) => self.eval_block(expr),
             Expression::If(expr) => self.eval_if_conditional(expr),
+            Expression::Index(expr) => self.eval_index(expr),
+        }
+    }
+
+    fn eval_index(&mut self, index: &Index) -> InterpreterResult {
+        let lhs = self.expression(&index.lhs)?;
+        let idx = self.expression(&index.index)?;
+
+        match (&lhs, &idx) {
+            (Value::Array(arr), Value::Int(i)) => match arr.get(*i as usize) {
+                Some(val) => Ok(val.clone()),
+                None => Ok(Value::Null),
+            },
+            _ => panic!("Invalid index access on {}", lhs),
         }
     }
 
@@ -423,5 +437,15 @@ mod test {
         run(("fun (){1;}();", Value::Int(1)));
         run(("let fn = fun (){1;}; fn();", Value::Int(1)));
         run(("let fn = fun (x){x;}; fn(123);", Value::Int(123)));
+    }
+
+    #[test]
+    pub fn eval_array_access() {
+        run(("let x = [123]; x[0];", Value::Int(123)));
+        run(("let x = [123]; x[10];", Value::Null));
+        run(("let x = [1,2,3, 4]; x[1+2];", Value::Int(4)));
+        run(("[[123], 2][0][0];", Value::Int(123)));
+        run(("[[123], 2][0];", Value::Array(vec![Value::Int(123)])));
+        run((r#"["test"][0];"#, Value::String("test".to_string())));
     }
 }

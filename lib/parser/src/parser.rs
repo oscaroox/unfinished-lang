@@ -376,28 +376,37 @@ impl<'a> Parser<'a> {
 
     fn call(&mut self) -> Result<Expression, ParserError> {
         let mut expr = self.primary()?;
+        loop {
+            if self.matches(vec![TokenType::LeftParen]) {
+                let paren = self.prev_token.clone();
 
-        if self.matches(vec![TokenType::LeftParen]) {
-            let paren = self.prev_token.clone();
+                let mut args = vec![];
 
-            let mut args = vec![];
+                if self.curr_token.token_type != TokenType::RightParen && !self.is_end() {
+                    loop {
+                        args.push(self.expression()?);
 
-            if self.curr_token.token_type != TokenType::RightParen && !self.is_end() {
-                loop {
-                    args.push(self.expression()?);
-
-                    if !self.matches(vec![TokenType::Comma]) {
-                        break;
+                        if !self.matches(vec![TokenType::Comma]) {
+                            break;
+                        }
                     }
                 }
-            }
 
-            match self.eat_optional(TokenType::RightParen) {
-                Some(_) => {}
-                None => return Err(self.error("Unterminated function call".to_string(), paren)),
-            }
+                match self.eat_optional(TokenType::RightParen) {
+                    Some(_) => {}
+                    None => return Err(self.error("Unterminated function call".to_string(), paren)),
+                }
 
-            expr = Expression::create_call(expr, args);
+                expr = Expression::create_call(expr, args);
+            } else if self.matches(vec![TokenType::LeftBracket]) {
+                let idx = self.expression()?;
+
+                self.eat(TokenType::RightBracket, "Expected ']'")?;
+
+                expr = Expression::create_index(expr, idx);
+            } else {
+                break;
+            }
         }
 
         Ok(expr)
@@ -520,12 +529,20 @@ mod test {
         assert_eq!(errors, expected)
     }
 
+    fn expr(val: Expression) -> Statement {
+        Statement::create_expr(val)
+    }
+
     fn int(val: i64) -> Expression {
         Expression::Literal(Literal::Int(val))
     }
 
     fn float(val: f64) -> Expression {
         Expression::Literal(Literal::Float(val))
+    }
+
+    fn array(val: Vec<Expression>) -> Expression {
+        Expression::Literal(Literal::Array(val))
     }
 
     fn bool_lit(val: bool) -> Expression {
@@ -600,9 +617,10 @@ mod test {
             r#"
             [1, 3, 4, true, false, "string", 2.0, null];
             [{}];
+            [1,];
             "#,
             vec![
-                Statement::create_expr(Expression::create_literal(Literal::Array(vec![
+                Statement::create_expr(array(vec![
                     int(1),
                     int(3),
                     int(4),
@@ -611,10 +629,9 @@ mod test {
                     string_lit("string"),
                     float(2.0),
                     null(),
-                ]))),
-                Statement::create_expr(Expression::create_literal(Literal::Array(vec![
-                    Expression::create_block(vec![]),
-                ]))),
+                ])),
+                Statement::create_expr(array(vec![Expression::create_block(vec![])])),
+                Statement::create_expr(array(vec![int(1)])),
             ],
         );
     }
@@ -822,6 +839,24 @@ mod test {
                 Statement::create_expr(Expression::Literal(Literal::Int(23))),
             ],
         );
+    }
+
+    #[test]
+    fn array_access() {
+        parse(
+            "array[0]; [1,2,3][2]; [[1], 2][0][0];",
+            vec![
+                Statement::create_expr(Expression::create_index(let_ref("array"), int(0))),
+                Statement::create_expr(Expression::create_index(
+                    array(vec![int(1), int(2), int(3)]),
+                    int(2),
+                )),
+                Statement::create_expr(Expression::create_index(
+                    Expression::create_index(array(vec![array(vec![int(1)]), int(2)]), int(0)),
+                    int(0),
+                )),
+            ],
+        )
     }
 
     #[test]
