@@ -526,7 +526,7 @@ mod test {
     }
 
     // TODO check errors
-    fn parse_error(source: &str, expected: Vec<ParserError>) {
+    fn _parse_error(source: &str, expected: Vec<ParserError>) {
         let (res, errors) = run_parser(source);
 
         let errs: Vec<String> = errors.clone().into_iter().map(|e| e.to_string()).collect();

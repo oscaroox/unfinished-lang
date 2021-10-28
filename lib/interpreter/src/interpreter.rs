@@ -1,10 +1,4 @@
-use std::{
-    cell::{Ref, RefCell},
-    collections::HashMap,
-    env,
-    fmt::Debug,
-    rc::Rc,
-};
+use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
 use crate::{builtin::get_builtins, environment::Environment, Value};
 use ast::{
@@ -365,7 +359,7 @@ mod test {
 
         match interpreter.run(stmts) {
             Ok(val) => assert_eq!(val, src.1),
-            Err(err) => todo!(),
+            Err(err) => println!("{:#?}", err),
         };
     }
 

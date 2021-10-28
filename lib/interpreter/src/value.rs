@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use ast::{Identifier, Literal, Statement};
+use ast::{Identifier, Statement};
 
 use crate::{builtin::Builtin, environment::Environment};
 
