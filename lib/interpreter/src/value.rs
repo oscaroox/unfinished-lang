@@ -71,16 +71,9 @@ impl std::fmt::Display for Value {
             Value::String(v) => write!(f, "{}", v),
             Value::Bool(v) => write!(f, "{}", v),
             Value::Array(v) => {
-                let mut out = String::new();
-                out += "[";
-                for (i, val) in v.iter().enumerate() {
-                    out += &val.to_string();
-                    if v.len() < i {
-                        out += ",";
-                    }
-                }
-                out += "]";
-                write!(f, "{}", out)
+                write!(f, "[")?;
+                let elem: Vec<String> = v.into_iter().map(|val| val.to_string()).collect();
+                write!(f, "{}]", elem.join(", "))
             }
             Value::Null => write!(f, "null"),
             Value::Empty => write!(f, ""),
