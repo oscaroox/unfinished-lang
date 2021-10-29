@@ -92,6 +92,7 @@ impl Interpreter {
             Expression::If(expr) => self.eval_if_conditional(expr),
             Expression::Index(expr) => self.eval_index(expr),
             Expression::SetIndex(expr) => self.eval_set_index(expr),
+            Expression::Return(_) => todo!(),
         }
     }
 

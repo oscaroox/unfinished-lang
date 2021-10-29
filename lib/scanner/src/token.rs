@@ -48,6 +48,7 @@ impl Token {
     impl_token!(false_token, False);
     impl_token!(if_token, If);
     impl_token!(else_token, Else);
+    impl_token!(return_token, Return);
     impl_token!(null, Null);
 
     impl_token!(and, And);

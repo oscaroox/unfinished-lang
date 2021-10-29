@@ -159,15 +159,23 @@ impl<'a> Parser<'a> {
     }
 
     fn expression(&mut self) -> Result<Expression, ParserError> {
-        // if self.matches(vec![TokenType::Fun]) {
-        //     return self.fun_expression();
-        // } else
         if self.matches(vec![TokenType::If]) {
             return self.if_expression();
         } else if self.matches(vec![TokenType::LeftBrace]) {
             return Ok(Expression::create_block(self.block_expression()?));
+        } else if self.matches(vec![TokenType::Return]) {
+            return self.return_expression();
         }
         self.assignment()
+    }
+
+    fn return_expression(&mut self) -> Result<Expression, ParserError> {
+        let mut value = None;
+        if !self.curr_token.is_semi_colon() {
+            value = Some(self.expression()?);
+        }
+
+        Ok(Expression::create_return(value))
     }
 
     fn fun_expression(&mut self) -> Result<Expression, ParserError> {
@@ -883,14 +891,25 @@ mod test {
         parse(
             "name(); this_is_a_func(); fnc(1, name, true);",
             vec![
-                Statement::create_expr(Expression::create_call(let_ref("name"), vec![])),
-                Statement::create_expr(Expression::create_call(let_ref("this_is_a_func"), vec![])),
-                Statement::create_expr(Expression::create_call(
+                expr(Expression::create_call(let_ref("name"), vec![])),
+                expr(Expression::create_call(let_ref("this_is_a_func"), vec![])),
+                expr(Expression::create_call(
                     let_ref("fnc"),
                     vec![int(1), let_ref("name"), bool_lit(true)],
                 )),
             ],
         );
+    }
+
+    #[test]
+    fn return_expr() {
+        parse(
+            "return; return 1;",
+            vec![
+                expr(Expression::create_return(None)),
+                expr(Expression::create_return(Some(int(1)))),
+            ],
+        )
     }
 
     #[test]

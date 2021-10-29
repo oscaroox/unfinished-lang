@@ -1,6 +1,7 @@
 use crate::{
     Assign, BinOp, BinaryOperation, Block, Call, Function, Grouping, Identifier, IfConditional,
-    Index, LetRef, Literal, Logic, LogicOperation, SetIndex, Statement, UnaryOp, UnaryOperation,
+    Index, LetRef, Literal, Logic, LogicOperation, ReturnExpr, SetIndex, Statement, UnaryOp,
+    UnaryOperation,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -18,6 +19,7 @@ pub enum Expression {
     Function(Function),
     Block(Block),
     If(IfConditional),
+    Return(ReturnExpr),
 }
 
 impl Expression {
@@ -109,5 +111,11 @@ impl Expression {
 
     pub fn create_block(stmts: Vec<Statement>) -> Expression {
         Expression::Block(Block { stmts })
+    }
+
+    pub fn create_return(value: Option<Expression>) -> Expression {
+        Expression::Return(ReturnExpr {
+            value: Box::new(value),
+        })
     }
 }
