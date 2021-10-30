@@ -15,7 +15,7 @@ pub enum Value {
     NativeFunction(NativeFunction),
     ReturnVal(Box<Value>),
     Null,
-    Empty,
+    Unit,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -81,7 +81,7 @@ impl std::fmt::Display for Value {
                 write!(f, "{}]", elem.join(", "))
             }
             Value::Null => write!(f, "null"),
-            Value::Empty => write!(f, ""),
+            Value::Unit => write!(f, "Unit"),
             Value::Function(v) => {
                 let n = if let Some(n) = &v.name {
                     n.to_string()

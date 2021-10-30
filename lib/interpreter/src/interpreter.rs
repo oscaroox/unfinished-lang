@@ -17,6 +17,16 @@ pub struct Interpreter {
 
 type InterpreterResult = Result<Value, RuntimeError>;
 
+macro_rules! eval_with_new_env_in_scope {
+    ($self:ident, $env:expr, $fun:ident, $stmt:expr) => {{
+        let parent_env = $self.env.clone();
+        $self.env = $env;
+        let res = $self.$fun($stmt);
+        $self.env = parent_env;
+        res
+    }};
+}
+
 impl Interpreter {
     pub fn new() -> Interpreter {
         let globals = Rc::new(RefCell::new(Environment::new()));
@@ -47,29 +57,13 @@ impl Interpreter {
     }
 
     fn eval_statements(&mut self, stmts: &Program) -> InterpreterResult {
-        let mut res = Value::Empty;
+        let mut res = Value::Unit;
         for stmt in stmts.iter() {
             res = self.execute_statement(stmt)?;
             if let Value::ReturnVal(_) = res {
                 return Ok(res);
             }
         }
-        Ok(res)
-    }
-
-    fn execute_block(&mut self, stmts: &Program, environment: Environment) -> InterpreterResult {
-        let mut res = Value::Null;
-        let parent_env = self.env.clone();
-        self.env = Rc::new(RefCell::new(environment));
-
-        for stmt in stmts.iter() {
-            res = self.execute_statement(stmt)?;
-            if let Value::ReturnVal(_) = res {
-                return Ok(res);
-            }
-        }
-
-        self.env = parent_env;
         Ok(res)
     }
 
@@ -89,7 +83,7 @@ impl Interpreter {
 
         self.env.borrow_mut().define(name, val);
 
-        Ok(Value::Empty)
+        Ok(Value::Unit)
     }
 
     fn expression(&mut self, expression: &Expression) -> InterpreterResult {
@@ -114,7 +108,7 @@ impl Interpreter {
     fn eval_return(&mut self, ret: &ReturnExpr) -> InterpreterResult {
         match &*ret.value {
             Some(op) => Ok(Value::return_val(self.expression(op)?)),
-            None => Ok(Value::Null),
+            None => Ok(Value::return_val(Value::Null)),
         }
     }
 
@@ -168,7 +162,7 @@ impl Interpreter {
     fn eval_call(&mut self, call: &Call) -> InterpreterResult {
         let callee = self.expression(&call.callee)?;
         let mut args = vec![];
-        let mut env = Environment::with_outer(self.env.clone());
+
         for arg in &call.arguments {
             let val = self.expression(arg)?;
             args.push(val);
@@ -176,6 +170,8 @@ impl Interpreter {
 
         match callee {
             Value::Function(fun) => {
+                let mut env = Environment::with_outer(self.env.clone());
+
                 if args.len() != fun.params.len() {
                     panic!("Expected {} arguments got {}", fun.params.len(), args.len())
                 }
@@ -184,7 +180,8 @@ impl Interpreter {
                     env.define(param.0.to_string(), arg.clone());
                 }
 
-                self.execute_block(&fun.body, env.clone())
+                let env = Rc::new(RefCell::new(env));
+                eval_with_new_env_in_scope!(self, env, eval, &fun.body)
             }
             Value::NativeFunction(v) => {
                 if args.len() != v.arity.into() {
@@ -258,21 +255,22 @@ impl Interpreter {
     }
 
     fn eval_block(&mut self, block: &Block) -> InterpreterResult {
-        let env = Environment::with_outer(self.env.clone());
-        return self.execute_block(&block.stmts, env);
+        let env = Rc::new(RefCell::new(Environment::with_outer(self.env.clone())));
+        eval_with_new_env_in_scope!(self, env, eval_statements, &block.stmts)
     }
 
     fn eval_if_conditional(&mut self, ifcond: &IfConditional) -> InterpreterResult {
         let cond = self.expression(&ifcond.condition)?;
-        let env = Environment::with_outer(self.env.clone());
+        let env = Rc::new(RefCell::new(Environment::with_outer(self.env.clone())));
+        let val = Value::Null;
+
         if cond.is_truthy() {
-            return self.execute_block(&ifcond.then, env);
-        }
-        if let Some(el) = &ifcond.not_then {
-            return self.execute_block(el, env);
+            return eval_with_new_env_in_scope!(self, env, eval_statements, &ifcond.then);
+        } else if let Some(el) = &ifcond.not_then {
+            return eval_with_new_env_in_scope!(self, env, eval_statements, el);
         }
 
-        Ok(Value::Null)
+        Ok(val)
     }
 
     fn eval_let_reference(&mut self, letref: &ast::LetRef) -> InterpreterResult {
@@ -388,7 +386,7 @@ mod test {
 
     #[test]
     pub fn let_statement() {
-        run(("let name = 123;", Value::Empty));
+        run(("let name = 123;", Value::Unit));
         run(("let name; name;", Value::Null));
         run(("let name = 123; name;", Value::Int(123)));
     }
@@ -541,6 +539,30 @@ mod test {
             Value::Int(233),
         ));
         run((
+            "
+                let noop = fun () {
+                    if (1 < 2) {
+                        return 1;
+                    };
+                    return;
+                }; noop();
+        ",
+            Value::Int(1),
+        ));
+
+        run((
+            "
+                let noop = fun () {
+                    if (1 < 2) {
+                        return;
+                    };
+                    return 1;
+                }; noop();
+        ",
+            Value::Null,
+        ));
+
+        run((
             "{
                 1;
                 2;
@@ -549,6 +571,42 @@ mod test {
                 let x = 1;
              };",
             Value::Int(22),
+        ));
+    }
+
+    #[test]
+    pub fn eval_scopes() {
+        run((
+            "
+        let x = 23;
+            let y = {
+                let x = 123;
+            };
+        x;
+        ",
+            Value::Int(23),
+        ));
+        run((
+            "
+        let x = 23;
+            let y = {
+                 x = 123;
+            };
+        x;
+        ",
+            Value::Int(123),
+        ));
+
+        run((
+            "
+        let x = 23;
+            let y = {
+                 x = 123;
+                let x = 123;
+            };
+        y;
+        ",
+            Value::Unit,
         ));
     }
 
