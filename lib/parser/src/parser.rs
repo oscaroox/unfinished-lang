@@ -165,8 +165,36 @@ impl<'a> Parser<'a> {
             return Ok(Expression::create_block(self.block_expression()?));
         } else if self.matches(vec![TokenType::Return]) {
             return self.return_expression();
+        } else if self.matches(vec![TokenType::Data]) {
+            return self.data_expression();
         }
         self.assignment()
+    }
+
+    fn data_expression(&mut self) -> Result<Expression, ParserError> {
+        let ident = self.eat(TokenType::Identifier, "Expected identifier")?;
+        self.eat(TokenType::LeftBrace, "Expected '{'")?;
+
+        let mut fields = vec![];
+
+        if self.curr_token.token_type != TokenType::RightBrace {
+            while !self.curr_token.is_eof() {
+                let id = self.eat(TokenType::Identifier, "Expected identifier")?;
+                fields.push(Identifier::new(id.value.to_string()));
+
+                if !self.matches(vec![TokenType::Comma])
+                    || self.curr_token.token_type == TokenType::RightBrace
+                {
+                    break;
+                }
+            }
+        }
+
+        self.eat(TokenType::RightBrace, "Expected '}'")?;
+        Ok(Expression::create_data_class(
+            Identifier::new(ident.value.to_string()),
+            fields,
+        ))
     }
 
     fn return_expression(&mut self) -> Result<Expression, ParserError> {
@@ -574,6 +602,16 @@ mod test {
 
     fn string_lit(val: &str) -> Expression {
         Expression::create_literal(Literal::String(val.to_string()))
+    }
+
+    fn data_class(name: &str, fields: Vec<&str>) -> Expression {
+        Expression::create_data_class(
+            Identifier::new(name.to_string()),
+            fields
+                .iter()
+                .map(|v| Identifier::new(v.to_string()))
+                .collect(),
+        )
     }
 
     #[test]
@@ -1012,6 +1050,53 @@ mod test {
                     )])),
                 ),
             ],
+        );
+    }
+
+    #[test]
+    fn data_class_expr() {
+        parse(
+            "
+            data Person {};
+        ",
+            vec![expr(data_class("Person", vec![]))],
+        );
+
+        parse(
+            "
+            data Person {
+                first_name,
+            };
+        ",
+            vec![expr(data_class("Person", vec!["first_name"]))],
+        );
+
+        parse(
+            "
+            data Person {
+                first_name,
+                last_name,
+                age
+            };
+        ",
+            vec![expr(data_class(
+                "Person",
+                vec!["first_name", "last_name", "age"],
+            ))],
+        );
+
+        parse(
+            "
+            data Person {
+                first_name,
+                last_name,
+                age,
+            };
+        ",
+            vec![expr(data_class(
+                "Person",
+                vec!["first_name", "last_name", "age"],
+            ))],
         );
     }
 }

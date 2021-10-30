@@ -2,8 +2,8 @@ use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
 use crate::{builtin::get_builtins, environment::Environment, Value};
 use ast::{
-    Assign, BinOp, BinaryOperation, Block, Call, Expression, Function, IfConditional, Index, Let,
-    Literal, Logic, LogicOperation, Program, ReturnExpr, SetIndex, Statement, UnaryOp,
+    Assign, BinOp, BinaryOperation, Block, Call, DataClass, Expression, Function, IfConditional,
+    Index, Let, Literal, Logic, LogicOperation, Program, ReturnExpr, SetIndex, Statement, UnaryOp,
     UnaryOperation,
 };
 
@@ -104,7 +104,18 @@ impl Interpreter {
             Expression::Index(expr) => self.eval_index(expr),
             Expression::SetIndex(expr) => self.eval_set_index(expr),
             Expression::Return(expr) => self.eval_return(expr),
+            Expression::DataClass(expr) => self.eval_data_class(expr),
         }
+    }
+
+    fn eval_data_class(&mut self, data_class: &DataClass) -> InterpreterResult {
+        let value = Value::data_class(data_class.name.to_owned(), data_class.fields.clone());
+
+        self.env
+            .borrow_mut()
+            .define(data_class.name.value(), value.clone());
+
+        Ok(value)
     }
 
     fn eval_return(&mut self, ret: &ReturnExpr) -> InterpreterResult {
@@ -356,6 +367,7 @@ impl Interpreter {
 #[cfg(test)]
 mod test {
     use crate::{Interpreter, Value};
+    use ast::Identifier;
     use parser::Parser;
     use scanner::Scanner;
     use spanner::SpanManager;
@@ -383,8 +395,12 @@ mod test {
         };
     }
 
+    fn ident(name: &str) -> Identifier {
+        Identifier::new(name.to_string())
+    }
+
     #[test]
-    pub fn let_statement() {
+    fn let_statement() {
         run(("let name = 123;", Value::Unit));
         run(("let name; name;", Value::Null));
         run(("let name = 123; name;", Value::Int(123)));
@@ -627,5 +643,25 @@ mod test {
     #[test]
     pub fn eval_set_array_index() {
         run(("let x = [123]; x[0] = 1; x[0];", Value::Int(1)));
+    }
+
+    #[test]
+    pub fn eval_data_class() {
+        run((
+            "data Person {};",
+            Value::data_class(ident("Person"), vec![]),
+        ));
+
+        run((
+            "data Person {
+                first_name,
+                last_name,
+                age,
+            };",
+            Value::data_class(
+                ident("Person"),
+                vec![ident("first_name"), ident("last_name"), ident("age")],
+            ),
+        ));
     }
 }

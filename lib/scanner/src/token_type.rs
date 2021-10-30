@@ -14,6 +14,7 @@ pub enum TokenType {
     False,
     Null,
     Return,
+    Data,
 
     And,
     Or,
@@ -69,6 +70,7 @@ impl std::fmt::Display for TokenType {
             TokenType::And => write!(f, "&&"),
             TokenType::Or => write!(f, "||"),
             TokenType::Return => write!(f, "RETURN"),
+            TokenType::Data => write!(f, "DATA"),
             TokenType::LessThan => write!(f, "<"),
             TokenType::LessThanEqual => write!(f, "<="),
             TokenType::GreaterThan => write!(f, ">"),

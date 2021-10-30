@@ -12,10 +12,17 @@ pub enum Value {
     Bool(bool),
     Array(Vec<Value>),
     Function(FunctionValue),
+    DataClass(DataClass),
     NativeFunction(NativeFunction),
     ReturnVal(Box<Value>),
     Null,
     Unit,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DataClass {
+    pub name: Identifier,
+    pub fields: Vec<Identifier>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -66,6 +73,10 @@ impl Value {
     pub fn return_val(val: Value) -> Value {
         Value::ReturnVal(Box::new(val))
     }
+
+    pub fn data_class(name: Identifier, fields: Vec<Identifier>) -> Value {
+        Value::DataClass(DataClass { name, fields })
+    }
 }
 
 impl std::fmt::Display for Value {
@@ -92,6 +103,9 @@ impl std::fmt::Display for Value {
             }
             Value::NativeFunction(v) => {
                 write!(f, "<nativeFun {}>", v.name)
+            }
+            Value::DataClass(v) => {
+                write!(f, "<dataClass {}>", v.name.value())
             }
             Value::ReturnVal(_) => write!(f, ""),
         }

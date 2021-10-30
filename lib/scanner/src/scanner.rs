@@ -157,6 +157,7 @@ impl<'a> Scanner<'a> {
             "true" => Token::true_token(span),
             "false" => Token::false_token(span),
             "return" => Token::return_token(span),
+            "data" => Token::data(span),
             "null" => Token::null(span),
             _ => Token::identifier(value, span),
         }
@@ -522,7 +523,7 @@ this_is_a_identifier";
     #[test]
     fn keywords() {
         test_scan(
-            "let fun true false null if else return",
+            "let fun true false null if else return data",
             vec![
                 (TokenType::Let, None),
                 (TokenType::Fun, None),
@@ -532,6 +533,7 @@ this_is_a_identifier";
                 (TokenType::If, None),
                 (TokenType::Else, None),
                 (TokenType::Return, None),
+                (TokenType::Data, None),
                 (TokenType::EOF, None),
             ],
         );
