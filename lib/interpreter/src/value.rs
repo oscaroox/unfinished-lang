@@ -13,6 +13,7 @@ pub enum Value {
     Array(Vec<Value>),
     Function(FunctionValue),
     NativeFunction(NativeFunction),
+    ReturnVal(Box<Value>),
     Null,
     Empty,
 }
@@ -61,6 +62,10 @@ impl Value {
             builtin,
         })
     }
+
+    pub fn return_val(val: Value) -> Value {
+        Value::ReturnVal(Box::new(val))
+    }
 }
 
 impl std::fmt::Display for Value {
@@ -88,6 +93,7 @@ impl std::fmt::Display for Value {
             Value::NativeFunction(v) => {
                 write!(f, "<nativeFun {}>", v.name)
             }
+            Value::ReturnVal(_) => write!(f, ""),
         }
     }
 }

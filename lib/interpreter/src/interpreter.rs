@@ -3,7 +3,8 @@ use std::{cell::RefCell, fmt::Debug, rc::Rc};
 use crate::{builtin::get_builtins, environment::Environment, Value};
 use ast::{
     Assign, BinOp, BinaryOperation, Block, Call, Expression, Function, IfConditional, Index, Let,
-    Literal, Logic, LogicOperation, Program, SetIndex, Statement, UnaryOp, UnaryOperation,
+    Literal, Logic, LogicOperation, Program, ReturnExpr, SetIndex, Statement, UnaryOp,
+    UnaryOperation,
 };
 
 #[derive(Debug)]
@@ -33,15 +34,26 @@ impl Interpreter {
         Interpreter { env }
     }
 
-    pub fn run(&mut self, stmts: Program) -> Result<Value, RuntimeError> {
+    pub fn run(&mut self, stmts: Program) -> InterpreterResult {
+        self.eval(&stmts)
+    }
+
+    fn eval(&mut self, stmts: &Program) -> InterpreterResult {
+        let res = self.eval_statements(stmts)?;
+        match res {
+            Value::ReturnVal(val) => Ok(*val),
+            _ => Ok(res),
+        }
+    }
+
+    fn eval_statements(&mut self, stmts: &Program) -> InterpreterResult {
         let mut res = Value::Empty;
         for stmt in stmts.iter() {
-            match self.execute_statement(stmt) {
-                Ok(v) => res = v,
-                Err(_) => todo!(),
+            res = self.execute_statement(stmt)?;
+            if let Value::ReturnVal(_) = res {
+                return Ok(res);
             }
         }
-
         Ok(res)
     }
 
@@ -52,20 +64,23 @@ impl Interpreter {
 
         for stmt in stmts.iter() {
             res = self.execute_statement(stmt)?;
+            if let Value::ReturnVal(_) = res {
+                return Ok(res);
+            }
         }
 
         self.env = parent_env;
         Ok(res)
     }
 
-    fn execute_statement(&mut self, stmt: &Statement) -> Result<Value, RuntimeError> {
+    fn execute_statement(&mut self, stmt: &Statement) -> InterpreterResult {
         match stmt {
             Statement::Let(r#let) => self.let_statement(r#let),
             Statement::Expr(expr) => self.expression(expr),
         }
     }
 
-    fn let_statement(&mut self, stmt: &Let) -> Result<Value, RuntimeError> {
+    fn let_statement(&mut self, stmt: &Let) -> InterpreterResult {
         let name = stmt.id.to_string();
         let val = match &stmt.value {
             Some(expr) => self.expression(expr)?,
@@ -77,7 +92,7 @@ impl Interpreter {
         Ok(Value::Empty)
     }
 
-    fn expression(&mut self, expression: &Expression) -> Result<Value, RuntimeError> {
+    fn expression(&mut self, expression: &Expression) -> InterpreterResult {
         match expression {
             Expression::BinOp(expr) => self.eval_binop(expr),
             Expression::Literal(expr) => self.eval_literal(expr),
@@ -92,7 +107,14 @@ impl Interpreter {
             Expression::If(expr) => self.eval_if_conditional(expr),
             Expression::Index(expr) => self.eval_index(expr),
             Expression::SetIndex(expr) => self.eval_set_index(expr),
-            Expression::Return(_) => todo!(),
+            Expression::Return(expr) => self.eval_return(expr),
+        }
+    }
+
+    fn eval_return(&mut self, ret: &ReturnExpr) -> InterpreterResult {
+        match &*ret.value {
+            Some(op) => Ok(Value::return_val(self.expression(op)?)),
+            None => Ok(Value::Null),
         }
     }
 
@@ -162,7 +184,7 @@ impl Interpreter {
                     env.define(param.0.to_string(), arg.clone());
                 }
 
-                self.execute_block(&fun.body, env)
+                self.execute_block(&fun.body, env.clone())
             }
             Value::NativeFunction(v) => {
                 if args.len() != v.arity.into() {
@@ -486,6 +508,48 @@ mod test {
         run(("fun (){1;}();", Value::Int(1)));
         run(("let fn = fun (){1;}; fn();", Value::Int(1)));
         run(("let fn = fun (x){x;}; fn(123);", Value::Int(123)));
+    }
+
+    #[test]
+    pub fn eval_return() {
+        run((
+            "fun() {
+                if true {
+                    return 233;
+                };
+            123;
+        }();",
+            Value::Int(233),
+        ));
+        run((
+            "fun() {
+                if false {
+                    return 233;
+                };
+            123;
+        }();",
+            Value::Int(123),
+        ));
+        run((
+            "fun() {
+                if true {
+                    return 233;
+                } else {
+                    return 123;
+                };
+        }();",
+            Value::Int(233),
+        ));
+        run((
+            "{
+                1;
+                2;
+                return 22;
+                6;
+                let x = 1;
+             };",
+            Value::Int(22),
+        ));
     }
 
     #[test]
