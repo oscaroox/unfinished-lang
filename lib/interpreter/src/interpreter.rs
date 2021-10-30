@@ -17,6 +17,8 @@ pub struct Interpreter {
 
 type InterpreterResult = Result<Value, RuntimeError>;
 
+// macro used for swapping the parent environment with the new supplied environmet
+// this also makes sure this code isnt duplicated when evaluating if, block and function calls
 macro_rules! eval_with_new_env_in_scope {
     ($self:ident, $env:expr, $fun:ident, $stmt:expr) => {{
         let parent_env = $self.env.clone();
@@ -301,12 +303,9 @@ impl Interpreter {
     fn eval_assignment(&mut self, assign: &Assign) -> InterpreterResult {
         let name = assign.name.0.clone();
         let val = self.expression(&assign.rhs)?;
-        match self.env.borrow_mut().assign(name, val) {
-            Some(val) => {
-                // self.env.borrow_mut().define(name, val.clone());
-                Ok(val)
-            }
-            None => panic!("Assignment to unknown variable"),
+        match self.env.borrow_mut().assign(name.to_string(), val) {
+            Some(val) => Ok(val),
+            None => panic!("Assignment to unknown variable: {}", name),
         }
     }
 
