@@ -76,6 +76,7 @@ impl Token {
     impl_token!(comma, Comma);
     impl_token!(semi_colon, SemiColon);
     impl_token!(bang, Bang);
+    impl_token!(colon, Colon);
 
     impl_token!(assign, Assign);
     impl_token!(assign_colon, AssignColon);

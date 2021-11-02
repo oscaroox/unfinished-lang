@@ -47,6 +47,7 @@ pub enum TokenType {
     Comma,
     SemiColon,
     Bang,
+    Colon,
 
     Illegal,
     EOF,
@@ -97,6 +98,7 @@ impl std::fmt::Display for TokenType {
             TokenType::Comma => write!(f, ","),
             TokenType::SemiColon => write!(f, ";"),
             TokenType::Bang => write!(f, "!"),
+            TokenType::Colon => write!(f, ":"),
             TokenType::Illegal => write!(f, "ILLEGAL"),
             TokenType::EOF => write!(f, "EOF"),
             TokenType::BadToken => write!(f, "BADTOKEN"),

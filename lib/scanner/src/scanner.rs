@@ -183,7 +183,7 @@ impl<'a> Scanner<'a> {
                     self.advance();
                     return Token::assign_colon(self.span(pos, self.pos));
                 }
-                Token::illegal(curr_ch.to_string(), self.span(pos, self.pos))
+                Token::colon(self.span(pos, self.pos))
             }
             '-' => {
                 if self.peek() == '=' {
@@ -337,7 +337,7 @@ mod tests {
     #[test]
     fn other_tokens() {
         test_scan(
-            "{},;()[]! =>",
+            "{},;()[]! =>:",
             vec![
                 (TokenType::LeftBrace, None),
                 (TokenType::RightBrace, None),
@@ -349,6 +349,7 @@ mod tests {
                 (TokenType::RightBracket, None),
                 (TokenType::Bang, None),
                 (TokenType::Arrow, None),
+                (TokenType::Colon, None),
                 (TokenType::EOF, None),
             ],
         );
