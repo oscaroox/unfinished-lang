@@ -2,8 +2,8 @@ use crate::{Expression, Identifier};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct DataClassInstanceField {
-    name: Identifier,
-    value: Expression,
+    pub name: Identifier,
+    pub value: Expression,
 }
 
 impl DataClassInstanceField {

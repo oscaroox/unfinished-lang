@@ -1,10 +1,10 @@
-use std::{cell::RefCell, fmt::Debug, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, fmt::Debug, rc::Rc};
 
 use crate::{builtin::get_builtins, environment::Environment, Value};
 use ast::{
-    Assign, BinOp, BinaryOperation, Block, Call, DataClass, Expression, Function, IfConditional,
-    Index, Let, Literal, Logic, LogicOperation, Program, ReturnExpr, SetIndex, Statement, UnaryOp,
-    UnaryOperation,
+    Assign, BinOp, BinaryOperation, Block, Call, DataClass, DataClassInstance, Expression,
+    Function, IfConditional, Index, Let, Literal, Logic, LogicOperation, Program, ReturnExpr,
+    SetIndex, Statement, UnaryOp, UnaryOperation,
 };
 
 #[derive(Debug)]
@@ -105,8 +105,52 @@ impl Interpreter {
             Expression::SetIndex(expr) => self.eval_set_index(expr),
             Expression::Return(expr) => self.eval_return(expr),
             Expression::DataClass(expr) => self.eval_data_class(expr),
-            Expression::DataClassInstance(_) => todo!(),
+            Expression::DataClassInstance(expr) => self.eval_data_class_instance(expr),
         }
+    }
+
+    fn eval_data_class_instance(
+        &mut self,
+        data_class_instance: &ast::DataClassInstance,
+    ) -> InterpreterResult {
+        let data_class_identifier = data_class_instance.name.clone();
+        let data_class = match self.env.borrow().get(&data_class_identifier.0) {
+            Some(val) => match val {
+                Value::DataClass(class) => class.clone(),
+                _ => panic!("Cannot only instantiate data classes got {}", val),
+            },
+            None => panic!("Unkown data class {}", data_class_identifier),
+        };
+
+        let mut eval_fields = HashMap::new();
+
+        //  check if the instance fields are actually in the Data class e.g
+        //  data Person { name };
+        //  Person { name: "test", age: 2 } // Error unknown field age
+        for field in &data_class_instance.fields {
+            if data_class.fields.contains(&field.name) {
+                let val = self.expression(&field.value)?;
+                eval_fields.insert(field.name.value(), val);
+            } else {
+                panic!(
+                    "Unknown field {} provided to data class {}",
+                    field.name, data_class_identifier
+                )
+            }
+        }
+
+        // fill in the missing fields with null value
+        for field in &data_class.fields {
+            if !eval_fields.contains_key(&field.0) {
+                eval_fields.insert(field.0.to_string(), Value::Null);
+            }
+        }
+
+        Ok(Value::data_class_instance(
+            data_class_identifier,
+            eval_fields,
+            data_class.fields.clone(),
+        ))
     }
 
     fn eval_data_class(&mut self, data_class: &DataClass) -> InterpreterResult {
@@ -367,7 +411,7 @@ impl Interpreter {
 
 #[cfg(test)]
 mod test {
-    use std::{cell::RefCell, rc::Rc};
+    use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
     use crate::{Interpreter, Value};
     use ast::Identifier;
@@ -663,6 +707,53 @@ mod test {
             };",
             Value::data_class(
                 ident("Person"),
+                vec![ident("first_name"), ident("last_name"), ident("age")],
+            ),
+        ));
+    }
+
+    #[test]
+    pub fn eval_data_class_instance() {
+        let mut map = HashMap::new();
+        map.insert(
+            String::from("first_name"),
+            Value::String(String::from("John")),
+        );
+        map.insert(
+            String::from("last_name"),
+            Value::String(String::from("Doe")),
+        );
+        map.insert(String::from("age"), Value::Int(40));
+
+        run((
+            r#"data Person {
+                first_name,
+                last_name,
+                age,
+            };
+            let person = Person { first_name: "John", last_name: "Doe", age: 40 };
+            person;
+            "#,
+            Value::data_class_instance(
+                ident("Person"),
+                map.clone(),
+                vec![ident("first_name"), ident("last_name"), ident("age")],
+            ),
+        ));
+
+        map.insert(String::from("age"), Value::Null);
+        run((
+            r#"data Person {
+                first_name,
+                last_name,
+                age,
+            };
+            let person = Person { first_name: "John", last_name: "Doe" };
+            person;
+            "#,
+            Value::data_class_instance(
+                ident("Person"),
+                map,
                 vec![ident("first_name"), ident("last_name"), ident("age")],
             ),
         ));

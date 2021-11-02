@@ -1,10 +1,11 @@
 use std::{
     cell::{Ref, RefCell},
+    collections::HashMap,
     rc::Rc,
     sync::Arc,
 };
 
-use ast::{Identifier, Statement};
+use ast::{DataClassInstanceField, Identifier, Statement};
 
 use crate::{builtin::Builtin, environment::Environment};
 
@@ -17,6 +18,7 @@ pub enum Value {
     Array(Rc<RefCell<Array>>),
     Function(FunctionValue),
     DataClass(DataClass),
+    DataClassInstance(Rc<RefCell<DataClassInstance>>),
     NativeFunction(NativeFunction),
     ReturnVal(Box<Value>),
     Null,
@@ -24,14 +26,34 @@ pub enum Value {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Array {
-    pub values: Vec<Value>,
+pub struct DataClassInstance {
+    pub name: Identifier,
+    pub keys: Vec<Identifier>,
+    pub fields: HashMap<String, Value>,
+}
+
+impl DataClassInstance {
+    pub fn get(&self, name: String) -> Value {
+        match self.fields.get(&name) {
+            Some(v) => v.clone(),
+            None => panic!("Undefined property {}", name),
+        }
+    }
+
+    pub fn set(&mut self, name: String, value: Value) {
+        self.fields.insert(name, value.clone());
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DataClass {
     pub name: Identifier,
     pub fields: Vec<Identifier>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Array {
+    pub values: Vec<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -90,6 +112,18 @@ impl Value {
     pub fn array(values: Vec<Value>) -> Value {
         Value::Array(Rc::new(RefCell::new(Array { values })))
     }
+
+    pub fn data_class_instance(
+        name: Identifier,
+        fields: HashMap<String, Value>,
+        keys: Vec<Identifier>,
+    ) -> Value {
+        Value::DataClassInstance(Rc::new(RefCell::new(DataClassInstance {
+            name,
+            fields,
+            keys,
+        })))
+    }
 }
 
 impl std::fmt::Display for Value {
@@ -122,6 +156,18 @@ impl std::fmt::Display for Value {
             }
             Value::DataClass(v) => {
                 write!(f, "<dataClass {}>", v.name.value())
+            }
+            Value::DataClassInstance(v) => {
+                let name = v.borrow().name.value();
+                write!(f, "{} {{ ", name)?;
+                let mut out = vec![];
+
+                for key in &v.borrow().keys {
+                    if let Some(field) = &v.borrow().fields.get(&key.0) {
+                        out.push(format!("{}: {}", key, field))
+                    }
+                }
+                write!(f, "{} }}", out.join(", "))
             }
             Value::ReturnVal(_) => write!(f, ""),
         }
