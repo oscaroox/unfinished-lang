@@ -1,7 +1,8 @@
 use crate::{
     Assign, BinOp, BinaryOperation, Block, Call, DataClass, DataClassInstance,
-    DataClassInstanceField, Function, Grouping, Identifier, IfConditional, Index, LetRef, Literal,
-    Logic, LogicOperation, ReturnExpr, SetIndex, Statement, UnaryOp, UnaryOperation,
+    DataClassInstanceField, Function, GetProperty, Grouping, Identifier, IfConditional, Index,
+    LetRef, Literal, Logic, LogicOperation, ReturnExpr, SetIndex, SetProperty, Statement, UnaryOp,
+    UnaryOperation,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -11,6 +12,8 @@ pub enum Expression {
     Assign(Assign),
     Index(Index),
     SetIndex(SetIndex),
+    GetProperty(GetProperty),
+    SetProperty(SetProperty),
     LetRef(LetRef),
     UnaryOp(UnaryOp),
     Grouping(Grouping),
@@ -79,6 +82,25 @@ impl Expression {
         Expression::SetIndex(SetIndex {
             lhs: Box::new(lhs),
             index: Box::new(index),
+            value: Box::new(value),
+        })
+    }
+
+    pub fn create_get_property(object: Expression, name: Identifier) -> Expression {
+        Expression::GetProperty(GetProperty {
+            object: Box::new(object),
+            name,
+        })
+    }
+
+    pub fn create_set_property(
+        object: Expression,
+        name: Identifier,
+        value: Expression,
+    ) -> Expression {
+        Expression::SetProperty(SetProperty {
+            object: Box::new(object),
+            name,
             value: Box::new(value),
         })
     }

@@ -340,10 +340,19 @@ impl<'a> Parser<'a> {
                         ))
                     }
                 },
+                // TODO assignment to index and property should support += -+ *= and /=
+                // only works with =
                 Expression::Index(idx) => {
                     return Ok(Expression::create_set_index(
                         *idx.lhs.clone(),
                         *idx.index.clone(),
+                        rhs,
+                    ))
+                }
+                Expression::GetProperty(get) => {
+                    return Ok(Expression::create_set_property(
+                        *get.object.clone(),
+                        get.name.clone(),
                         rhs,
                     ))
                 }
@@ -487,6 +496,11 @@ impl<'a> Parser<'a> {
                 self.eat(TokenType::RightBracket, "Expected ']'")?;
 
                 expr = Expression::create_index(expr, idx);
+            } else if self.matches(vec![TokenType::Dot]) {
+                let name = self.eat(TokenType::Identifier, "Expected identifier,")?;
+
+                expr =
+                    Expression::create_get_property(expr, Identifier::new(name.value.to_string()))
             } else {
                 break;
             }
@@ -1175,6 +1189,53 @@ mod test {
                         data_class_instance_field("last_name", string_lit("doe")),
                         data_class_instance_field("age", int(23)),
                     ],
+                )),
+            ],
+        );
+    }
+
+    #[test]
+    fn get_property_expr() {
+        parse(
+            "
+            data Person {
+                first_name,
+                last_name,
+                age,
+            };
+            let p = Person{};
+            p.first_name;
+        ",
+            vec![
+                expr(data_class("Person", vec!["first_name", "last_name", "age"])),
+                Statement::create_let("p".to_string(), Some(data_class_instance("Person", vec![]))),
+                expr(Expression::create_get_property(
+                    let_ref("p"),
+                    Identifier::new("first_name".to_string()),
+                )),
+            ],
+        );
+    }
+
+    #[test]
+    fn set_property_expr() {
+        parse(
+            r#"
+            data Person {
+                first_name,
+                last_name,
+                age,
+            };
+            let p = Person{};
+            p.first_name = "jane";
+        "#,
+            vec![
+                expr(data_class("Person", vec!["first_name", "last_name", "age"])),
+                Statement::create_let("p".to_string(), Some(data_class_instance("Person", vec![]))),
+                expr(Expression::create_set_property(
+                    let_ref("p"),
+                    Identifier::new("first_name".to_string()),
+                    string_lit("jane"),
                 )),
             ],
         );

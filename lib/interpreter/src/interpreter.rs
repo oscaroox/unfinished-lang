@@ -2,9 +2,9 @@ use std::{cell::RefCell, collections::HashMap, fmt::Debug, rc::Rc};
 
 use crate::{builtin::get_builtins, environment::Environment, Value};
 use ast::{
-    Assign, BinOp, BinaryOperation, Block, Call, DataClass, DataClassInstance, Expression,
-    Function, IfConditional, Index, Let, Literal, Logic, LogicOperation, Program, ReturnExpr,
-    SetIndex, Statement, UnaryOp, UnaryOperation,
+    Assign, BinOp, BinaryOperation, Block, Call, DataClass, Expression, Function, GetProperty,
+    IfConditional, Index, Let, Literal, Logic, LogicOperation, Program, ReturnExpr, SetIndex,
+    SetProperty, Statement, UnaryOp, UnaryOperation,
 };
 
 #[derive(Debug)]
@@ -106,6 +106,42 @@ impl Interpreter {
             Expression::Return(expr) => self.eval_return(expr),
             Expression::DataClass(expr) => self.eval_data_class(expr),
             Expression::DataClassInstance(expr) => self.eval_data_class_instance(expr),
+            Expression::GetProperty(expr) => self.eval_get_property(expr),
+            Expression::SetProperty(expr) => self.eval_set_property(expr),
+        }
+    }
+
+    fn eval_set_property(&mut self, set_property: &SetProperty) -> InterpreterResult {
+        let obj = self.expression(&set_property.object)?;
+
+        match obj {
+            Value::DataClassInstance(instance) => {
+                let value = self.expression(&set_property.value)?;
+                instance
+                    .borrow_mut()
+                    .set(set_property.name.0.to_string(), value.clone());
+
+                Ok(value.clone())
+            }
+            _ => panic!(
+                "Can only access properties on data class instances got {}",
+                obj
+            ),
+        }
+    }
+
+    fn eval_get_property(&mut self, get_property: &GetProperty) -> InterpreterResult {
+        let obj = self.expression(&get_property.object)?;
+
+        match obj {
+            Value::DataClassInstance(instance) => {
+                let val = instance.borrow().get(get_property.name.0.to_string());
+                Ok(val.clone())
+            }
+            _ => panic!(
+                "Can only access properties on data class instances got {}",
+                obj
+            ),
         }
     }
 
@@ -411,7 +447,7 @@ impl Interpreter {
 
 #[cfg(test)]
 mod test {
-    use std::{cell::RefCell, collections::HashMap, rc::Rc};
+    use std::collections::HashMap;
 
     use crate::{Interpreter, Value};
     use ast::Identifier;
@@ -753,9 +789,81 @@ mod test {
             "#,
             Value::data_class_instance(
                 ident("Person"),
-                map,
+                map.clone(),
                 vec![ident("first_name"), ident("last_name"), ident("age")],
             ),
+        ));
+
+        map.insert(String::from("first_name"), Value::Null);
+        map.insert(String::from("last_name"), Value::Null);
+        map.insert(String::from("age"), Value::Null);
+        run((
+            r#"data Person {
+                first_name,
+                last_name,
+                age,
+            };
+            let person = Person {};
+            person;
+            "#,
+            Value::data_class_instance(
+                ident("Person"),
+                map.clone(),
+                vec![ident("first_name"), ident("last_name"), ident("age")],
+            ),
+        ));
+    }
+
+    #[test]
+    pub fn eval_property_access() {
+        let mut map = HashMap::new();
+        map.insert(
+            String::from("first_name"),
+            Value::String(String::from("John")),
+        );
+        map.insert(
+            String::from("last_name"),
+            Value::String(String::from("Doe")),
+        );
+        map.insert(String::from("age"), Value::Int(40));
+
+        run((
+            r#"data Person {
+                first_name,
+                last_name,
+                age,
+            };
+            let person = Person { first_name: "John", last_name: "Doe", age: 40 };
+            person.first_name;
+            "#,
+            Value::String("John".to_string()),
+        ));
+    }
+
+    #[test]
+    pub fn eval_property_set() {
+        let mut map = HashMap::new();
+        map.insert(
+            String::from("first_name"),
+            Value::String(String::from("John")),
+        );
+        map.insert(
+            String::from("last_name"),
+            Value::String(String::from("Doe")),
+        );
+        map.insert(String::from("age"), Value::Int(40));
+
+        run((
+            r#"data Person {
+                first_name,
+                last_name,
+                age,
+            };
+            let person = Person { first_name: "John", last_name: "Doe", age: 40 };
+            person.age = 22;
+            person.age;
+            "#,
+            Value::Int(22),
         ));
     }
 }

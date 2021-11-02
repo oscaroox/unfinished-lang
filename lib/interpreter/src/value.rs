@@ -1,11 +1,6 @@
-use std::{
-    cell::{Ref, RefCell},
-    collections::HashMap,
-    rc::Rc,
-    sync::Arc,
-};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use ast::{DataClassInstanceField, Identifier, Statement};
+use ast::{Identifier, Statement};
 
 use crate::{builtin::Builtin, environment::Environment};
 
