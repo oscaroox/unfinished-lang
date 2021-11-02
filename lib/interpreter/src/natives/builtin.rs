@@ -67,7 +67,7 @@ fn builtin_println(args: Vec<Value>) -> BuiltinResult {
 
 fn builtin_len(args: Vec<Value>) -> BuiltinResult {
     match &args[0] {
-        Value::Array(arr) => Ok(Value::Int(arr.len() as i64)),
+        Value::Array(arr) => Ok(Value::Int(arr.borrow().values.len() as i64)),
         Value::String(s1) => Ok(Value::Int(s1.len() as i64)),
         _ => {
             panic!("invalid len")

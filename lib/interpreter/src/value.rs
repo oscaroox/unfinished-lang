@@ -1,4 +1,8 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Ref, RefCell},
+    rc::Rc,
+    sync::Arc,
+};
 
 use ast::{Identifier, Statement};
 
@@ -10,13 +14,18 @@ pub enum Value {
     Float(f64),
     String(String),
     Bool(bool),
-    Array(Vec<Value>),
+    Array(Rc<RefCell<Array>>),
     Function(FunctionValue),
     DataClass(DataClass),
     NativeFunction(NativeFunction),
     ReturnVal(Box<Value>),
     Null,
     Unit,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Array {
+    pub values: Vec<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -77,6 +86,10 @@ impl Value {
     pub fn data_class(name: Identifier, fields: Vec<Identifier>) -> Value {
         Value::DataClass(DataClass { name, fields })
     }
+
+    pub fn array(values: Vec<Value>) -> Value {
+        Value::Array(Rc::new(RefCell::new(Array { values })))
+    }
 }
 
 impl std::fmt::Display for Value {
@@ -84,12 +97,15 @@ impl std::fmt::Display for Value {
         match self {
             Value::Int(v) => write!(f, "{}", v),
             Value::Float(v) => write!(f, "{}", v),
-            Value::String(v) => write!(f, "{}", v),
+            Value::String(v) => write!(f, r#""{}""#, v),
             Value::Bool(v) => write!(f, "{}", v),
             Value::Array(v) => {
                 write!(f, "[")?;
-                let elem: Vec<String> = v.into_iter().map(|val| val.to_string()).collect();
-                write!(f, "{}]", elem.join(", "))
+                let mut out = vec![];
+                for val in &v.borrow().values {
+                    out.push(val.to_string());
+                }
+                write!(f, "{}]", out.join(", "))
             }
             Value::Null => write!(f, "null"),
             Value::Unit => write!(f, "Unit"),

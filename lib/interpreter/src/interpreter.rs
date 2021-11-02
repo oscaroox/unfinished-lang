@@ -134,25 +134,25 @@ impl Interpreter {
         match (&lhs, &index, &value) {
             (Value::Array(arr), Value::Int(i), _) => {
                 let idx = *i as usize;
-                if arr.len() < idx {
+
+                if arr.borrow().values.len() < idx {
                     panic!(
                         "Index out of bound array len: {} index was: {}",
-                        arr.len(),
+                        arr.borrow().values.len(),
                         idx
                     );
                 }
+                arr.borrow_mut().values[idx] = value.clone();
+                // match &*set_index.lhs {
+                //     Expression::LetRef(let_ref) => {
+                //         array[idx] = value.clone();
 
-                match &*set_index.lhs {
-                    Expression::LetRef(let_ref) => {
-                        let mut newarr = arr.clone();
-                        newarr[idx] = value.clone();
-
-                        self.env
-                            .borrow_mut()
-                            .assign(let_ref.name.0.to_string(), Value::Array(newarr));
-                    }
-                    _ => {}
-                }
+                //         self.env
+                //             .borrow_mut()
+                //             .assign(let_ref.name.0.to_string(), Value::Array(newarr));
+                //     }
+                //     _ => {}
+                // }
 
                 Ok(value)
             }
@@ -165,7 +165,7 @@ impl Interpreter {
         let idx = self.expression(&index.index)?;
 
         match (&lhs, &idx) {
-            (Value::Array(arr), Value::Int(i)) => match arr.get(*i as usize) {
+            (Value::Array(arr), Value::Int(i)) => match arr.borrow().values.get(*i as usize) {
                 Some(val) => Ok(val.clone()),
                 None => Ok(Value::Null),
             },
@@ -306,7 +306,7 @@ impl Interpreter {
                 for e in v {
                     res.push(self.expression(e)?);
                 }
-                Value::Array(res)
+                Value::array(res)
             }
             Literal::Null => Value::Null,
         })
@@ -367,6 +367,8 @@ impl Interpreter {
 
 #[cfg(test)]
 mod test {
+    use std::{cell::RefCell, rc::Rc};
+
     use crate::{Interpreter, Value};
     use ast::Identifier;
     use parser::Parser;
@@ -421,7 +423,7 @@ mod test {
 
         run((
             r#"let x = ["test", 1, 1.5, true, false, null]; x;"#,
-            Value::Array(vec![
+            Value::array(vec![
                 Value::String("test".to_string()),
                 Value::Int(1),
                 Value::Float(1.5),
@@ -637,7 +639,7 @@ mod test {
         run(("let x = [123]; x[10];", Value::Null));
         run(("let x = [1,2,3, 4]; x[1+2];", Value::Int(4)));
         run(("[[123], 2][0][0];", Value::Int(123)));
-        run(("[[123], 2][0];", Value::Array(vec![Value::Int(123)])));
+        run(("[[123], 2][0];", Value::array(vec![Value::Int(123)])));
         run((r#"["test"][0];"#, Value::String("test".to_string())));
     }
 
