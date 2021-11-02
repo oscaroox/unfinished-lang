@@ -1,7 +1,7 @@
 use crate::{
-    Assign, BinOp, BinaryOperation, Block, Call, DataClass, Function, Grouping, Identifier,
-    IfConditional, Index, LetRef, Literal, Logic, LogicOperation, ReturnExpr, SetIndex, Statement,
-    UnaryOp, UnaryOperation,
+    Assign, BinOp, BinaryOperation, Block, Call, DataClass, DataClassInstance,
+    DataClassInstanceField, Function, Grouping, Identifier, IfConditional, Index, LetRef, Literal,
+    Logic, LogicOperation, ReturnExpr, SetIndex, Statement, UnaryOp, UnaryOperation,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -18,6 +18,7 @@ pub enum Expression {
     Call(Call),
     Function(Function),
     DataClass(DataClass),
+    DataClassInstance(DataClassInstance),
     Block(Block),
     If(IfConditional),
     Return(ReturnExpr),
@@ -122,5 +123,12 @@ impl Expression {
 
     pub fn create_data_class(name: Identifier, fields: Vec<Identifier>) -> Expression {
         Expression::DataClass(DataClass { fields, name })
+    }
+
+    pub fn create_data_class_instance(
+        name: Identifier,
+        fields: Vec<DataClassInstanceField>,
+    ) -> Expression {
+        Expression::DataClassInstance(DataClassInstance { name, fields })
     }
 }

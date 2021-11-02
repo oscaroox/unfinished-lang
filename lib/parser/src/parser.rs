@@ -1,6 +1,6 @@
 use ast::{
-    BinaryOperation, Expression, Identifier, Literal, LogicOperation, Program, Statement,
-    UnaryOperation,
+    BinaryOperation, DataClassInstanceField, Expression, Identifier, Literal, LogicOperation,
+    Program, Statement, UnaryOperation,
 };
 use scanner::{Scanner, Token, TokenType};
 use spanner::Span;
@@ -66,6 +66,14 @@ impl<'a> Parser<'a> {
             }
         }
         false
+    }
+
+    fn check(&mut self, token_type: TokenType) -> bool {
+        self.curr_token.token_type == token_type
+    }
+
+    fn check_peek(&mut self, token_type: TokenType) -> bool {
+        self.peek_token.token_type == token_type
     }
 
     fn advance(&mut self) -> Token {
@@ -166,12 +174,44 @@ impl<'a> Parser<'a> {
         } else if self.matches(vec![TokenType::Return]) {
             return self.return_expression();
         } else if self.matches(vec![TokenType::Data]) {
-            return self.data_expression();
+            return self.data_class_expression();
+        } else if self.check(TokenType::Identifier) && self.check_peek(TokenType::LeftBrace) {
+            return self.data_class_instantiate();
         }
         self.assignment()
     }
 
-    fn data_expression(&mut self) -> Result<Expression, ParserError> {
+    fn data_class_instantiate(&mut self) -> Result<Expression, ParserError> {
+        let ident = self.eat(TokenType::Identifier, "Expected identifier")?;
+        self.eat(TokenType::LeftBrace, "Expected '{'")?;
+
+        let mut fields = vec![];
+
+        if self.curr_token.token_type != TokenType::RightBrace {
+            while !self.curr_token.is_eof() {
+                let id = self.eat(TokenType::Identifier, "Expected identifier")?;
+                self.eat(TokenType::Colon, "Expected ':'")?;
+                let expr = self.expression()?;
+                let field =
+                    DataClassInstanceField::new(Identifier::new(id.value.to_string()), expr);
+                fields.push(field);
+
+                if !self.matches(vec![TokenType::Comma])
+                    || self.curr_token.token_type == TokenType::RightBrace
+                {
+                    break;
+                }
+            }
+        }
+
+        self.eat(TokenType::RightBrace, "Expected '}'")?;
+        Ok(Expression::create_data_class_instance(
+            Identifier::new(ident.value.to_string()),
+            fields,
+        ))
+    }
+
+    fn data_class_expression(&mut self) -> Result<Expression, ParserError> {
         let ident = self.eat(TokenType::Identifier, "Expected identifier")?;
         self.eat(TokenType::LeftBrace, "Expected '{'")?;
 
@@ -537,8 +577,8 @@ mod test {
 
     use super::Parser;
     use ast::{
-        BinaryOperation, Expression, Identifier, Literal, LogicOperation, Program, Statement,
-        UnaryOperation,
+        BinaryOperation, DataClassInstanceField, Expression, Identifier, Literal, LogicOperation,
+        Program, Statement, UnaryOperation,
     };
     use scanner::Scanner;
     use spanner::SpanManager;
@@ -612,6 +652,14 @@ mod test {
                 .map(|v| Identifier::new(v.to_string()))
                 .collect(),
         )
+    }
+
+    fn data_class_instance(name: &str, fields: Vec<DataClassInstanceField>) -> Expression {
+        Expression::create_data_class_instance(Identifier::new(name.to_string()), fields)
+    }
+
+    fn data_class_instance_field(name: &str, value: Expression) -> DataClassInstanceField {
+        DataClassInstanceField::new(Identifier::new(name.to_string()), value)
     }
 
     #[test]
@@ -1097,6 +1145,38 @@ mod test {
                 "Person",
                 vec!["first_name", "last_name", "age"],
             ))],
+        );
+    }
+
+    #[test]
+    fn data_class_instantiate_expr() {
+        parse(
+            "
+            data Person {};
+            Person {};
+        ",
+            vec![
+                expr(data_class("Person", vec![])),
+                expr(data_class_instance("Person", vec![])),
+            ],
+        );
+
+        parse(
+            r#"
+            data Person {first_name, last_name, age};
+            Person { first_name: "john", last_name: "doe", age: 23 };
+        "#,
+            vec![
+                expr(data_class("Person", vec!["first_name", "last_name", "age"])),
+                expr(data_class_instance(
+                    "Person",
+                    vec![
+                        data_class_instance_field("first_name", string_lit("john")),
+                        data_class_instance_field("last_name", string_lit("doe")),
+                        data_class_instance_field("age", int(23)),
+                    ],
+                )),
+            ],
         );
     }
 }

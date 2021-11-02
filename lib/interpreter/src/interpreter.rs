@@ -105,6 +105,7 @@ impl Interpreter {
             Expression::SetIndex(expr) => self.eval_set_index(expr),
             Expression::Return(expr) => self.eval_return(expr),
             Expression::DataClass(expr) => self.eval_data_class(expr),
+            Expression::DataClassInstance(_) => todo!(),
         }
     }
 
