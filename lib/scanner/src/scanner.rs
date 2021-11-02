@@ -178,10 +178,15 @@ impl<'a> Scanner<'a> {
                 Token::plus(self.span(pos, self.pos))
             }
             ':' => {
-                if self.peek() == '=' {
+                let peek = self.peek();
+                if peek == '=' || peek == ':' {
                     self.advance();
                     self.advance();
-                    return Token::assign_colon(self.span(pos, self.pos));
+                    if peek == '=' {
+                        return Token::assign_colon(self.span(pos, self.pos));
+                    } else {
+                        return Token::colon_colon(self.span(pos, self.pos));
+                    }
                 }
                 Token::colon(self.span(pos, self.pos))
             }
@@ -261,6 +266,7 @@ impl<'a> Scanner<'a> {
                 }
                 Token::bang(self.span(pos, self.pos))
             }
+            '.' => Token::dot(self.span(pos, self.pos)),
             '(' => Token::left_paren(self.span(pos, self.pos)),
             ')' => Token::right_paren(self.span(pos, self.pos)),
             '{' => Token::left_brace(self.span(pos, self.pos)),
@@ -337,7 +343,7 @@ mod tests {
     #[test]
     fn other_tokens() {
         test_scan(
-            "{},;()[]! =>:",
+            "{},;()[]! =>:.::",
             vec![
                 (TokenType::LeftBrace, None),
                 (TokenType::RightBrace, None),
@@ -350,6 +356,8 @@ mod tests {
                 (TokenType::Bang, None),
                 (TokenType::Arrow, None),
                 (TokenType::Colon, None),
+                (TokenType::Dot, None),
+                (TokenType::ColonColon, None),
                 (TokenType::EOF, None),
             ],
         );
