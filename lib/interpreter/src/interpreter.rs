@@ -711,6 +711,16 @@ mod test {
     #[test]
     pub fn eval_native_function() {
         run(("println(1);", Value::Null));
+        run((r#"len("this is a string");"#, Value::Int(16)));
+        run((
+            " 
+        let arr = [0];
+        let arr2 = clone(arr);
+        arr2[0] = 123;
+        arr[0];
+        ",
+            Value::Int(0),
+        ));
     }
 
     #[test]
@@ -726,6 +736,17 @@ mod test {
     #[test]
     pub fn eval_set_array_index() {
         run(("let x = [123]; x[0] = 1; x[0];", Value::Int(1)));
+        run((
+            "
+        let x = [123]; 
+        x[0] = 1;
+        x[0] += 2;
+        x[0] -= 1;
+        x[0] *= 2;
+        x[0] /= 1;
+        x[0];",
+            Value::Int(4),
+        ));
     }
 
     #[test]
@@ -816,17 +837,6 @@ mod test {
 
     #[test]
     pub fn eval_property_access() {
-        let mut map = HashMap::new();
-        map.insert(
-            String::from("first_name"),
-            Value::String(String::from("John")),
-        );
-        map.insert(
-            String::from("last_name"),
-            Value::String(String::from("Doe")),
-        );
-        map.insert(String::from("age"), Value::Int(40));
-
         run((
             r#"data Person {
                 first_name,
@@ -842,17 +852,6 @@ mod test {
 
     #[test]
     pub fn eval_property_set() {
-        let mut map = HashMap::new();
-        map.insert(
-            String::from("first_name"),
-            Value::String(String::from("John")),
-        );
-        map.insert(
-            String::from("last_name"),
-            Value::String(String::from("Doe")),
-        );
-        map.insert(String::from("age"), Value::Int(40));
-
         run((
             r#"data Person {
                 first_name,
@@ -864,6 +863,35 @@ mod test {
             person.age;
             "#,
             Value::Int(22),
+        ));
+
+        run((
+            r#"data Person {
+                first_name,
+                last_name,
+                age,
+            };
+            let person = Person { first_name: "John", last_name: "Doe", age: 40 };
+            person.age += 1;
+            person.age;
+            "#,
+            Value::Int(41),
+        ));
+
+        run((
+            r#"data Person {
+                first_name,
+                last_name,
+                age,
+            };
+            let person = Person { first_name: "John", last_name: "Doe", age: 40 };
+            person.age += 10;
+            person.age -= 10;
+            person.age *= 2;
+            person.age /= 2;
+            person.age;
+            "#,
+            Value::Int(40),
         ));
     }
 }

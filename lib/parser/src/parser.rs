@@ -340,22 +340,46 @@ impl<'a> Parser<'a> {
                         ))
                     }
                 },
-                // TODO assignment to index and property should support += -+ *= and /=
-                // only works with =
-                Expression::Index(idx) => {
-                    return Ok(Expression::create_set_index(
-                        *idx.lhs.clone(),
-                        *idx.index.clone(),
-                        rhs,
-                    ))
-                }
-                Expression::GetProperty(get) => {
-                    return Ok(Expression::create_set_property(
-                        *get.object.clone(),
-                        get.name.clone(),
-                        rhs,
-                    ))
-                }
+                Expression::Index(idx) => match assignment_tok.token_type {
+                    TokenType::Assign => {
+                        return Ok(Expression::create_set_index(
+                            *idx.lhs.clone(),
+                            *idx.index.clone(),
+                            rhs,
+                        ))
+                    }
+                    _ => {
+                        return Ok(Expression::create_set_index(
+                            *idx.lhs.clone(),
+                            *idx.index.clone(),
+                            Expression::create_binop(
+                                expr,
+                                BinaryOperation::from_token(assignment_tok.clone()),
+                                rhs,
+                            ),
+                        ))
+                    }
+                },
+                Expression::GetProperty(get) => match assignment_tok.token_type {
+                    TokenType::Assign => {
+                        return Ok(Expression::create_set_property(
+                            *get.object.clone(),
+                            get.name.clone(),
+                            rhs,
+                        ))
+                    }
+                    _ => {
+                        return Ok(Expression::create_set_property(
+                            *get.object.clone(),
+                            get.name.clone(),
+                            Expression::create_binop(
+                                expr,
+                                BinaryOperation::from_token(assignment_tok.clone()),
+                                rhs,
+                            ),
+                        ))
+                    }
+                },
                 _ => {
                     return Err(ParserError::Error(
                         "Invalid assignment target".to_string(),
@@ -984,6 +1008,53 @@ mod test {
                 int(1),
             ))],
         );
+
+        parse(
+            "
+            array[0] += 1;
+            array[0] -= 1;
+            array[0] *= 1;
+            array[0] /= 1;
+            ",
+            vec![
+                expr(Expression::create_set_index(
+                    let_ref("array"),
+                    int(0),
+                    Expression::create_binop(
+                        Expression::create_index(let_ref("array"), int(0)),
+                        BinaryOperation::Add,
+                        int(1),
+                    ),
+                )),
+                expr(Expression::create_set_index(
+                    let_ref("array"),
+                    int(0),
+                    Expression::create_binop(
+                        Expression::create_index(let_ref("array"), int(0)),
+                        BinaryOperation::Substract,
+                        int(1),
+                    ),
+                )),
+                expr(Expression::create_set_index(
+                    let_ref("array"),
+                    int(0),
+                    Expression::create_binop(
+                        Expression::create_index(let_ref("array"), int(0)),
+                        BinaryOperation::Multiply,
+                        int(1),
+                    ),
+                )),
+                expr(Expression::create_set_index(
+                    let_ref("array"),
+                    int(0),
+                    Expression::create_binop(
+                        Expression::create_index(let_ref("array"), int(0)),
+                        BinaryOperation::Divide,
+                        int(1),
+                    ),
+                )),
+            ],
+        );
     }
 
     #[test]
@@ -1227,15 +1298,81 @@ mod test {
                 age,
             };
             let p = Person{};
-            p.first_name = "jane";
+            p.age = 1;
         "#,
             vec![
                 expr(data_class("Person", vec!["first_name", "last_name", "age"])),
                 Statement::create_let("p".to_string(), Some(data_class_instance("Person", vec![]))),
                 expr(Expression::create_set_property(
                     let_ref("p"),
-                    Identifier::new("first_name".to_string()),
-                    string_lit("jane"),
+                    Identifier::new("age".to_string()),
+                    int(1),
+                )),
+            ],
+        );
+        parse(
+            r#"
+            data Person {
+                first_name,
+                last_name,
+                age,
+            };
+            let p = Person{};
+            p.age += 1;
+            p.age -= 1;
+            p.age *= 1;
+            p.age /= 1;
+        "#,
+            vec![
+                expr(data_class("Person", vec!["first_name", "last_name", "age"])),
+                Statement::create_let("p".to_string(), Some(data_class_instance("Person", vec![]))),
+                expr(Expression::create_set_property(
+                    let_ref("p"),
+                    Identifier::new("age".to_string()),
+                    Expression::create_binop(
+                        Expression::create_get_property(
+                            let_ref("p"),
+                            Identifier::new("age".to_string()),
+                        ),
+                        BinaryOperation::Add,
+                        int(1),
+                    ),
+                )),
+                expr(Expression::create_set_property(
+                    let_ref("p"),
+                    Identifier::new("age".to_string()),
+                    Expression::create_binop(
+                        Expression::create_get_property(
+                            let_ref("p"),
+                            Identifier::new("age".to_string()),
+                        ),
+                        BinaryOperation::Substract,
+                        int(1),
+                    ),
+                )),
+                expr(Expression::create_set_property(
+                    let_ref("p"),
+                    Identifier::new("age".to_string()),
+                    Expression::create_binop(
+                        Expression::create_get_property(
+                            let_ref("p"),
+                            Identifier::new("age".to_string()),
+                        ),
+                        BinaryOperation::Multiply,
+                        int(1),
+                    ),
+                )),
+                expr(Expression::create_set_property(
+                    let_ref("p"),
+                    Identifier::new("age".to_string()),
+                    Expression::create_binop(
+                        Expression::create_get_property(
+                            let_ref("p"),
+                            Identifier::new("age".to_string()),
+                        ),
+                        BinaryOperation::Divide,
+                        int(1),
+                    ),
                 )),
             ],
         );
