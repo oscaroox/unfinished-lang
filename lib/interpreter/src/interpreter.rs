@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, convert::TryInto, fmt::Debug, rc::Rc};
 
-use crate::{builtin::get_builtins, environment::Environment, FunctionValue, Value};
+use crate::{builtin::get_builtins, environment::Environment, Value};
 use ast::{
     Assign, BinOp, BinaryOperation, Block, Call, DataClass, Expression, Function, GetProperty,
     IfConditional, Index, Let, Literal, Logic, LogicOperation, Program, ReturnExpr, SelfExpr,
@@ -513,7 +513,7 @@ mod test {
     use std::collections::HashMap;
 
     use crate::{DataClass, FunctionValue, Interpreter, Value};
-    use ast::{DataClassInstance, Identifier};
+    use ast::Identifier;
     use parser::Parser;
     use scanner::Scanner;
     use spanner::SpanManager;

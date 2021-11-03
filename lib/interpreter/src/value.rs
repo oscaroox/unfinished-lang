@@ -39,8 +39,6 @@ impl DataClassInstance {
         }
     }
 
-    pub fn get_method(&self, name: String) {}
-
     pub fn set(&mut self, name: String, value: Value) {
         self.fields.insert(name, value.clone());
     }
