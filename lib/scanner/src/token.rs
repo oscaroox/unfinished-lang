@@ -50,6 +50,7 @@ impl Token {
     impl_token!(else_token, Else);
     impl_token!(return_token, Return);
     impl_token!(data, Data);
+    impl_token!(self_token, SELF);
     impl_token!(null, Null);
 
     impl_token!(and, And);
