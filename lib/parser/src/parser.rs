@@ -7,6 +7,12 @@ use spanner::Span;
 
 use crate::ParserError;
 
+#[derive(Debug, PartialEq)]
+pub enum FunctionKind {
+    Function,
+    Method,
+}
+
 #[derive(Debug)]
 pub struct Parser<'a> {
     scanner: Scanner<'a>,
@@ -129,6 +135,7 @@ impl<'a> Parser<'a> {
                     Expression::Function(fun) => Expression::create_function(
                         Some(identifier.value.to_string()),
                         fun.params,
+                        fun.is_static,
                         fun.body,
                     ),
                     _ => expr,
@@ -216,6 +223,7 @@ impl<'a> Parser<'a> {
         self.eat(TokenType::LeftBrace, "Expected '{'")?;
 
         let mut fields = vec![];
+        let mut methods = vec![];
 
         if self.curr_token.token_type != TokenType::RightBrace {
             while !self.curr_token.is_eof() {
@@ -231,9 +239,25 @@ impl<'a> Parser<'a> {
         }
 
         self.eat(TokenType::RightBrace, "Expected '}'")?;
+
+        let double_colon = self.eat_optional(TokenType::ColonColon);
+
+        if double_colon.is_some() {
+            self.eat(TokenType::LeftBrace, "Expected '{'")?;
+
+            while !self.check(TokenType::RightBrace) && !self.is_end() {
+                self.eat(TokenType::Fun, "Expected 'fun'")?;
+
+                methods.push(self.fun_expression(FunctionKind::Method)?);
+            }
+
+            self.eat(TokenType::RightBrace, "Expected '}'")?;
+        }
+
         Ok(Expression::create_data_class(
             Identifier::new(ident.value.to_string()),
             fields,
+            methods,
         ))
     }
 
@@ -246,14 +270,40 @@ impl<'a> Parser<'a> {
         Ok(Expression::create_return(value))
     }
 
-    fn fun_expression(&mut self) -> Result<Expression, ParserError> {
+    fn fun_expression(&mut self, kind: FunctionKind) -> Result<Expression, ParserError> {
+        let mut name = None;
         let mut params = vec![];
+        let mut is_static = true;
+
+        if kind == FunctionKind::Method {
+            let ident = self.eat(TokenType::Identifier, "Expected method identifier")?;
+            name = Some(ident.value);
+        }
+
         let left_param = self.eat_optional(TokenType::LeftParen);
 
         if let Some(_) = left_param {
+            if kind == FunctionKind::Method && self.check(TokenType::SELF) {
+                let token = self.eat(TokenType::SELF, "Expected 'self'")?;
+                self.eat_optional(TokenType::Comma);
+                is_static = false;
+                params.push(Identifier::with_token_type(token.value, token.token_type));
+            } else if kind == FunctionKind::Function && self.check(TokenType::SELF) {
+                return Err(ParserError::Error(
+                    "Keyword 'self' can only be used in methods not functions".to_string(),
+                    self.curr_token.clone(),
+                ));
+            }
             if self.curr_token.token_type != TokenType::RightParen {
                 loop {
-                    let ident = self.eat(TokenType::Identifier, "Expected identifier")?;
+                    if self.check(TokenType::SELF) {
+                        return Err(ParserError::Error(
+                            "Expected 'self' to be the first parameter in a method".to_string(),
+                            self.curr_token.clone(),
+                        ));
+                    }
+
+                    let ident = self.eat(TokenType::Identifier, "Expected 'identifier'")?;
                     params.push(Identifier::new(ident.value));
 
                     if !self.matches(vec![TokenType::Comma])
@@ -269,8 +319,9 @@ impl<'a> Parser<'a> {
         if self.matches(vec![TokenType::Arrow]) {
             let expression = self.expression()?;
             return Ok(Expression::create_function(
-                None,
+                name,
                 params,
+                is_static,
                 vec![Statement::create_expr(expression)],
             ));
         }
@@ -278,7 +329,7 @@ impl<'a> Parser<'a> {
         self.eat(TokenType::LeftBrace, "Expected '{'")?;
         let block = self.block_expression()?;
 
-        Ok(Expression::create_function(None, params, block))
+        Ok(Expression::create_function(name, params, is_static, block))
     }
 
     fn block_expression(&mut self) -> Result<Vec<Statement>, ParserError> {
@@ -575,11 +626,11 @@ impl<'a> Parser<'a> {
         }
 
         if self.matches(vec![TokenType::Fun]) {
-            return self.fun_expression();
+            return self.fun_expression(FunctionKind::Function);
         }
 
         if self.matches(vec![TokenType::SELF]) {
-            return Ok(Expression::create_self());
+            return Ok(Expression::create_self(token.value));
         }
 
         if self.matches(vec![TokenType::LeftBracket]) {
@@ -622,7 +673,7 @@ mod test {
         BinaryOperation, DataClassInstanceField, Expression, Identifier, Literal, LogicOperation,
         Program, Statement, UnaryOperation,
     };
-    use scanner::Scanner;
+    use scanner::{Scanner, TokenType};
     use spanner::SpanManager;
 
     fn run_parser(source: &str) -> (Program, Vec<ParserError>) {
@@ -686,13 +737,14 @@ mod test {
         Expression::create_literal(Literal::String(val.to_string()))
     }
 
-    fn data_class(name: &str, fields: Vec<&str>) -> Expression {
+    fn data_class(name: &str, fields: Vec<&str>, methods: Vec<Expression>) -> Expression {
         Expression::create_data_class(
             Identifier::new(name.to_string()),
             fields
                 .iter()
                 .map(|v| Identifier::new(v.to_string()))
                 .collect(),
+            methods,
         )
     }
 
@@ -702,6 +754,15 @@ mod test {
 
     fn data_class_instance_field(name: &str, value: Expression) -> DataClassInstanceField {
         DataClassInstanceField::new(Identifier::new(name.to_string()), value)
+    }
+
+    fn fun_expr(
+        name: Option<String>,
+        params: Vec<Identifier>,
+        is_static: bool,
+        body: Vec<Statement>,
+    ) -> Expression {
+        Expression::create_function(name, params, is_static, body)
     }
 
     #[test]
@@ -791,7 +852,10 @@ mod test {
 
     #[test]
     fn self_keyword() {
-        parse("self;", vec![expr(Expression::create_self())]);
+        parse(
+            "self;",
+            vec![expr(Expression::create_self("self".to_string()))],
+        );
     }
 
     #[test]
@@ -1105,14 +1169,15 @@ mod test {
         };
         ",
             vec![
-                Statement::create_expr(Expression::create_function(None, vec![], vec![])),
-                Statement::create_expr(Expression::create_function(None, vec![], vec![])),
+                Statement::create_expr(Expression::create_function(None, vec![], false, vec![])),
+                Statement::create_expr(Expression::create_function(None, vec![], false, vec![])),
                 Statement::create_expr(Expression::create_function(
                     None,
                     vec![
                         Identifier::new("x".to_string()),
                         Identifier::new("y".to_string()),
                     ],
+                    false,
                     vec![],
                 )),
                 Statement::create_expr(Expression::create_function(
@@ -1121,6 +1186,7 @@ mod test {
                         Identifier::new("y".to_string()),
                         Identifier::new("z".to_string()),
                     ],
+                    false,
                     vec![
                         Statement::create_let("name".to_string(), Some(int(2))),
                         Statement::create_expr(int(123)),
@@ -1135,7 +1201,7 @@ mod test {
         parse(
             "fun (){}();",
             vec![Statement::create_expr(Expression::create_call(
-                Expression::create_function(None, vec![], vec![]),
+                Expression::create_function(None, vec![], false, vec![]),
                 vec![],
             ))],
         );
@@ -1201,7 +1267,7 @@ mod test {
             "
             data Person {};
         ",
-            vec![expr(data_class("Person", vec![]))],
+            vec![expr(data_class("Person", vec![], vec![]))],
         );
 
         parse(
@@ -1210,7 +1276,7 @@ mod test {
                 first_name,
             };
         ",
-            vec![expr(data_class("Person", vec!["first_name"]))],
+            vec![expr(data_class("Person", vec!["first_name"], vec![]))],
         );
 
         parse(
@@ -1224,6 +1290,7 @@ mod test {
             vec![expr(data_class(
                 "Person",
                 vec!["first_name", "last_name", "age"],
+                vec![],
             ))],
         );
 
@@ -1238,6 +1305,75 @@ mod test {
             vec![expr(data_class(
                 "Person",
                 vec!["first_name", "last_name", "age"],
+                vec![],
+            ))],
+        );
+    }
+
+    #[test]
+    fn data_class_methods_expr() {
+        parse(
+            "
+            data Person {
+                first_name,
+            } :: {
+                fun new {
+                }
+
+                fun name(self) {
+
+                }
+            };
+        ",
+            vec![expr(data_class(
+                "Person",
+                vec!["first_name"],
+                vec![
+                    fun_expr(Some("new".to_string()), vec![], false, vec![]),
+                    fun_expr(
+                        Some("name".to_string()),
+                        vec![Identifier::with_token_type(
+                            "self".to_string(),
+                            TokenType::SELF,
+                        )],
+                        false,
+                        vec![],
+                    ),
+                ],
+            ))],
+        );
+    }
+
+    #[test]
+    fn data_class_methods_self_expr() {
+        parse(
+            "
+            data Person {
+                first_name,
+            } :: {
+                fun name(self) {
+                    self.first_name;
+                }
+                fun set_name(self, name) {
+                    self.first_name = name;
+                }
+            };
+        ",
+            vec![expr(data_class(
+                "Person",
+                vec!["first_name"],
+                vec![
+                    fun_expr(Some("name".to_string()), vec![], false, vec![]),
+                    fun_expr(
+                        Some("set_name".to_string()),
+                        vec![Identifier::with_token_type(
+                            "self".to_string(),
+                            TokenType::SELF,
+                        )],
+                        false,
+                        vec![],
+                    ),
+                ],
             ))],
         );
     }
@@ -1250,7 +1386,7 @@ mod test {
             Person {};
         ",
             vec![
-                expr(data_class("Person", vec![])),
+                expr(data_class("Person", vec![], vec![])),
                 expr(data_class_instance("Person", vec![])),
             ],
         );
@@ -1261,7 +1397,11 @@ mod test {
             Person { first_name: "john", last_name: "doe", age: 23 };
         "#,
             vec![
-                expr(data_class("Person", vec!["first_name", "last_name", "age"])),
+                expr(data_class(
+                    "Person",
+                    vec!["first_name", "last_name", "age"],
+                    vec![],
+                )),
                 expr(data_class_instance(
                     "Person",
                     vec![
@@ -1287,7 +1427,11 @@ mod test {
             p.first_name;
         ",
             vec![
-                expr(data_class("Person", vec!["first_name", "last_name", "age"])),
+                expr(data_class(
+                    "Person",
+                    vec!["first_name", "last_name", "age"],
+                    vec![],
+                )),
                 Statement::create_let("p".to_string(), Some(data_class_instance("Person", vec![]))),
                 expr(Expression::create_get_property(
                     let_ref("p"),
@@ -1310,7 +1454,11 @@ mod test {
             p.age = 1;
         "#,
             vec![
-                expr(data_class("Person", vec!["first_name", "last_name", "age"])),
+                expr(data_class(
+                    "Person",
+                    vec!["first_name", "last_name", "age"],
+                    vec![],
+                )),
                 Statement::create_let("p".to_string(), Some(data_class_instance("Person", vec![]))),
                 expr(Expression::create_set_property(
                     let_ref("p"),
@@ -1333,7 +1481,11 @@ mod test {
             p.age /= 1;
         "#,
             vec![
-                expr(data_class("Person", vec!["first_name", "last_name", "age"])),
+                expr(data_class(
+                    "Person",
+                    vec!["first_name", "last_name", "age"],
+                    vec![],
+                )),
                 Statement::create_let("p".to_string(), Some(data_class_instance("Person", vec![]))),
                 expr(Expression::create_set_property(
                     let_ref("p"),

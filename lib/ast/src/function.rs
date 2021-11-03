@@ -5,4 +5,5 @@ pub struct Function {
     pub name: Option<String>,
     pub params: Vec<Identifier>,
     pub body: Vec<Statement>,
+    pub is_static: bool,
 }

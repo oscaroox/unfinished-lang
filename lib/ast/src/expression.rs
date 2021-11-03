@@ -109,9 +109,15 @@ impl Expression {
     pub fn create_function(
         name: Option<String>,
         params: Vec<Identifier>,
+        is_static: bool,
         body: Vec<Statement>,
     ) -> Expression {
-        Expression::Function(Function { name, params, body })
+        Expression::Function(Function {
+            name,
+            params,
+            body,
+            is_static,
+        })
     }
 
     pub fn create_if(
@@ -144,8 +150,16 @@ impl Expression {
         })
     }
 
-    pub fn create_data_class(name: Identifier, fields: Vec<Identifier>) -> Expression {
-        Expression::DataClass(DataClass { fields, name })
+    pub fn create_data_class(
+        name: Identifier,
+        fields: Vec<Identifier>,
+        methods: Vec<Expression>,
+    ) -> Expression {
+        Expression::DataClass(DataClass {
+            fields,
+            name,
+            methods,
+        })
     }
 
     pub fn create_data_class_instance(
@@ -155,7 +169,7 @@ impl Expression {
         Expression::DataClassInstance(DataClassInstance { name, fields })
     }
 
-    pub fn create_self() -> Expression {
-        Expression::SelfExpr(SelfExpr {})
+    pub fn create_self(name: String) -> Expression {
+        Expression::SelfExpr(SelfExpr { name })
     }
 }

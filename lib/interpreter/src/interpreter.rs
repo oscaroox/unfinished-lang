@@ -1,10 +1,10 @@
-use std::{cell::RefCell, collections::HashMap, fmt::Debug, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, convert::TryInto, fmt::Debug, rc::Rc};
 
-use crate::{builtin::get_builtins, environment::Environment, Value};
+use crate::{builtin::get_builtins, environment::Environment, FunctionValue, Value};
 use ast::{
     Assign, BinOp, BinaryOperation, Block, Call, DataClass, Expression, Function, GetProperty,
-    IfConditional, Index, Let, Literal, Logic, LogicOperation, Program, ReturnExpr, SetIndex,
-    SetProperty, Statement, UnaryOp, UnaryOperation,
+    IfConditional, Index, Let, Literal, Logic, LogicOperation, Program, ReturnExpr, SelfExpr,
+    SetIndex, SetProperty, Statement, UnaryOp, UnaryOperation,
 };
 
 #[derive(Debug)]
@@ -108,6 +108,14 @@ impl Interpreter {
             Expression::DataClassInstance(expr) => self.eval_data_class_instance(expr),
             Expression::GetProperty(expr) => self.eval_get_property(expr),
             Expression::SetProperty(expr) => self.eval_set_property(expr),
+            Expression::SelfExpr(expr) => self.eval_self_expr(expr),
+        }
+    }
+
+    fn eval_self_expr(&mut self, self_expr: &SelfExpr) -> InterpreterResult {
+        match self.env.borrow().get(&self_expr.name) {
+            Some(v) => Ok(v),
+            None => panic!("Unknown variable 'self'"),
         }
     }
 
@@ -117,14 +125,15 @@ impl Interpreter {
         match obj {
             Value::DataClassInstance(instance) => {
                 let value = self.expression(&set_property.value)?;
+
                 instance
                     .borrow_mut()
-                    .set(set_property.name.0.to_string(), value.clone());
+                    .set(set_property.name.value.to_string(), value.clone());
 
                 Ok(value.clone())
             }
             _ => panic!(
-                "Can only access properties on data class instances got {}",
+                "Can only set properties on data class instances got {}",
                 obj
             ),
         }
@@ -135,8 +144,24 @@ impl Interpreter {
 
         match obj {
             Value::DataClassInstance(instance) => {
-                let val = instance.borrow().get(get_property.name.0.to_string());
+                let mut val = instance.borrow().get(get_property.name.value.to_string());
+                match val {
+                    Value::Function(ref mut fun) => {
+                        fun.closure.borrow_mut().define(
+                            "self".to_string(),
+                            Value::DataClassInstance(instance.clone()),
+                        );
+                        if fun.arity > 0 {
+                            fun.arity = fun.arity - 1;
+                        }
+                    }
+                    _ => {}
+                };
                 Ok(val.clone())
+            }
+            Value::DataClass(d) => {
+                let fun = d.get(get_property.name.value.to_string());
+                Ok(Value::Function(fun))
             }
             _ => panic!(
                 "Can only access properties on data class instances got {}",
@@ -150,7 +175,7 @@ impl Interpreter {
         data_class_instance: &ast::DataClassInstance,
     ) -> InterpreterResult {
         let data_class_identifier = data_class_instance.name.clone();
-        let data_class = match self.env.borrow().get(&data_class_identifier.0) {
+        let data_class = match self.env.borrow().get(&data_class_identifier.value) {
             Some(val) => match val {
                 Value::DataClass(class) => class.clone(),
                 _ => panic!("Cannot only instantiate data classes got {}", val),
@@ -166,7 +191,7 @@ impl Interpreter {
         for field in &data_class_instance.fields {
             if data_class.fields.contains(&field.name) {
                 let val = self.expression(&field.value)?;
-                eval_fields.insert(field.name.value(), val);
+                eval_fields.insert(field.name.value.to_string(), val);
             } else {
                 panic!(
                     "Unknown field {} provided to data class {}",
@@ -177,24 +202,51 @@ impl Interpreter {
 
         // fill in the missing fields with null value
         for field in &data_class.fields {
-            if !eval_fields.contains_key(&field.0) {
-                eval_fields.insert(field.0.to_string(), Value::Null);
+            if !eval_fields.contains_key(&field.value) {
+                eval_fields.insert(field.value.to_string(), Value::Null);
             }
         }
 
         Ok(Value::data_class_instance(
             data_class_identifier,
+            data_class.clone(),
             eval_fields,
             data_class.fields.clone(),
         ))
     }
 
     fn eval_data_class(&mut self, data_class: &DataClass) -> InterpreterResult {
-        let value = Value::data_class(data_class.name.to_owned(), data_class.fields.clone());
+        let mut static_methods = HashMap::new();
+        let mut instance_methods = HashMap::new();
+
+        for method in &data_class.methods {
+            match method {
+                Expression::Function(fun) => match self.expression(method)? {
+                    Value::Function(value_fun) => {
+                        if fun.is_static {
+                            static_methods
+                                .insert(fun.name.as_ref().unwrap().to_string(), value_fun);
+                        } else {
+                            instance_methods
+                                .insert(fun.name.as_ref().unwrap().to_string(), value_fun);
+                        }
+                    }
+                    _ => unreachable!(),
+                },
+                _ => unreachable!(),
+            }
+        }
+
+        let value = Value::data_class(
+            data_class.name.to_owned(),
+            data_class.fields.clone(),
+            static_methods,
+            instance_methods,
+        );
 
         self.env
             .borrow_mut()
-            .define(data_class.name.value(), value.clone());
+            .define(data_class.name.value.to_string(), value.clone());
 
         Ok(value)
     }
@@ -264,14 +316,24 @@ impl Interpreter {
 
         match callee {
             Value::Function(fun) => {
-                let mut env = Environment::with_outer(self.env.clone());
+                let mut env = Environment::with_outer(fun.closure.clone());
+                let mut params = vec![];
 
-                if args.len() != fun.params.len() {
-                    panic!("Expected {} arguments got {}", fun.params.len(), args.len())
+                // TODO mark value functions as methods
+                if fun.params.len() > 0 {
+                    if fun.params[0].is_self() {
+                        params = fun.params[1..].to_vec();
+                    }
                 }
 
-                for (arg, param) in args.iter().zip(fun.params.iter()) {
-                    env.define(param.0.to_string(), arg.clone());
+                if args.len() != fun.arity.into() {
+                    panic!("Expected {} arguments got {}", params.len(), args.len())
+                }
+
+                for (arg, param) in args.iter().zip(params.iter()) {
+                    if !param.is_self() {
+                        env.define(param.value.to_string(), arg.clone());
+                    }
                 }
 
                 let env = Rc::new(RefCell::new(env));
@@ -292,6 +354,7 @@ impl Interpreter {
         let fun = Value::function(
             function.name.clone(),
             function.params.clone(),
+            function.params.len().try_into().unwrap(),
             function.body.clone(),
             self.env.clone(),
         );
@@ -368,7 +431,7 @@ impl Interpreter {
     }
 
     fn eval_let_reference(&mut self, letref: &ast::LetRef) -> InterpreterResult {
-        let ident = letref.name.0.to_string();
+        let ident = letref.name.value.to_string();
         match self.env.borrow().get(&ident) {
             Some(var) => Ok(var.clone()),
             None => panic!("undefined variable {}", ident),
@@ -393,7 +456,7 @@ impl Interpreter {
     }
 
     fn eval_assignment(&mut self, assign: &Assign) -> InterpreterResult {
-        let name = assign.name.0.clone();
+        let name = assign.name.value.clone();
         let val = self.expression(&assign.rhs)?;
         match self.env.borrow_mut().assign(name.to_string(), val) {
             Some(val) => Ok(val),
@@ -449,8 +512,8 @@ impl Interpreter {
 mod test {
     use std::collections::HashMap;
 
-    use crate::{Interpreter, Value};
-    use ast::Identifier;
+    use crate::{DataClass, FunctionValue, Interpreter, Value};
+    use ast::{DataClassInstance, Identifier};
     use parser::Parser;
     use scanner::Scanner;
     use spanner::SpanManager;
@@ -480,6 +543,20 @@ mod test {
 
     fn ident(name: &str) -> Identifier {
         Identifier::new(name.to_string())
+    }
+
+    fn data_class(
+        name: &str,
+        fields: Vec<Identifier>,
+        static_methods: HashMap<String, FunctionValue>,
+        instance_methods: HashMap<String, FunctionValue>,
+    ) -> DataClass {
+        DataClass {
+            name: Identifier::new(name.to_string()),
+            fields,
+            static_methods,
+            instance_methods,
+        }
     }
 
     #[test]
@@ -753,7 +830,7 @@ mod test {
     pub fn eval_data_class() {
         run((
             "data Person {};",
-            Value::data_class(ident("Person"), vec![]),
+            Value::data_class(ident("Person"), vec![], HashMap::new(), HashMap::new()),
         ));
 
         run((
@@ -765,6 +842,8 @@ mod test {
             Value::data_class(
                 ident("Person"),
                 vec![ident("first_name"), ident("last_name"), ident("age")],
+                HashMap::new(),
+                HashMap::new(),
             ),
         ));
     }
@@ -782,6 +861,7 @@ mod test {
         );
         map.insert(String::from("age"), Value::Int(40));
 
+        let field_idents = vec![ident("first_name"), ident("last_name"), ident("age")];
         run((
             r#"data Person {
                 first_name,
@@ -793,8 +873,14 @@ mod test {
             "#,
             Value::data_class_instance(
                 ident("Person"),
+                data_class(
+                    "Person",
+                    field_idents.clone(),
+                    HashMap::new(),
+                    HashMap::new(),
+                ),
                 map.clone(),
-                vec![ident("first_name"), ident("last_name"), ident("age")],
+                field_idents.clone(),
             ),
         ));
 
@@ -810,8 +896,14 @@ mod test {
             "#,
             Value::data_class_instance(
                 ident("Person"),
+                data_class(
+                    "Person",
+                    field_idents.clone(),
+                    HashMap::new(),
+                    HashMap::new(),
+                ),
                 map.clone(),
-                vec![ident("first_name"), ident("last_name"), ident("age")],
+                field_idents.clone(),
             ),
         ));
 
@@ -829,8 +921,14 @@ mod test {
             "#,
             Value::data_class_instance(
                 ident("Person"),
+                data_class(
+                    "Person",
+                    field_idents.clone(),
+                    HashMap::new(),
+                    HashMap::new(),
+                ),
                 map.clone(),
-                vec![ident("first_name"), ident("last_name"), ident("age")],
+                field_idents.clone(),
             ),
         ));
     }
@@ -892,6 +990,70 @@ mod test {
             person.age;
             "#,
             Value::Int(40),
+        ));
+    }
+
+    #[test]
+    pub fn eval_data_class_static_method() {
+        run((
+            "data Person {
+                id
+            } :: {
+                fun new {
+                    Person { id: 1 };
+                }
+            };
+            let person = Person.new();
+            person.id;
+            ",
+            Value::Int(1),
+        ));
+    }
+
+    #[test]
+    pub fn eval_data_class_instance_method() {
+        run((
+            "data Person {
+                id
+            } :: {
+                fun new {
+                    Person { id: 22 };
+                }
+
+                fun get_id(self) {
+                    self.id;
+                }
+            };
+            let person = Person.new();
+            person.get_id();
+            ",
+            Value::Int(22),
+        ));
+    }
+
+    #[test]
+    pub fn eval_data_class_instance_set_method() {
+        run((
+            "data Person {
+                id
+            } :: {
+                fun new {
+                    Person { id: 22 };
+                }
+
+                fun set_id(self, new_id) {
+                    self.id = new_id;
+                }
+
+                fun get_id(self) {
+                    self.id;
+                }
+            };
+            let person = Person.new();
+            person.set_id(98324);
+            person.get_id();
+            ",
+            Value::Int(98324),
         ));
     }
 }

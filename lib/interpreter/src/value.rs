@@ -23,6 +23,7 @@ pub enum Value {
 #[derive(Debug, Clone, PartialEq)]
 pub struct DataClassInstance {
     pub name: Identifier,
+    pub data_class: DataClass,
     pub keys: Vec<Identifier>,
     pub fields: HashMap<String, Value>,
 }
@@ -31,9 +32,14 @@ impl DataClassInstance {
     pub fn get(&self, name: String) -> Value {
         match self.fields.get(&name) {
             Some(v) => v.clone(),
-            None => panic!("Undefined property {}", name),
+            None => match self.data_class.instance_methods.get(&name) {
+                Some(v) => Value::Function(v.clone()),
+                None => panic!("Undefined property {}", name),
+            },
         }
     }
+
+    pub fn get_method(&self, name: String) {}
 
     pub fn set(&mut self, name: String, value: Value) {
         self.fields.insert(name, value.clone());
@@ -44,6 +50,17 @@ impl DataClassInstance {
 pub struct DataClass {
     pub name: Identifier,
     pub fields: Vec<Identifier>,
+    pub static_methods: HashMap<String, FunctionValue>,
+    pub instance_methods: HashMap<String, FunctionValue>,
+}
+
+impl DataClass {
+    pub fn get(&self, name: String) -> FunctionValue {
+        match self.static_methods.get(&name) {
+            Some(v) => v.clone(),
+            None => panic!("Undefined method {}", name),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -54,6 +71,7 @@ pub struct Array {
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionValue {
     pub name: Option<String>,
+    pub arity: u8,
     pub params: Vec<Identifier>,
     pub body: Vec<Statement>,
     pub closure: Rc<RefCell<Environment>>,
@@ -77,12 +95,14 @@ impl Value {
     pub fn function(
         name: Option<String>,
         params: Vec<Identifier>,
+        arity: u8,
         body: Vec<Statement>,
         closure: Rc<RefCell<Environment>>,
     ) -> Value {
         Value::Function(FunctionValue {
             name,
             params,
+            arity,
             body,
             closure,
         })
@@ -100,8 +120,18 @@ impl Value {
         Value::ReturnVal(Box::new(val))
     }
 
-    pub fn data_class(name: Identifier, fields: Vec<Identifier>) -> Value {
-        Value::DataClass(DataClass { name, fields })
+    pub fn data_class(
+        name: Identifier,
+        fields: Vec<Identifier>,
+        static_methods: HashMap<String, FunctionValue>,
+        instance_methods: HashMap<String, FunctionValue>,
+    ) -> Value {
+        Value::DataClass(DataClass {
+            name,
+            fields,
+            static_methods,
+            instance_methods,
+        })
     }
 
     pub fn array(values: Vec<Value>) -> Value {
@@ -110,11 +140,13 @@ impl Value {
 
     pub fn data_class_instance(
         name: Identifier,
+        data_class: DataClass,
         fields: HashMap<String, Value>,
         keys: Vec<Identifier>,
     ) -> Value {
         Value::DataClassInstance(Rc::new(RefCell::new(DataClassInstance {
             name,
+            data_class,
             fields,
             keys,
         })))
@@ -150,15 +182,15 @@ impl std::fmt::Display for Value {
                 write!(f, "<nativeFun {}>", v.name)
             }
             Value::DataClass(v) => {
-                write!(f, "<dataClass {}>", v.name.value())
+                write!(f, "<dataClass {}>", v.name.value)
             }
             Value::DataClassInstance(v) => {
-                let name = v.borrow().name.value();
+                let name = v.borrow().name.value.to_string();
                 write!(f, "{} {{ ", name)?;
                 let mut out = vec![];
 
                 for key in &v.borrow().keys {
-                    if let Some(field) = &v.borrow().fields.get(&key.0) {
+                    if let Some(field) = &v.borrow().fields.get(&key.value) {
                         out.push(format!("{}: {}", key, field))
                     }
                 }
