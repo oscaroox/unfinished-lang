@@ -578,6 +578,10 @@ impl<'a> Parser<'a> {
             return self.fun_expression();
         }
 
+        if self.matches(vec![TokenType::SELF]) {
+            return Ok(Expression::create_self());
+        }
+
         if self.matches(vec![TokenType::LeftBracket]) {
             let mut exprs = vec![];
             if self.curr_token.token_type != TokenType::RightBracket {
@@ -783,6 +787,11 @@ mod test {
                 Literal::Null,
             ))],
         );
+    }
+
+    #[test]
+    fn self_keyword() {
+        parse("self;", vec![expr(Expression::create_self())]);
     }
 
     #[test]

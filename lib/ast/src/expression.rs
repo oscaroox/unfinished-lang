@@ -1,8 +1,8 @@
 use crate::{
     Assign, BinOp, BinaryOperation, Block, Call, DataClass, DataClassInstance,
     DataClassInstanceField, Function, GetProperty, Grouping, Identifier, IfConditional, Index,
-    LetRef, Literal, Logic, LogicOperation, ReturnExpr, SetIndex, SetProperty, Statement, UnaryOp,
-    UnaryOperation,
+    LetRef, Literal, Logic, LogicOperation, ReturnExpr, SelfExpr, SetIndex, SetProperty, Statement,
+    UnaryOp, UnaryOperation,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -25,6 +25,7 @@ pub enum Expression {
     Block(Block),
     If(IfConditional),
     Return(ReturnExpr),
+    SelfExpr(SelfExpr),
 }
 
 impl Expression {
@@ -152,5 +153,9 @@ impl Expression {
         fields: Vec<DataClassInstanceField>,
     ) -> Expression {
         Expression::DataClassInstance(DataClassInstance { name, fields })
+    }
+
+    pub fn create_self() -> Expression {
+        Expression::SelfExpr(SelfExpr {})
     }
 }
