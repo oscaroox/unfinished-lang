@@ -323,11 +323,13 @@ impl Interpreter {
                 if fun.params.len() > 0 {
                     if fun.params[0].is_self() {
                         params = fun.params[1..].to_vec();
+                    } else {
+                        params = fun.params;
                     }
                 }
 
                 if args.len() != fun.arity.into() {
-                    panic!("Expected {} arguments got {}", params.len(), args.len())
+                    panic!("Expected {} arguments got {}", fun.arity, args.len())
                 }
 
                 for (arg, param) in args.iter().zip(params.iter()) {
