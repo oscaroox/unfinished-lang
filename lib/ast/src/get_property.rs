@@ -4,4 +4,5 @@ use crate::{Expression, Identifier};
 pub struct GetProperty {
     pub object: Box<Expression>,
     pub name: Identifier,
+    pub is_callable: bool,
 }

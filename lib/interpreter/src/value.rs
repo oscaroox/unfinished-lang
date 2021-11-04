@@ -39,6 +39,13 @@ impl DataClassInstance {
         }
     }
 
+    pub fn get_method(&self, name: String) -> Value {
+        match self.data_class.instance_methods.get(&name) {
+            Some(v) => Value::Function(v.clone()),
+            None => panic!("Undefined method {}", name),
+        }
+    }
+
     pub fn set(&mut self, name: String, value: Value) {
         self.fields.insert(name, value.clone());
     }

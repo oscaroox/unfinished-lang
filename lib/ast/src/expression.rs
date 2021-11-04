@@ -87,9 +87,14 @@ impl Expression {
         })
     }
 
-    pub fn create_get_property(object: Expression, name: Identifier) -> Expression {
+    pub fn create_get_property(
+        object: Expression,
+        name: Identifier,
+        is_callable: bool,
+    ) -> Expression {
         Expression::GetProperty(GetProperty {
             object: Box::new(object),
+            is_callable,
             name,
         })
     }

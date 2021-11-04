@@ -144,7 +144,13 @@ impl Interpreter {
 
         match obj {
             Value::DataClassInstance(instance) => {
-                let mut val = instance.borrow().get(get_property.name.value.to_string());
+                let mut val = if get_property.is_callable {
+                    instance
+                        .borrow()
+                        .get_method(get_property.name.value.to_string())
+                } else {
+                    instance.borrow().get(get_property.name.value.to_string())
+                };
                 match val {
                     Value::Function(ref mut fun) => {
                         fun.closure.borrow_mut().define(
@@ -348,7 +354,7 @@ impl Interpreter {
 
                 v.builtin.call(args)
             }
-            _ => panic!("You can only call functions"),
+            _ => panic!("You can only call functions and methods"),
         }
     }
 
@@ -996,6 +1002,25 @@ mod test {
     }
 
     #[test]
+    pub fn eval_shorthand_data_class_instantiate() {
+        run((
+            r#"
+            data Person {
+                first_name,
+                last_name,
+                age,
+            };
+            let first_name = "John";
+            let last_name = "Doe";
+            let age = 40;
+            let person = Person { first_name, last_name, age };
+            person.age;
+            "#,
+            Value::Int(40),
+        ));
+    }
+
+    #[test]
     pub fn eval_data_class_static_method() {
         run((
             "data Person {
@@ -1028,6 +1053,25 @@ mod test {
             };
             let person = Person.new();
             person.get_id();
+            ",
+            Value::Int(22),
+        ));
+
+        // should allow a method with the same name as a data class field to be called
+        run((
+            "data Person {
+                id
+            } :: {
+                fun new {
+                    Person { id: 22 };
+                }
+
+                fun id(self) {
+                    self.id;
+                }
+            };
+            let person = Person.new();
+            person.id();
             ",
             Value::Int(22),
         ));
