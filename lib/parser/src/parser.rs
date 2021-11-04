@@ -197,6 +197,21 @@ impl<'a> Parser<'a> {
         if self.curr_token.token_type != TokenType::RightBrace {
             while !self.curr_token.is_eof() {
                 let id = self.eat(TokenType::Identifier, "Expected identifier")?;
+
+                if self.matches(vec![TokenType::Comma])
+                    || self.curr_token.token_type == TokenType::RightBrace
+                {
+                    let ident = Identifier::new(id.value.to_string());
+                    fields.push(DataClassInstanceField::new(
+                        ident.clone(),
+                        Expression::create_let_ref(ident),
+                    ));
+                    if self.curr_token.token_type == TokenType::RightBrace {
+                        break;
+                    }
+                    continue;
+                }
+
                 self.eat(TokenType::Colon, "Expected ':'")?;
                 let expr = self.expression()?;
                 let field =
@@ -573,9 +588,12 @@ impl<'a> Parser<'a> {
                 expr = Expression::create_index(expr, idx);
             } else if self.matches(vec![TokenType::Dot]) {
                 let name = self.eat(TokenType::Identifier, "Expected identifier,")?;
-
-                expr =
-                    Expression::create_get_property(expr, Identifier::new(name.value.to_string()))
+                let is_callable = self.check(TokenType::LeftParen);
+                expr = Expression::create_get_property(
+                    expr,
+                    Identifier::new(name.value.to_string()),
+                    is_callable,
+                )
             } else {
                 break;
             }
@@ -725,12 +743,24 @@ mod test {
         Expression::create_literal(Literal::Bool(val))
     }
 
+    fn ident(val: &str) -> Identifier {
+        Identifier::new(val.to_string())
+    }
+
+    fn ident_self() -> Identifier {
+        Identifier::with_token_type("self".to_string(), TokenType::SELF)
+    }
+
     fn null() -> Expression {
         Expression::create_literal(Literal::Null)
     }
 
     fn let_ref(val: &str) -> Expression {
         Expression::create_let_ref(Identifier::new(val.to_string()))
+    }
+
+    fn let_stmt(name: &str, value: Option<Expression>) -> Statement {
+        Statement::create_let(name.to_string(), value)
     }
 
     fn string_lit(val: &str) -> Expression {
@@ -859,7 +889,7 @@ mod test {
     }
 
     #[test]
-    fn let_stmt() {
+    fn parse_let_stmt() {
         parse(
             "let num; let _num = 1;",
             vec![
@@ -1143,6 +1173,14 @@ mod test {
                 )),
             ],
         );
+
+        parse(
+            "fun (){}();",
+            vec![Statement::create_expr(Expression::create_call(
+                Expression::create_function(None, vec![], true, vec![]),
+                vec![],
+            ))],
+        );
     }
 
     #[test]
@@ -1169,15 +1207,15 @@ mod test {
         };
         ",
             vec![
-                Statement::create_expr(Expression::create_function(None, vec![], false, vec![])),
-                Statement::create_expr(Expression::create_function(None, vec![], false, vec![])),
+                Statement::create_expr(Expression::create_function(None, vec![], true, vec![])),
+                Statement::create_expr(Expression::create_function(None, vec![], true, vec![])),
                 Statement::create_expr(Expression::create_function(
                     None,
                     vec![
                         Identifier::new("x".to_string()),
                         Identifier::new("y".to_string()),
                     ],
-                    false,
+                    true,
                     vec![],
                 )),
                 Statement::create_expr(Expression::create_function(
@@ -1186,7 +1224,7 @@ mod test {
                         Identifier::new("y".to_string()),
                         Identifier::new("z".to_string()),
                     ],
-                    false,
+                    true,
                     vec![
                         Statement::create_let("name".to_string(), Some(int(2))),
                         Statement::create_expr(int(123)),
@@ -1194,17 +1232,6 @@ mod test {
                 )),
             ],
         )
-    }
-
-    #[test]
-    fn function_call_expr() {
-        parse(
-            "fun (){}();",
-            vec![Statement::create_expr(Expression::create_call(
-                Expression::create_function(None, vec![], false, vec![]),
-                vec![],
-            ))],
-        );
     }
 
     #[test]
@@ -1329,7 +1356,7 @@ mod test {
                 "Person",
                 vec!["first_name"],
                 vec![
-                    fun_expr(Some("new".to_string()), vec![], false, vec![]),
+                    fun_expr(Some("new".to_string()), vec![], true, vec![]),
                     fun_expr(
                         Some("name".to_string()),
                         vec![Identifier::with_token_type(
@@ -1363,15 +1390,25 @@ mod test {
                 "Person",
                 vec!["first_name"],
                 vec![
-                    fun_expr(Some("name".to_string()), vec![], false, vec![]),
+                    fun_expr(
+                        Some("name".to_string()),
+                        vec![ident_self()],
+                        false,
+                        vec![expr(Expression::create_get_property(
+                            Expression::create_self("self".to_string()),
+                            Identifier::new("first_name".to_string()),
+                            false,
+                        ))],
+                    ),
                     fun_expr(
                         Some("set_name".to_string()),
-                        vec![Identifier::with_token_type(
-                            "self".to_string(),
-                            TokenType::SELF,
-                        )],
+                        vec![ident_self(), ident("name")],
                         false,
-                        vec![],
+                        vec![expr(Expression::create_set_property(
+                            Expression::create_self("self".to_string()),
+                            ident("first_name"),
+                            let_ref("name"),
+                        ))],
                     ),
                 ],
             ))],
@@ -1415,6 +1452,47 @@ mod test {
     }
 
     #[test]
+    fn data_class_instantiate_shorthand_expr() {
+        parse(
+            r#"
+            data Person {
+                id,
+                first_name,
+            };
+            let id = 123;
+            let first_name = "John";
+            Person {
+                id,
+                first_name,
+            };
+            Person {
+                id,
+                first_name
+            };
+        "#,
+            vec![
+                expr(data_class("Person", vec!["id", "first_name"], vec![])),
+                let_stmt("id", Some(int(123))),
+                let_stmt("first_name", Some(string_lit("John"))),
+                expr(data_class_instance(
+                    "Person",
+                    vec![
+                        data_class_instance_field("id", let_ref("id")),
+                        data_class_instance_field("first_name", let_ref("first_name")),
+                    ],
+                )),
+                expr(data_class_instance(
+                    "Person",
+                    vec![
+                        data_class_instance_field("id", let_ref("id")),
+                        data_class_instance_field("first_name", let_ref("first_name")),
+                    ],
+                )),
+            ],
+        );
+    }
+
+    #[test]
     fn get_property_expr() {
         parse(
             "
@@ -1436,6 +1514,7 @@ mod test {
                 expr(Expression::create_get_property(
                     let_ref("p"),
                     Identifier::new("first_name".to_string()),
+                    false,
                 )),
             ],
         );
@@ -1494,6 +1573,7 @@ mod test {
                         Expression::create_get_property(
                             let_ref("p"),
                             Identifier::new("age".to_string()),
+                            false,
                         ),
                         BinaryOperation::Add,
                         int(1),
@@ -1506,6 +1586,7 @@ mod test {
                         Expression::create_get_property(
                             let_ref("p"),
                             Identifier::new("age".to_string()),
+                            false,
                         ),
                         BinaryOperation::Substract,
                         int(1),
@@ -1518,6 +1599,7 @@ mod test {
                         Expression::create_get_property(
                             let_ref("p"),
                             Identifier::new("age".to_string()),
+                            false,
                         ),
                         BinaryOperation::Multiply,
                         int(1),
@@ -1530,6 +1612,7 @@ mod test {
                         Expression::create_get_property(
                             let_ref("p"),
                             Identifier::new("age".to_string()),
+                            false,
                         ),
                         BinaryOperation::Divide,
                         int(1),
