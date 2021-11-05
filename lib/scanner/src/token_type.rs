@@ -17,6 +17,8 @@ pub enum TokenType {
     SELF,
     Data,
     Loop,
+    Break,
+    Continue,
 
     And,
     Or,
@@ -78,6 +80,8 @@ impl std::fmt::Display for TokenType {
             TokenType::SELF => write!(f, "self"),
             TokenType::Data => write!(f, "data"),
             TokenType::Loop => write!(f, "loop"),
+            TokenType::Break => write!(f, "break"),
+            TokenType::Continue => write!(f, "continue"),
             TokenType::LessThan => write!(f, "<"),
             TokenType::LessThanEqual => write!(f, "<="),
             TokenType::GreaterThan => write!(f, ">"),
