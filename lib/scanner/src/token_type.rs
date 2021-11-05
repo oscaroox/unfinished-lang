@@ -16,6 +16,7 @@ pub enum TokenType {
     Return,
     SELF,
     Data,
+    Loop,
 
     And,
     Or,
@@ -76,6 +77,7 @@ impl std::fmt::Display for TokenType {
             TokenType::Return => write!(f, "return"),
             TokenType::SELF => write!(f, "self"),
             TokenType::Data => write!(f, "data"),
+            TokenType::Loop => write!(f, "loop"),
             TokenType::LessThan => write!(f, "<"),
             TokenType::LessThanEqual => write!(f, "<="),
             TokenType::GreaterThan => write!(f, ">"),

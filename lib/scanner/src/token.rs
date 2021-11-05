@@ -52,6 +52,7 @@ impl Token {
     impl_token!(data, Data);
     impl_token!(self_token, SELF);
     impl_token!(null, Null);
+    impl_token!(loop_token, Loop);
 
     impl_token!(and, And);
     impl_token!(or, Or);
