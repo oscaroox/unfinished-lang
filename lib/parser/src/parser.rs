@@ -184,6 +184,12 @@ impl<'a> Parser<'a> {
             return self.data_class_expression();
         } else if self.matches(vec![TokenType::Loop]) {
             return self.loop_expression();
+        } else if self.matches(vec![TokenType::Break, TokenType::Continue]) {
+            return Ok(match self.prev_token.token_type {
+                TokenType::Break => Expression::create_break(),
+                TokenType::Continue => Expression::create_continue(),
+                _ => unreachable!(),
+            });
         } else if self.check(TokenType::Identifier) && self.check_peek(TokenType::LeftBrace) {
             return self.data_class_instantiate();
         }
@@ -1652,6 +1658,26 @@ mod test {
                 expr(Expression::create_loop(
                     Expression::create_logic(int(1), LogicOperation::LessThan, int(2)),
                     vec![],
+                )),
+            ],
+        )
+    }
+
+    #[test]
+    fn break_continue_expr() {
+        parse(
+            "
+        loop { break; }; 
+        loop { continue; }; 
+        ",
+            vec![
+                expr(Expression::create_loop(
+                    bool_lit(true),
+                    vec![expr(Expression::create_break())],
+                )),
+                expr(Expression::create_loop(
+                    bool_lit(true),
+                    vec![expr(Expression::create_continue())],
                 )),
             ],
         )

@@ -1,8 +1,8 @@
 use crate::{
-    Assign, BinOp, BinaryOperation, Block, Call, DataClass, DataClassInstance,
-    DataClassInstanceField, Function, GetProperty, Grouping, Identifier, IfConditional, Index,
-    LetRef, Literal, Logic, LogicOperation, LoopExpr, ReturnExpr, SelfExpr, SetIndex, SetProperty,
-    Statement, UnaryOp, UnaryOperation,
+    Assign, BinOp, BinaryOperation, Block, BreakExpr, Call, ContinueExpr, DataClass,
+    DataClassInstance, DataClassInstanceField, Function, GetProperty, Grouping, Identifier,
+    IfConditional, Index, LetRef, Literal, Logic, LogicOperation, LoopExpr, ReturnExpr, SelfExpr,
+    SetIndex, SetProperty, Statement, UnaryOp, UnaryOperation,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -27,6 +27,8 @@ pub enum Expression {
     Return(ReturnExpr),
     SelfExpr(SelfExpr),
     LoopExpr(LoopExpr),
+    BreakExpr(BreakExpr),
+    ContinueExpr(ContinueExpr),
 }
 
 impl Expression {
@@ -184,5 +186,13 @@ impl Expression {
             body,
             condition: Box::new(condition),
         })
+    }
+
+    pub fn create_break() -> Expression {
+        Expression::BreakExpr(BreakExpr {})
+    }
+
+    pub fn create_continue() -> Expression {
+        Expression::ContinueExpr(ContinueExpr {})
     }
 }
