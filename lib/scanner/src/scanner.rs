@@ -20,7 +20,9 @@ impl<'a> Scanner<'a> {
             span_maker,
         };
 
-        scanner.ch = scanner.source[0];
+        if scanner.source.len() > 0 {
+            scanner.ch = scanner.source[0];
+        }
         scanner
     }
 
@@ -336,6 +338,11 @@ mod tests {
                 assert_eq!(val.to_string(), token.value);
             }
         });
+    }
+
+    #[test]
+    fn scan_empty() {
+        test_scan("", vec![(TokenType::EOF, None)]);
     }
 
     #[test]
