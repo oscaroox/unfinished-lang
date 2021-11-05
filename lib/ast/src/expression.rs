@@ -1,8 +1,8 @@
 use crate::{
     Assign, BinOp, BinaryOperation, Block, Call, DataClass, DataClassInstance,
     DataClassInstanceField, Function, GetProperty, Grouping, Identifier, IfConditional, Index,
-    LetRef, Literal, Logic, LogicOperation, ReturnExpr, SelfExpr, SetIndex, SetProperty, Statement,
-    UnaryOp, UnaryOperation,
+    LetRef, Literal, Logic, LogicOperation, LoopExpr, ReturnExpr, SelfExpr, SetIndex, SetProperty,
+    Statement, UnaryOp, UnaryOperation,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -26,6 +26,7 @@ pub enum Expression {
     If(IfConditional),
     Return(ReturnExpr),
     SelfExpr(SelfExpr),
+    LoopExpr(LoopExpr),
 }
 
 impl Expression {
@@ -176,5 +177,12 @@ impl Expression {
 
     pub fn create_self(name: String) -> Expression {
         Expression::SelfExpr(SelfExpr { name })
+    }
+
+    pub fn create_loop(condition: Expression, body: Vec<Statement>) -> Expression {
+        Expression::LoopExpr(LoopExpr {
+            body,
+            condition: Box::new(condition),
+        })
     }
 }

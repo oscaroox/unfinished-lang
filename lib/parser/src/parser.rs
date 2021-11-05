@@ -182,10 +182,26 @@ impl<'a> Parser<'a> {
             return self.return_expression();
         } else if self.matches(vec![TokenType::Data]) {
             return self.data_class_expression();
+        } else if self.matches(vec![TokenType::Loop]) {
+            return self.loop_expression();
         } else if self.check(TokenType::Identifier) && self.check_peek(TokenType::LeftBrace) {
             return self.data_class_instantiate();
         }
         self.assignment()
+    }
+
+    fn loop_expression(&mut self) -> Result<Expression, ParserError> {
+        let condition = if !self.check(TokenType::LeftBrace) {
+            self.expression()?
+        } else {
+            Expression::create_literal(Literal::Bool(true))
+        };
+
+        self.eat(TokenType::LeftBrace, "Expected '{'")?;
+
+        let body = self.block_expression()?;
+
+        Ok(Expression::create_loop(condition, body))
     }
 
     fn data_class_instantiate(&mut self) -> Result<Expression, ParserError> {
@@ -1620,5 +1636,24 @@ mod test {
                 )),
             ],
         );
+    }
+
+    #[test]
+    fn loop_expr() {
+        parse(
+            "
+            loop {}; 
+            loop true {}; 
+            loop 1 < 2 {};
+            ",
+            vec![
+                expr(Expression::create_loop(bool_lit(true), vec![])),
+                expr(Expression::create_loop(bool_lit(true), vec![])),
+                expr(Expression::create_loop(
+                    Expression::create_logic(int(1), LogicOperation::LessThan, int(2)),
+                    vec![],
+                )),
+            ],
+        )
     }
 }

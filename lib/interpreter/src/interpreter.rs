@@ -3,8 +3,8 @@ use std::{cell::RefCell, collections::HashMap, convert::TryInto, fmt::Debug, rc:
 use crate::{builtin::get_builtins, environment::Environment, Value};
 use ast::{
     Assign, BinOp, BinaryOperation, Block, Call, DataClass, Expression, Function, GetProperty,
-    IfConditional, Index, Let, Literal, Logic, LogicOperation, Program, ReturnExpr, SelfExpr,
-    SetIndex, SetProperty, Statement, UnaryOp, UnaryOperation,
+    IfConditional, Index, Let, Literal, Logic, LogicOperation, LoopExpr, Program, ReturnExpr,
+    SelfExpr, SetIndex, SetProperty, Statement, UnaryOp, UnaryOperation,
 };
 
 #[derive(Debug)]
@@ -109,7 +109,15 @@ impl Interpreter {
             Expression::GetProperty(expr) => self.eval_get_property(expr),
             Expression::SetProperty(expr) => self.eval_set_property(expr),
             Expression::SelfExpr(expr) => self.eval_self_expr(expr),
+            Expression::LoopExpr(expr) => self.eval_loop_expr(expr),
         }
+    }
+
+    fn eval_loop_expr(&mut self, loop_expr: &LoopExpr) -> InterpreterResult {
+        while (self.expression(&loop_expr.condition)?).is_truthy() {
+            self.eval_statements(&loop_expr.body)?;
+        }
+        Ok(Value::Unit)
     }
 
     fn eval_self_expr(&mut self, self_expr: &SelfExpr) -> InterpreterResult {
@@ -569,6 +577,20 @@ mod test {
     }
 
     #[test]
+    fn eval_loop() {
+        run((
+            "
+        let i = 0;
+        loop i < 10 {
+            i += 1;
+        };
+        i;
+        ",
+            Value::Int(10),
+        ));
+    }
+
+    #[test]
     fn let_statement() {
         run(("let name = 123;", Value::Unit));
         run(("let name; name;", Value::Null));
@@ -576,7 +598,7 @@ mod test {
     }
 
     #[test]
-    pub fn literals() {
+    fn literals() {
         run(("let x = true; x;", Value::Bool(true)));
         run(("let x = false; x;", Value::Bool(false)));
         run(("let x = 123; x;", Value::Int(123)));
