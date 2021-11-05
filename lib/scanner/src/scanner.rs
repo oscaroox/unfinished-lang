@@ -166,6 +166,7 @@ impl<'a> Scanner<'a> {
 
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
+
         let curr_ch = self.ch;
         let pos = self.pos;
 
@@ -212,6 +213,25 @@ impl<'a> Scanner<'a> {
                     self.advance();
                     self.advance();
                     return Token::assign_slash(self.span(pos, self.pos));
+                } else if self.peek() == '/' {
+                    while self.peek() != '\n' && !self.is_end() {
+                        self.advance();
+                    }
+                    self.advance();
+                    return self.next_token();
+                } else if self.peek() == '*' {
+                    while !self.is_end() {
+                        self.advance();
+                        // let c = self.ch;
+                        // let peek = self.peek();
+                        if self.ch == '*' && self.peek() == '/' {
+                            break;
+                        }
+                    }
+                    // remove last slash when out of loop
+                    self.advance();
+                    self.advance();
+                    return self.next_token();
                 }
                 Token::slash(self.span(pos, self.pos))
             }
@@ -388,6 +408,27 @@ mod tests {
                 (TokenType::EOF, None),
             ],
         );
+    }
+
+    #[test]
+    fn comments() {
+        test_scan(
+            "
+        // this is a commeents
+        // let test = 123;
+        ",
+            vec![(TokenType::EOF, None)],
+        );
+
+        test_scan(
+            "
+        /**
+         * This is a multiline comment
+         */
+
+        ",
+            vec![(TokenType::EOF, None)],
+        )
     }
 
     #[test]
