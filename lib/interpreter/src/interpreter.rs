@@ -169,6 +169,7 @@ impl Interpreter {
                 let fun = d.get(get_property.name.value.to_string());
                 Ok(Value::Function(fun))
             }
+            Value::Null => panic!("Cannot access {} on null", get_property.name),
             _ => panic!(
                 "Can only access properties on data class instances got {}",
                 obj
