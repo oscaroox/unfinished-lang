@@ -16,6 +16,8 @@ pub enum Value {
     DataClassInstance(Rc<RefCell<DataClassInstance>>),
     NativeFunction(NativeFunction),
     ReturnVal(Box<Value>),
+    Break,
+    Continue,
     Null,
     Unit,
 }
@@ -202,6 +204,8 @@ impl std::fmt::Display for Value {
                 write!(f, "{} }}", out.join(", "))
             }
             Value::ReturnVal(_) => write!(f, ""),
+            Value::Break => write!(f, ""),
+            Value::Continue => write!(f, ""),
         }
     }
 }

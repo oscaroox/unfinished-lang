@@ -62,8 +62,9 @@ impl Interpreter {
         let mut res = Value::Unit;
         for stmt in stmts.iter() {
             res = self.execute_statement(stmt)?;
-            if let Value::ReturnVal(_) = res {
-                return Ok(res);
+            match res {
+                Value::ReturnVal(_) | Value::Break | Value::Continue => return Ok(res),
+                _ => {}
             }
         }
         Ok(res)
@@ -110,14 +111,29 @@ impl Interpreter {
             Expression::SetProperty(expr) => self.eval_set_property(expr),
             Expression::SelfExpr(expr) => self.eval_self_expr(expr),
             Expression::LoopExpr(expr) => self.eval_loop_expr(expr),
+            Expression::BreakExpr(_) => Ok(Value::Break),
+            Expression::ContinueExpr(_) => Ok(Value::Continue),
         }
     }
 
     fn eval_loop_expr(&mut self, loop_expr: &LoopExpr) -> InterpreterResult {
+        let mut outval = Value::Unit;
         while (self.expression(&loop_expr.condition)?).is_truthy() {
-            self.eval_statements(&loop_expr.body)?;
+            let val = self.eval_statements(&loop_expr.body)?;
+            match val {
+                Value::Break | Value::ReturnVal(_) => {
+                    if let Value::ReturnVal(_) = val {
+                        outval = val;
+                    }
+                    break;
+                }
+                Value::Continue => {
+                    continue;
+                }
+                _ => {}
+            }
         }
-        Ok(Value::Unit)
+        Ok(outval)
     }
 
     fn eval_self_expr(&mut self, self_expr: &SelfExpr) -> InterpreterResult {
@@ -587,6 +603,20 @@ mod test {
         i;
         ",
             Value::Int(10),
+        ));
+
+        run((
+            "
+        let i = 0;
+        loop i < 10 {
+            if i == 5 {
+                break;
+            };
+            i += 1;
+        };
+        i;
+        ",
+            Value::Int(5),
         ));
     }
 
