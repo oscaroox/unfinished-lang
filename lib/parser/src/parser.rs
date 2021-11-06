@@ -7,10 +7,25 @@ use spanner::Span;
 
 use crate::ParserError;
 
+const RECOVER_SET: [TokenType; 5] = [
+    TokenType::Let,
+    TokenType::Fun,
+    TokenType::Data,
+    TokenType::Loop,
+    TokenType::If,
+];
+
 #[derive(Debug, PartialEq)]
 pub enum FunctionKind {
+    None,
     Function,
     Method,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum LoopKind {
+    None,
+    Loop,
 }
 
 #[derive(Debug)]
@@ -19,6 +34,9 @@ pub struct Parser<'a> {
     prev_token: Token,
     curr_token: Token,
     peek_token: Token,
+
+    current_function: FunctionKind,
+    current_loop: LoopKind,
 }
 
 impl<'a> Parser<'a> {
@@ -30,6 +48,8 @@ impl<'a> Parser<'a> {
             prev_token: Token::eof(Span::dummy()),
             curr_token,
             peek_token,
+            current_function: FunctionKind::None,
+            current_loop: LoopKind::None,
         }
     }
 
@@ -56,9 +76,8 @@ impl<'a> Parser<'a> {
                 return;
             }
 
-            match self.curr_token.token_type {
-                TokenType::Let | TokenType::Fun => return,
-                _ => {}
+            if RECOVER_SET.contains(&self.curr_token.token_type) {
+                return;
             }
             self.advance();
         }
@@ -183,17 +202,32 @@ impl<'a> Parser<'a> {
         } else if self.matches(vec![TokenType::Data]) {
             return self.data_class_expression();
         } else if self.matches(vec![TokenType::Loop]) {
-            return self.loop_expression();
+            self.current_loop = LoopKind::Loop;
+            let expr = self.loop_expression();
+            self.current_loop = LoopKind::None;
+            return expr;
         } else if self.matches(vec![TokenType::Break, TokenType::Continue]) {
-            return Ok(match self.prev_token.token_type {
-                TokenType::Break => Expression::create_break(),
-                TokenType::Continue => Expression::create_continue(),
-                _ => unreachable!(),
-            });
+            return self.continue_break_expression();
         } else if self.check(TokenType::Identifier) && self.check_peek(TokenType::LeftBrace) {
             return self.data_class_instantiate();
         }
         self.assignment()
+    }
+
+    fn continue_break_expression(&mut self) -> Result<Expression, ParserError> {
+        if self.current_loop == LoopKind::None {
+            let msg = if self.prev_token.token_type == TokenType::Break {
+                String::from("Cannot use break outside loops")
+            } else {
+                String::from("Cannot use continue outside loops")
+            };
+            return Err(ParserError::Error(msg, self.prev_token.clone()));
+        }
+        Ok(match self.prev_token.token_type {
+            TokenType::Break => Expression::create_break(),
+            TokenType::Continue => Expression::create_continue(),
+            _ => unreachable!(),
+        })
     }
 
     fn loop_expression(&mut self) -> Result<Expression, ParserError> {
@@ -284,8 +318,10 @@ impl<'a> Parser<'a> {
 
             while !self.check(TokenType::RightBrace) && !self.is_end() {
                 self.eat(TokenType::Fun, "Expected 'fun'")?;
-
-                methods.push(self.fun_expression(FunctionKind::Method)?);
+                self.current_function = FunctionKind::Method;
+                let expr = self.fun_expression(FunctionKind::Method);
+                self.current_function = FunctionKind::None;
+                methods.push(expr?);
             }
 
             self.eat(TokenType::RightBrace, "Expected '}'")?;
@@ -299,7 +335,14 @@ impl<'a> Parser<'a> {
     }
 
     fn return_expression(&mut self) -> Result<Expression, ParserError> {
+        if self.current_function == FunctionKind::None {
+            return Err(ParserError::Error(
+                "Cannot use return in top level code".to_string(),
+                self.prev_token.clone(),
+            ));
+        }
         let mut value = None;
+
         if !self.curr_token.is_semi_colon() {
             value = Some(self.expression()?);
         }
@@ -666,10 +709,19 @@ impl<'a> Parser<'a> {
         }
 
         if self.matches(vec![TokenType::Fun]) {
-            return self.fun_expression(FunctionKind::Function);
+            self.current_function = FunctionKind::Function;
+            let expr = self.fun_expression(FunctionKind::Function);
+            self.current_function = FunctionKind::None;
+            return expr;
         }
 
         if self.matches(vec![TokenType::SELF]) {
+            if self.current_function == FunctionKind::None {
+                return Err(ParserError::Error(
+                    "Cannot use self outside methods".to_string(),
+                    token.clone(),
+                ));
+            }
             return Ok(Expression::create_self(token.value));
         }
 
