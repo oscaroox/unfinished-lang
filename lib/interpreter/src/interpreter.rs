@@ -118,8 +118,12 @@ impl Interpreter {
 
     fn eval_loop_expr(&mut self, loop_expr: &LoopExpr) -> InterpreterResult {
         let mut outval = Value::Unit;
+
         while (self.expression(&loop_expr.condition)?).is_truthy() {
             let val = self.eval_statements(&loop_expr.body)?;
+            if let Some(incr) = &loop_expr.increment {
+                self.expression(&*incr)?;
+            }
             match val {
                 Value::Break | Value::ReturnVal(_) => {
                     if let Value::ReturnVal(_) = val {
@@ -617,6 +621,20 @@ mod test {
         i;
         ",
             Value::Int(5),
+        ));
+
+        run((
+            "
+        let x = 0;
+        loop i = 0; i < 10; i += 1; {
+            if i == 5 {
+                continue;
+            };
+            x += i;
+        };
+        x;
+        ",
+            Value::Int(40),
         ));
     }
 

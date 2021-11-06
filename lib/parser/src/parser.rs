@@ -237,11 +237,32 @@ impl<'a> Parser<'a> {
             Expression::create_literal(Literal::Bool(true))
         };
 
+        // check if for loop i=0;
+        if matches!(condition, Expression::Assign(_)) && self.check(TokenType::SemiColon) {
+            self.eat(TokenType::SemiColon, "Expected ';'")?;
+            let cond = self.expression()?;
+            self.eat(TokenType::SemiColon, "Expected ';'")?;
+            let incr = self.expression()?;
+            self.eat(TokenType::SemiColon, "Expected ';'")?;
+
+            self.eat(TokenType::LeftBrace, "Expected '{'")?;
+            let body = self.block_expression()?;
+            let loop_expr = Expression::create_loop(cond, body, Some(incr));
+            let let_decl = condition.clone();
+            let assign = let_decl.to_assign();
+
+            return Ok(Expression::create_block(vec![
+                Statement::create_let(assign.name.value, None),
+                Statement::create_expr(let_decl),
+                Statement::create_expr(loop_expr),
+            ]));
+        }
+
         self.eat(TokenType::LeftBrace, "Expected '{'")?;
 
         let body = self.block_expression()?;
 
-        Ok(Expression::create_loop(condition, body))
+        Ok(Expression::create_loop(condition, body, None))
     }
 
     fn data_class_instantiate(&mut self) -> Result<Expression, ParserError> {
@@ -867,6 +888,27 @@ mod test {
         body: Vec<Statement>,
     ) -> Expression {
         Expression::create_function(name, params, is_static, body)
+    }
+
+    #[test]
+    fn loop_for_expr() {
+        parse(
+            "
+            loop i = 0; i < 10; i += 1; {};
+            ",
+            vec![expr(Expression::create_block(vec![
+                let_stmt("i", None),
+                expr(Expression::create_assign(ident("i"), int(0))),
+                expr(Expression::create_loop(
+                    Expression::create_logic(let_ref("i"), LogicOperation::LessThan, int(10)),
+                    vec![],
+                    Some(Expression::create_assign(
+                        ident("i"),
+                        Expression::create_binop(let_ref("i"), BinaryOperation::Add, int(1)),
+                    )),
+                )),
+            ]))],
+        );
     }
 
     #[test]
@@ -1705,11 +1747,12 @@ mod test {
             loop 1 < 2 {};
             ",
             vec![
-                expr(Expression::create_loop(bool_lit(true), vec![])),
-                expr(Expression::create_loop(bool_lit(true), vec![])),
+                expr(Expression::create_loop(bool_lit(true), vec![], None)),
+                expr(Expression::create_loop(bool_lit(true), vec![], None)),
                 expr(Expression::create_loop(
                     Expression::create_logic(int(1), LogicOperation::LessThan, int(2)),
                     vec![],
+                    None,
                 )),
             ],
         )
@@ -1726,10 +1769,12 @@ mod test {
                 expr(Expression::create_loop(
                     bool_lit(true),
                     vec![expr(Expression::create_break())],
+                    None,
                 )),
                 expr(Expression::create_loop(
                     bool_lit(true),
                     vec![expr(Expression::create_continue())],
+                    None,
                 )),
             ],
         )
