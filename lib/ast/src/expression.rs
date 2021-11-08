@@ -32,6 +32,20 @@ pub enum Expression {
 }
 
 impl Expression {
+    pub fn to_assign(&self) -> Assign {
+        match &self {
+            Expression::Assign(e) => e.clone(),
+            _ => panic!("Cannot cast to assign"),
+        }
+    }
+
+    pub fn to_let_ref(&self) -> LetRef {
+        match &self {
+            Expression::LetRef(e) => e.clone(),
+            _ => panic!("Cannot cast to assign"),
+        }
+    }
+
     pub fn create_binop(left: Expression, op: BinaryOperation, right: Expression) -> Expression {
         Expression::BinOp(BinOp {
             left: Box::new(left),
@@ -181,10 +195,20 @@ impl Expression {
         Expression::SelfExpr(SelfExpr { name })
     }
 
-    pub fn create_loop(condition: Expression, body: Vec<Statement>) -> Expression {
+    pub fn create_loop(
+        condition: Expression,
+        body: Vec<Statement>,
+        iterator: Option<Expression>,
+    ) -> Expression {
+        let iterator = if let Some(e) = iterator {
+            Some(Box::new(e))
+        } else {
+            None
+        };
         Expression::LoopExpr(LoopExpr {
             body,
             condition: Box::new(condition),
+            iterator,
         })
     }
 

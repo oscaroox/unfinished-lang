@@ -55,6 +55,7 @@ impl Token {
     impl_token!(loop_token, Loop);
     impl_token!(break_token, Break);
     impl_token!(continue_token, Continue);
+    impl_token!(in_token, In);
 
     impl_token!(and, And);
     impl_token!(or, Or);

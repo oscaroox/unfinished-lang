@@ -28,6 +28,8 @@ pub enum LoopKind {
     Loop,
 }
 
+pub struct Tes {}
+
 #[derive(Debug)]
 pub struct Parser<'a> {
     scanner: Scanner<'a>,
@@ -65,6 +67,7 @@ impl<'a> Parser<'a> {
                 }
             }
         }
+
         (program, errors)
     }
 
@@ -208,7 +211,10 @@ impl<'a> Parser<'a> {
             return expr;
         } else if self.matches(vec![TokenType::Break, TokenType::Continue]) {
             return self.continue_break_expression();
-        } else if self.check(TokenType::Identifier) && self.check_peek(TokenType::LeftBrace) {
+        } else if self.check(TokenType::Identifier)
+            && self.check_peek(TokenType::LeftBrace)
+            && self.prev_token.token_type != TokenType::In
+        {
             return self.data_class_instantiate();
         }
         self.assignment()
@@ -231,37 +237,35 @@ impl<'a> Parser<'a> {
     }
 
     fn loop_expression(&mut self) -> Result<Expression, ParserError> {
+        let token = self.curr_token.clone();
         let condition = if !self.check(TokenType::LeftBrace) {
             self.expression()?
         } else {
             Expression::create_literal(Literal::Bool(true))
         };
 
-        // check if for loop i=0;
-        if matches!(condition, Expression::Assign(_)) && self.check(TokenType::SemiColon) {
-            self.eat(TokenType::SemiColon, "Expected ';'")?;
-            let cond = self.expression()?;
-            self.eat(TokenType::SemiColon, "Expected ';'")?;
-            let incr = self.expression()?;
-            self.eat(TokenType::SemiColon, "Expected ';'")?;
-
-            self.eat(TokenType::LeftBrace, "Expected '{'")?;
-            let body = self.block_expression()?;
-            let loop_expr = Expression::create_loop(cond, body, Some(incr));
-            let let_decl = condition.clone();
-            let assign = let_decl.to_assign();
-
-            return Ok(Expression::create_block(vec![
-                Statement::create_let(assign.name.value, None),
-                Statement::create_expr(let_decl),
-                Statement::create_expr(loop_expr),
-            ]));
-        }
+        let iterator = if self.matches(vec![TokenType::In]) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
 
         self.eat(TokenType::LeftBrace, "Expected '{'")?;
 
         let body = self.block_expression()?;
 
+        if let Some(iter) = iterator {
+            return match &condition {
+                Expression::LetRef(let_ref) => Ok(Expression::create_block(vec![
+                    Statement::create_let(let_ref.name.value.to_string(), None),
+                    Statement::create_expr(Expression::create_loop(condition, body, Some(iter))),
+                ])),
+                _ => Err(ParserError::ExpectedToken(
+                    "Expected variable".to_string(),
+                    token,
+                )),
+            };
+        }
         Ok(Expression::create_loop(condition, body, None))
     }
 
@@ -894,18 +898,31 @@ mod test {
     fn loop_for_expr() {
         parse(
             "
-            loop i = 0; i < 10; i += 1; {};
-            ",
+        loop i in name {};
+        ",
             vec![expr(Expression::create_block(vec![
                 let_stmt("i", None),
-                expr(Expression::create_assign(ident("i"), int(0))),
                 expr(Expression::create_loop(
-                    Expression::create_logic(let_ref("i"), LogicOperation::LessThan, int(10)),
+                    let_ref("i"),
                     vec![],
-                    Some(Expression::create_assign(
-                        ident("i"),
-                        Expression::create_binop(let_ref("i"), BinaryOperation::Add, int(1)),
-                    )),
+                    Some(let_ref("name")),
+                )),
+            ]))],
+        );
+
+        parse(
+            "
+        loop i in (Person {}) {};
+        ",
+            vec![expr(Expression::create_block(vec![
+                let_stmt("i", None),
+                expr(Expression::create_loop(
+                    let_ref("i"),
+                    vec![],
+                    Some(Expression::create_grouping(data_class_instance(
+                        "Person",
+                        vec![],
+                    ))),
                 )),
             ]))],
         );

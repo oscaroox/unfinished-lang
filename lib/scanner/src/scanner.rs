@@ -165,6 +165,7 @@ impl<'a> Scanner<'a> {
             "loop" => Token::loop_token(span),
             "break" => Token::break_token(span),
             "continue" => Token::continue_token(span),
+            "in" => Token::in_token(span),
             _ => Token::identifier(value, span),
         }
     }
@@ -584,7 +585,7 @@ this_is_a_identifier";
     #[test]
     fn keywords() {
         test_scan(
-            "let fun true false null if else return data self loop break continue",
+            "let fun true false null if else return data self loop break continue in",
             vec![
                 (TokenType::Let, None),
                 (TokenType::Fun, None),
@@ -599,6 +600,7 @@ this_is_a_identifier";
                 (TokenType::Loop, None),
                 (TokenType::Break, None),
                 (TokenType::Continue, None),
+                (TokenType::In, None),
                 (TokenType::EOF, None),
             ],
         );

@@ -117,13 +117,65 @@ impl Interpreter {
     }
 
     fn eval_loop_expr(&mut self, loop_expr: &LoopExpr) -> InterpreterResult {
-        let mut outval = Value::Unit;
+        let env = Rc::new(RefCell::new(Environment::with_outer(self.env.clone())));
+        if let Some(_) = &loop_expr.iterator {
+            self.run_for_in(loop_expr, env)
+        } else {
+            self.run_while(loop_expr, env)
+        }
+    }
 
-        while (self.expression(&loop_expr.condition)?).is_truthy() {
-            let val = self.eval_statements(&loop_expr.body)?;
-            if let Some(incr) = &loop_expr.increment {
-                self.expression(&*incr)?;
+    fn run_for_in(
+        &mut self,
+        loop_expr: &LoopExpr,
+        env: Rc<RefCell<Environment>>,
+    ) -> InterpreterResult {
+        let mut outval = Value::Unit;
+        let iter = self.expression(loop_expr.iterator.as_ref().unwrap())?;
+        match iter {
+            Value::Array(arr) => {
+                let let_ref = loop_expr.condition.to_let_ref();
+                let values = &arr.borrow().values;
+                for x in values {
+                    env.borrow_mut()
+                        .assign(let_ref.name.value.to_string(), x.clone());
+
+                    let val = eval_with_new_env_in_scope!(
+                        self,
+                        env.clone(),
+                        eval_statements,
+                        &loop_expr.body
+                    )?;
+
+                    match val {
+                        Value::Break | Value::ReturnVal(_) => {
+                            if let Value::ReturnVal(_) = val {
+                                outval = val;
+                            }
+                            break;
+                        }
+                        Value::Continue => {
+                            continue;
+                        }
+                        _ => {}
+                    }
+                }
             }
+            _ => panic!("Can only iterate over arrays"),
+        }
+
+        Ok(outval)
+    }
+
+    fn run_while(
+        &mut self,
+        loop_expr: &LoopExpr,
+        env: Rc<RefCell<Environment>>,
+    ) -> InterpreterResult {
+        let mut outval = Value::Unit;
+        while (self.expression(&loop_expr.condition)?).is_truthy() {
+            let val =
+                eval_with_new_env_in_scope!(self, env.clone(), eval_statements, &loop_expr.body)?;
             match val {
                 Value::Break | Value::ReturnVal(_) => {
                     if let Value::ReturnVal(_) = val {
@@ -625,16 +677,17 @@ mod test {
 
         run((
             "
+        let names = [2,5,7,8];
         let x = 0;
-        loop i = 0; i < 10; i += 1; {
-            if i == 5 {
+        loop name in names {
+            if name == 7 {
                 continue;
             };
-            x += i;
+            x += 1;
         };
         x;
         ",
-            Value::Int(40),
+            Value::Int(3),
         ));
     }
 

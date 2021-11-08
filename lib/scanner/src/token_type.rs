@@ -19,6 +19,7 @@ pub enum TokenType {
     Loop,
     Break,
     Continue,
+    In,
 
     And,
     Or,
@@ -82,6 +83,7 @@ impl std::fmt::Display for TokenType {
             TokenType::Loop => write!(f, "loop"),
             TokenType::Break => write!(f, "break"),
             TokenType::Continue => write!(f, "continue"),
+            TokenType::In => write!(f, "in"),
             TokenType::LessThan => write!(f, "<"),
             TokenType::LessThanEqual => write!(f, "<="),
             TokenType::GreaterThan => write!(f, ">"),

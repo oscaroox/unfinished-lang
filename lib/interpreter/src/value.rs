@@ -165,7 +165,7 @@ impl std::fmt::Display for Value {
         match self {
             Value::Int(v) => write!(f, "{}", v),
             Value::Float(v) => write!(f, "{}", v),
-            Value::String(v) => write!(f, r#""{}""#, v),
+            Value::String(v) => write!(f, r#"{}"#, v),
             Value::Bool(v) => write!(f, "{}", v),
             Value::Array(v) => {
                 write!(f, "[")?;
