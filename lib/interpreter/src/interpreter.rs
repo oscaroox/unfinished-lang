@@ -29,6 +29,24 @@ macro_rules! eval_with_new_env_in_scope {
     }};
 }
 
+macro_rules! eval_loop_body {
+    ($self:ident, $env:expr, $outval:expr, $fun:ident, $stmt:expr) => {{
+        let val = eval_with_new_env_in_scope!($self, $env.clone(), $fun, $stmt)?;
+        match val {
+            Value::Break | Value::ReturnVal(_) => {
+                if let Value::ReturnVal(_) = val {
+                    $outval = val;
+                }
+                break;
+            }
+            Value::Continue => {
+                continue;
+            }
+            _ => {}
+        }
+    }};
+}
+
 impl Interpreter {
     pub fn new() -> Interpreter {
         let globals = Rc::new(RefCell::new(Environment::new()));
@@ -117,78 +135,50 @@ impl Interpreter {
     }
 
     fn eval_loop_expr(&mut self, loop_expr: &LoopExpr) -> InterpreterResult {
-        let env = Rc::new(RefCell::new(Environment::with_outer(self.env.clone())));
-        if let Some(_) = &loop_expr.iterator {
-            self.run_for_in(loop_expr, env)
+        let env = Rc::new(RefCell::new(Environment::with_outer(Rc::clone(&self.env))));
+        let mut outval = Value::Unit;
+        if let Some(iter) = &loop_expr.iterator {
+            let iter = self.expression(iter)?;
+            let let_ref = loop_expr.condition.to_let_ref();
+            // define the var with null value
+            env.borrow_mut()
+                .define(let_ref.name.value.to_string(), Value::Null);
+            match iter {
+                Value::Array(arr) => {
+                    let values = &arr.borrow().values;
+                    for x in values {
+                        env.borrow_mut()
+                            .assign(let_ref.name.value.to_string(), x.clone());
+                        eval_loop_body!(
+                            self,
+                            env.clone(),
+                            outval,
+                            eval_statements,
+                            &loop_expr.body
+                        );
+                    }
+                }
+                Value::Range(start, end) => {
+                    for i in start..end {
+                        env.borrow_mut()
+                            .assign(let_ref.name.value.to_string(), Value::Int(i));
+                        eval_loop_body!(
+                            self,
+                            env.clone(),
+                            outval,
+                            eval_statements,
+                            &loop_expr.body
+                        );
+                    }
+                }
+                _ => panic!("Can only iterate over arrays"),
+            }
         } else {
-            self.run_while(loop_expr, env)
-        }
-    }
-
-    fn run_for_in(
-        &mut self,
-        loop_expr: &LoopExpr,
-        env: Rc<RefCell<Environment>>,
-    ) -> InterpreterResult {
-        let mut outval = Value::Unit;
-        let iter = self.expression(loop_expr.iterator.as_ref().unwrap())?;
-        match iter {
-            Value::Array(arr) => {
-                let let_ref = loop_expr.condition.to_let_ref();
-                let values = &arr.borrow().values;
-                for x in values {
-                    env.borrow_mut()
-                        .assign(let_ref.name.value.to_string(), x.clone());
-
-                    let val = eval_with_new_env_in_scope!(
-                        self,
-                        env.clone(),
-                        eval_statements,
-                        &loop_expr.body
-                    )?;
-
-                    match val {
-                        Value::Break | Value::ReturnVal(_) => {
-                            if let Value::ReturnVal(_) = val {
-                                outval = val;
-                            }
-                            break;
-                        }
-                        Value::Continue => {
-                            continue;
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            _ => panic!("Can only iterate over arrays"),
-        }
-
-        Ok(outval)
-    }
-
-    fn run_while(
-        &mut self,
-        loop_expr: &LoopExpr,
-        env: Rc<RefCell<Environment>>,
-    ) -> InterpreterResult {
-        let mut outval = Value::Unit;
-        while (self.expression(&loop_expr.condition)?).is_truthy() {
-            let val =
-                eval_with_new_env_in_scope!(self, env.clone(), eval_statements, &loop_expr.body)?;
-            match val {
-                Value::Break | Value::ReturnVal(_) => {
-                    if let Value::ReturnVal(_) = val {
-                        outval = val;
-                    }
-                    break;
-                }
-                Value::Continue => {
-                    continue;
-                }
-                _ => {}
+            while (self.expression(&loop_expr.condition)?).is_truthy() {
+                eval_loop_body!(self, env.clone(), outval, eval_statements, &loop_expr.body);
             }
         }
+
         Ok(outval)
     }
 
@@ -231,18 +221,20 @@ impl Interpreter {
                 } else {
                     instance.borrow().get(get_property.name.value.to_string())
                 };
-                match val {
-                    Value::Function(ref mut fun) => {
-                        fun.closure.borrow_mut().define(
-                            "self".to_string(),
-                            Value::DataClassInstance(instance.clone()),
-                        );
-                        if fun.arity > 0 {
-                            fun.arity = fun.arity - 1;
-                        }
+
+                // if propery is a function bind self keyword to function closure
+                if let Value::Function(ref mut fun) = val {
+                    fun.closure.borrow_mut().define(
+                        "self".to_string(),
+                        Value::DataClassInstance(instance.clone()),
+                    );
+
+                    // decrement function arity by 1 since self is supplied by the interpreter
+                    if fun.arity > 0 {
+                        fun.arity = fun.arity - 1;
                     }
-                    _ => {}
-                };
+                }
+
                 Ok(val.clone())
             }
             Value::DataClass(d) => {
@@ -250,10 +242,7 @@ impl Interpreter {
                 Ok(Value::Function(fun))
             }
             Value::Null => panic!("Cannot access {} on null", get_property.name),
-            _ => panic!(
-                "Can only access properties on data class instances got {}",
-                obj
-            ),
+            _ => panic!("Property not found on {}", obj),
         }
     }
 
@@ -362,20 +351,9 @@ impl Interpreter {
                     );
                 }
                 arr.borrow_mut().values[idx] = value.clone();
-                // match &*set_index.lhs {
-                //     Expression::LetRef(let_ref) => {
-                //         array[idx] = value.clone();
-
-                //         self.env
-                //             .borrow_mut()
-                //             .assign(let_ref.name.0.to_string(), Value::Array(newarr));
-                //     }
-                //     _ => {}
-                // }
-
                 Ok(value)
             }
-            _ => panic!("Invalid set index on {}", lhs),
+            _ => panic!("Cannot set index into a value of {}", lhs.to_type()),
         }
     }
 
@@ -388,7 +366,7 @@ impl Interpreter {
                 Some(val) => Ok(val.clone()),
                 None => Ok(Value::Null),
             },
-            _ => panic!("Invalid index access on {}", lhs),
+            _ => panic!("Cannot index into a value of {}", lhs.to_type()),
         }
     }
 
@@ -689,6 +667,28 @@ mod test {
         ",
             Value::Int(3),
         ));
+
+        run((
+            "
+        let x = 0;
+        loop name in range(1, 10) {
+            x += 1;
+        };
+        x;
+        ",
+            Value::Int(9),
+        ));
+
+        run((
+            "
+        let x = 0;
+        loop name in range(0, 10) {
+            x += 1;
+        };
+        x;
+        ",
+            Value::Int(10),
+        ));
     }
 
     #[test]
@@ -920,6 +920,7 @@ mod test {
     #[test]
     pub fn eval_native_function() {
         run(("println(1);", Value::Null));
+        run(("range(1, 22);", Value::Range(1, 22)));
         run((r#"len("this is a string");"#, Value::Int(16)));
         run((
             " 

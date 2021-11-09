@@ -256,10 +256,13 @@ impl<'a> Parser<'a> {
 
         if let Some(iter) = iterator {
             return match &condition {
-                Expression::LetRef(let_ref) => Ok(Expression::create_block(vec![
-                    Statement::create_let(let_ref.name.value.to_string(), None),
-                    Statement::create_expr(Expression::create_loop(condition, body, Some(iter))),
-                ])),
+                Expression::LetRef(_let_ref) => {
+                    // Ok(Expression::create_block(vec![
+                    //     Statement::create_let(let_ref.name.value.to_string(), None),
+                    //     Statement::create_expr(Expression::create_loop(condition, body, Some(iter))),
+                    // ]))
+                    Ok(Expression::create_loop(condition, body, Some(iter)))
+                }
                 _ => Err(ParserError::ExpectedToken(
                     "Expected variable".to_string(),
                     token,
@@ -900,31 +903,25 @@ mod test {
             "
         loop i in name {};
         ",
-            vec![expr(Expression::create_block(vec![
-                let_stmt("i", None),
-                expr(Expression::create_loop(
-                    let_ref("i"),
-                    vec![],
-                    Some(let_ref("name")),
-                )),
-            ]))],
+            vec![expr(Expression::create_loop(
+                let_ref("i"),
+                vec![],
+                Some(let_ref("name")),
+            ))],
         );
 
         parse(
             "
         loop i in (Person {}) {};
         ",
-            vec![expr(Expression::create_block(vec![
-                let_stmt("i", None),
-                expr(Expression::create_loop(
-                    let_ref("i"),
+            vec![expr(Expression::create_loop(
+                let_ref("i"),
+                vec![],
+                Some(Expression::create_grouping(data_class_instance(
+                    "Person",
                     vec![],
-                    Some(Expression::create_grouping(data_class_instance(
-                        "Person",
-                        vec![],
-                    ))),
-                )),
-            ]))],
+                ))),
+            ))],
         );
     }
 
