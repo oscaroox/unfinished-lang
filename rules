@@ -1,0 +1,60 @@
+program ::=                     statements* EOF ;
+statements ::=      
+                                | letStmt
+                                | exprStmt ;
+
+letStmt ::=                     "let" IDENTIFIER (("=" | ":=") expression)? ";" ;
+exprStmt ::=                    expression ";" ;
+
+expression ::=                  
+                                | ifExpr 
+                                | blockExpr 
+                                | returnExpr 
+                                | dataClassExpr 
+                                | dataClassInstanceExpr 
+                                | loopExpr
+                                | breakExpr
+                                | continueExpr
+                                | assignment ;
+
+FUN ::=                         "fun" ( "("? parameters ")"? )? blockExpr;
+parameters ::=                  IDENTIFIER ( "," IDENTIFIER )* ;
+blockExpr ::=                   "{" statements* "}" ;
+
+ifExpr ::=                      "if" "("? expression ")"? block ("else" block)? ;
+returnExpr ::=                  "return" ( expression )? ;
+
+dataClassExpr ::=               "data" IDENTIFIER "{" ( dataClassFields )? "}" "::" "{"  ( dataClassMethod )*  "}";
+dataClassMethod ::=             "fun" IDENTIFIER "(" ( SELF ",") ?   parameters ")" blockExpr
+dataClassFields ::=             IDENTIFIER ("," IDENTIFIER)* ;
+
+dataClassInstanceExpr ::=       IDENTIFIER "{" ( dataClassInstanceFields  )? "}" ; 
+dataClassInstanceFields ::=     IDENTIFIER ( (",", dataClassInstanceField)*  | ":" expression ("," dataClassInstanceField)* ) ;
+
+loopExpr ::=                    "loop" ( expression ( in expression )?   )? blockExpr ;
+breakExpr ::=                   "break" ;
+continueExpr ::=                "continue" ;
+
+assignment ::=                  IDENTIFIER "=" assignment | or ;
+or ::=                          and ("||" and)* ;
+and ::=                         equality ("&&", equality)*;
+equality ::=                    comparison (("==" | "!=") comparison)* ; 
+comparison ::=                  term (( "<" | "<=" | ">" | "=>" ) term)* ;
+
+term ::=                        factor (("+"| "-") factor)* ;
+factor ::=                      unary (("*" | "/") unary)* ;
+unary ::=                       ("-" | "+" | "!") unary | primary ;
+call ::=                        primary "(" arguments ")" ; 
+arguments ::=                   expression ("," expression)* ;
+primary ::= 
+                                | STRING
+                                | INT
+                                | FLOAT
+                                | ARRAY
+                                | TRUE
+                                | FALSE
+                                | FUN
+                                | NULL
+                                | SELF
+                                | IDENTIFIER
+                                | "(" expression ")" ;
