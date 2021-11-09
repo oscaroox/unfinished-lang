@@ -11,6 +11,7 @@ pub enum Value {
     String(String),
     Bool(bool),
     Array(Rc<RefCell<Array>>),
+    Range(i64, i64),
     Function(FunctionValue),
     DataClass(DataClass),
     DataClassInstance(Rc<RefCell<DataClassInstance>>),
@@ -160,6 +161,28 @@ impl Value {
     }
 }
 
+impl Value {
+    pub fn to_type(&self) -> String {
+        match self {
+            Value::Int(_) => String::from("int"),
+            Value::Float(_) => String::from("float"),
+            Value::String(_) => String::from("string"),
+            Value::Bool(_) => String::from("bool"),
+            Value::Array(_) => String::from("array"),
+            Value::Range(_, _) => String::from("range"),
+            Value::Function(_) => String::from("function"),
+            Value::DataClass(_) => String::from("data_class"),
+            Value::DataClassInstance(_) => String::from("data_class_instance"),
+            Value::NativeFunction(_) => String::from("native_function"),
+            Value::ReturnVal(_) => String::from("return"),
+            Value::Break => String::from("break"),
+            Value::Continue => String::from("continue"),
+            Value::Null => String::from("null"),
+            Value::Unit => String::from("unit"),
+        }
+    }
+}
+
 impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -167,6 +190,7 @@ impl std::fmt::Display for Value {
             Value::Float(v) => write!(f, "{}", v),
             Value::String(v) => write!(f, r#"{}"#, v),
             Value::Bool(v) => write!(f, "{}", v),
+            Value::Range(start, end) => write!(f, "range({}, {})", start, end),
             Value::Array(v) => {
                 write!(f, "[")?;
                 let mut out = vec![];
@@ -176,7 +200,7 @@ impl std::fmt::Display for Value {
                 write!(f, "{}]", out.join(", "))
             }
             Value::Null => write!(f, "null"),
-            Value::Unit => write!(f, "Unit"),
+            Value::Unit => write!(f, "unit"),
             Value::Function(v) => {
                 let n = if let Some(n) = &v.name {
                     n.to_string()

@@ -2,6 +2,8 @@ use crate::{Expression, Let};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
+    // TODO just make everything an expression
+    // let statements should just return the unit type
     Let(Let),
     Expr(Expression),
 }

@@ -9,6 +9,7 @@ pub enum Builtin {
     Println = 1,
     Len = 2,
     Clone = 3,
+    Range = 4,
 }
 
 impl Builtin {
@@ -17,6 +18,7 @@ impl Builtin {
             Builtin::Println => builtin_println(args),
             Builtin::Len => builtin_len(args),
             Builtin::Clone => builtin_clone(args),
+            Builtin::Range => builtin_range(args),
         }
     }
 
@@ -25,11 +27,17 @@ impl Builtin {
             Builtin::Println => String::from("last"),
             Builtin::Len => String::from("len"),
             Builtin::Clone => String::from("clone"),
+            Builtin::Range => String::from("range"),
         }
     }
 
     pub fn builtins() -> Vec<Builtin> {
-        vec![Builtin::Println, Builtin::Len, Builtin::Clone]
+        vec![
+            Builtin::Println,
+            Builtin::Len,
+            Builtin::Clone,
+            Builtin::Range,
+        ]
     }
 }
 
@@ -62,6 +70,11 @@ pub fn get_builtins() -> HashMap<String, Value> {
         Value::native_function("clone", 1, Builtin::Clone),
     );
 
+    map.insert(
+        Builtin::Range.to_name(),
+        Value::native_function(Builtin::Range.to_name(), 2, Builtin::Range),
+    );
+
     map
 }
 
@@ -85,7 +98,7 @@ fn builtin_len(args: Vec<Value>) -> BuiltinResult {
         Value::Array(arr) => Ok(Value::Int(arr.borrow().values.len() as i64)),
         Value::String(s1) => Ok(Value::Int(s1.len() as i64)),
         _ => {
-            panic!("invalid len")
+            panic!("invalid use of len on {}", &args[0])
         }
     }
 }
@@ -116,5 +129,15 @@ fn builtin_clone(args: Vec<Value>) -> BuiltinResult {
             Ok(Value::Array(Rc::new(RefCell::new(a.clone()))))
         }
         _ => panic!("can only clone data classes"),
+    }
+}
+
+fn builtin_range(args: Vec<Value>) -> BuiltinResult {
+    let start = &args[0];
+    let end = &args[1];
+
+    match (start, end) {
+        (Value::Int(start), Value::Int(end)) => Ok(Value::Range(*start, *end)),
+        _ => panic!("Expected int got {} and {}", start, end),
     }
 }
