@@ -40,6 +40,13 @@ impl Expression {
         }
     }
 
+    pub fn to_let(&self) -> LetExpr {
+        match &self {
+            Expression::Let(e) => e.clone(),
+            _ => panic!("Cannot cast to assign"),
+        }
+    }
+
     pub fn to_let_ref(&self) -> LetRef {
         match &self {
             Expression::LetRef(e) => e.clone(),

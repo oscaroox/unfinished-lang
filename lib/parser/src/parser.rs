@@ -207,12 +207,13 @@ impl<'a> Parser<'a> {
                 },
             };
             init = Some(expr);
-        } else if !self.curr_token.is_semi_colon() {
-            return Err(ParserError::ExpectedToken(
-                "Expected '='".to_string(),
-                self.curr_token.clone(),
-            ));
         }
+        // else if !self.curr_token.is_semi_colon() {
+        //     return Err(ParserError::ExpectedToken(
+        //         "Expected '='".to_string(),
+        //         self.curr_token.clone(),
+        //     ));
+        // }
 
         Ok(Expression::create_let(
             Identifier::new(identifier.value),
@@ -256,13 +257,11 @@ impl<'a> Parser<'a> {
 
         if let Some(iter) = iterator {
             return match &condition {
-                Expression::LetRef(_let_ref) => {
-                    // Ok(Expression::create_block(vec![
-                    //     Statement::create_let(let_ref.name.value.to_string(), None),
-                    //     Statement::create_expr(Expression::create_loop(condition, body, Some(iter))),
-                    // ]))
-                    Ok(Expression::create_loop(condition, body, Some(iter)))
-                }
+                Expression::LetRef(let_ref) => Ok(Expression::create_loop(
+                    Expression::create_let(let_ref.name.clone(), None),
+                    body,
+                    Some(iter),
+                )),
                 _ => Err(ParserError::ExpectedToken(
                     "Expected variable".to_string(),
                     token,
@@ -900,7 +899,7 @@ mod test {
         loop i in name {};
         ",
             vec![Expression::create_loop(
-                let_ref("i"),
+                let_expr("i", None),
                 vec![],
                 Some(let_ref("name")),
             )],
@@ -911,7 +910,7 @@ mod test {
         loop i in (Person {}) {};
         ",
             vec![Expression::create_loop(
-                let_ref("i"),
+                let_expr("i", None),
                 vec![],
                 Some(Expression::create_grouping(data_class_instance(
                     "Person",

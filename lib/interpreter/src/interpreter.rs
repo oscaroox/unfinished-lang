@@ -132,39 +132,21 @@ impl Interpreter {
         let mut outval = Value::Unit;
         if let Some(iter) = &loop_expr.iterator {
             let iter = self.expression(iter)?;
-            let let_ref = loop_expr.condition.to_let_ref();
-            // define the var with null value
-            env.borrow_mut()
-                .define(let_ref.name.value.to_string(), Value::Null);
-            match iter {
-                Value::Array(arr) => {
-                    let values = &arr.borrow().values;
-                    for x in values {
-                        env.borrow_mut()
-                            .assign(let_ref.name.value.to_string(), x.clone());
-                        eval_loop_body!(
-                            self,
-                            env.clone(),
-                            outval,
-                            eval_expressions,
-                            &loop_expr.body
-                        );
-                    }
-                }
-                Value::Range(start, end) => {
-                    for i in start..end {
-                        env.borrow_mut()
-                            .assign(let_ref.name.value.to_string(), Value::Int(i));
-                        eval_loop_body!(
-                            self,
-                            env.clone(),
-                            outval,
-                            eval_expressions,
-                            &loop_expr.body
-                        );
-                    }
-                }
+
+            // condition is a let expr
+            self.expression(&loop_expr.condition)?;
+            let let_expr = loop_expr.condition.to_let();
+
+            let values = match iter {
+                Value::Array(arr) => arr.borrow().values.clone(),
+                Value::Range(start, end) => (start..end).map(|i| Value::Int(i)).collect(),
                 _ => panic!("Can only iterate over arrays"),
+            };
+
+            for x in values {
+                env.borrow_mut()
+                    .assign(let_expr.name.value.to_string(), x.clone());
+                eval_loop_body!(self, env.clone(), outval, eval_expressions, &loop_expr.body);
             }
         } else {
             while (self.expression(&loop_expr.condition)?).is_truthy() {
