@@ -1,8 +1,8 @@
 use crate::{
     Assign, BinOp, BinaryOperation, Block, BreakExpr, Call, ContinueExpr, DataClass,
     DataClassInstance, DataClassInstanceField, Function, GetProperty, Grouping, Identifier,
-    IfConditional, Index, LetRef, Literal, Logic, LogicOperation, LoopExpr, ReturnExpr, SelfExpr,
-    SetIndex, SetProperty, Statement, UnaryOp, UnaryOperation,
+    IfConditional, Index, LetExpr, LetRef, Literal, Logic, LogicOperation, LoopExpr, ReturnExpr,
+    SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -14,6 +14,7 @@ pub enum Expression {
     SetIndex(SetIndex),
     GetProperty(GetProperty),
     SetProperty(SetProperty),
+    Let(LetExpr),
     LetRef(LetRef),
     UnaryOp(UnaryOp),
     Grouping(Grouping),
@@ -44,6 +45,15 @@ impl Expression {
             Expression::LetRef(e) => e.clone(),
             _ => panic!("Cannot cast to assign"),
         }
+    }
+
+    pub fn create_let(name: Identifier, value: Option<Expression>) -> Expression {
+        let value = if let Some(e) = value {
+            Some(Box::new(e))
+        } else {
+            None
+        };
+        Expression::Let(LetExpr { name, value })
     }
 
     pub fn create_binop(left: Expression, op: BinaryOperation, right: Expression) -> Expression {
@@ -132,7 +142,7 @@ impl Expression {
         name: Option<String>,
         params: Vec<Identifier>,
         is_static: bool,
-        body: Vec<Statement>,
+        body: Vec<Expression>,
     ) -> Expression {
         Expression::Function(Function {
             name,
@@ -144,8 +154,8 @@ impl Expression {
 
     pub fn create_if(
         condition: Expression,
-        then: Vec<Statement>,
-        not_then: Option<Vec<Statement>>,
+        then: Vec<Expression>,
+        not_then: Option<Vec<Expression>>,
     ) -> Expression {
         Expression::If(IfConditional {
             condition: Box::new(condition),
@@ -162,8 +172,8 @@ impl Expression {
         })
     }
 
-    pub fn create_block(stmts: Vec<Statement>) -> Expression {
-        Expression::Block(Block { stmts })
+    pub fn create_block(exprs: Vec<Expression>) -> Expression {
+        Expression::Block(Block { exprs })
     }
 
     pub fn create_return(value: Option<Expression>) -> Expression {
@@ -197,7 +207,7 @@ impl Expression {
 
     pub fn create_loop(
         condition: Expression,
-        body: Vec<Statement>,
+        body: Vec<Expression>,
         iterator: Option<Expression>,
     ) -> Expression {
         let iterator = if let Some(e) = iterator {

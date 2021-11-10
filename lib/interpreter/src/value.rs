@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use ast::{Identifier, Statement};
+use ast::{Expression, Identifier};
 
 use crate::{builtin::Builtin, environment::Environment};
 
@@ -81,7 +81,7 @@ pub struct FunctionValue {
     pub name: Option<String>,
     pub arity: u8,
     pub params: Vec<Identifier>,
-    pub body: Vec<Statement>,
+    pub body: Vec<Expression>,
     pub closure: Rc<RefCell<Environment>>,
 }
 
@@ -104,7 +104,7 @@ impl Value {
         name: Option<String>,
         params: Vec<Identifier>,
         arity: u8,
-        body: Vec<Statement>,
+        body: Vec<Expression>,
         closure: Rc<RefCell<Environment>>,
     ) -> Value {
         Value::Function(FunctionValue {

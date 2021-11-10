@@ -38,7 +38,7 @@ fn main() {
 
         let mut interpreter = Interpreter::new();
         match parse_contents(source) {
-            Ok(stmts) => match interpreter.run(stmts) {
+            Ok(exprs) => match interpreter.run(exprs) {
                 Ok(_) => {}
                 Err(err) => {
                     println!("{:#?}", err);
@@ -61,7 +61,7 @@ fn main() {
             }
             let mut interpreter = Interpreter::with_env(env.clone());
             match parse_contents(contents) {
-                Ok(stmts) => match interpreter.run(stmts) {
+                Ok(exprs) => match interpreter.run(exprs) {
                     Ok(val) => match val {
                         interpreter::Value::Unit => {}
                         _ => println!("{}", val),
@@ -86,7 +86,7 @@ fn parse_contents(source: String) -> Result<Program, Vec<ParserError>> {
     let scanner = Scanner::new(source.to_string(), &mut maker);
     let mut parser = Parser::new(scanner);
 
-    let (stmts, errors) = parser.parse();
+    let (exprs, errors) = parser.parse();
 
     if errors.len() > 0 {
         for mut err in errors.clone() {
@@ -95,5 +95,5 @@ fn parse_contents(source: String) -> Result<Program, Vec<ParserError>> {
         return Err(errors);
     }
 
-    Ok(stmts)
+    Ok(exprs)
 }

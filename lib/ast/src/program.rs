@@ -1,3 +1,3 @@
-use crate::Statement;
+use crate::Expression;
 
-pub type Program = Vec<Statement>;
+pub type Program = Vec<Expression>;

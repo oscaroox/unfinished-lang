@@ -1,12 +1,8 @@
-program ::=                     statements* EOF ;
-statements ::=      
-                                | letStmt
-                                | exprStmt ;
-
-letStmt ::=                     "let" IDENTIFIER (("=" | ":=") expression)? ";" ;
+program ::=                     exprStmt* EOF ;
 exprStmt ::=                    expression ";" ;
 
 expression ::=                  
+                                | letExpr 
                                 | ifExpr 
                                 | blockExpr 
                                 | returnExpr 
@@ -16,6 +12,8 @@ expression ::=
                                 | breakExpr
                                 | continueExpr
                                 | assignment ;
+
+letExpr ::=                     "let" IDENTIFIER (("=" | ":=") expression)? ";" ;
 
 FUN ::=                         "fun" ( "("? parameters ")"? )? blockExpr;
 parameters ::=                  IDENTIFIER ( "," IDENTIFIER )* ;

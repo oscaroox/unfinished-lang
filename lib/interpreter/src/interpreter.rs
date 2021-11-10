@@ -3,8 +3,8 @@ use std::{cell::RefCell, collections::HashMap, convert::TryInto, fmt::Debug, rc:
 use crate::{builtin::get_builtins, environment::Environment, Value};
 use ast::{
     Assign, BinOp, BinaryOperation, Block, Call, DataClass, Expression, Function, GetProperty,
-    IfConditional, Index, Let, Literal, Logic, LogicOperation, LoopExpr, Program, ReturnExpr,
-    SelfExpr, SetIndex, SetProperty, Statement, UnaryOp, UnaryOperation,
+    IfConditional, Index, LetExpr, Literal, Logic, LogicOperation, LoopExpr, Program, ReturnExpr,
+    SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation,
 };
 
 #[derive(Debug)]
@@ -20,18 +20,18 @@ type InterpreterResult = Result<Value, RuntimeError>;
 // macro used for swapping the parent environment with the new supplied environmet
 // this also makes sure this code isnt duplicated when evaluating if, block and function calls
 macro_rules! eval_with_new_env_in_scope {
-    ($self:ident, $env:expr, $fun:ident, $stmt:expr) => {{
+    ($self:ident, $env:expr, $fun:ident, $exprs:expr) => {{
         let parent_env = $self.env.clone();
         $self.env = $env;
-        let res = $self.$fun($stmt);
+        let res = $self.$fun($exprs);
         $self.env = parent_env;
         res
     }};
 }
 
 macro_rules! eval_loop_body {
-    ($self:ident, $env:expr, $outval:expr, $fun:ident, $stmt:expr) => {{
-        let val = eval_with_new_env_in_scope!($self, $env.clone(), $fun, $stmt)?;
+    ($self:ident, $env:expr, $outval:expr, $fun:ident, $exprs:expr) => {{
+        let val = eval_with_new_env_in_scope!($self, $env.clone(), $fun, $exprs)?;
         match val {
             Value::Break | Value::ReturnVal(_) => {
                 if let Value::ReturnVal(_) = val {
@@ -64,22 +64,22 @@ impl Interpreter {
         Interpreter { env }
     }
 
-    pub fn run(&mut self, stmts: Program) -> InterpreterResult {
-        self.eval(&stmts)
+    pub fn run(&mut self, exprs: Program) -> InterpreterResult {
+        self.eval(&exprs)
     }
 
-    fn eval(&mut self, stmts: &Program) -> InterpreterResult {
-        let res = self.eval_statements(stmts)?;
+    fn eval(&mut self, exprs: &Program) -> InterpreterResult {
+        let res = self.eval_expressions(exprs)?;
         match res {
             Value::ReturnVal(val) => Ok(*val),
             _ => Ok(res),
         }
     }
 
-    fn eval_statements(&mut self, stmts: &Program) -> InterpreterResult {
+    fn eval_expressions(&mut self, exprs: &Program) -> InterpreterResult {
         let mut res = Value::Unit;
-        for stmt in stmts.iter() {
-            res = self.execute_statement(stmt)?;
+        for expr in exprs.iter() {
+            res = self.expression(expr)?;
             match res {
                 Value::ReturnVal(_) | Value::Break | Value::Continue => return Ok(res),
                 _ => {}
@@ -88,27 +88,9 @@ impl Interpreter {
         Ok(res)
     }
 
-    fn execute_statement(&mut self, stmt: &Statement) -> InterpreterResult {
-        match stmt {
-            Statement::Let(r#let) => self.let_statement(r#let),
-            Statement::Expr(expr) => self.expression(expr),
-        }
-    }
-
-    fn let_statement(&mut self, stmt: &Let) -> InterpreterResult {
-        let name = stmt.id.to_string();
-        let val = match &stmt.value {
-            Some(expr) => self.expression(expr)?,
-            None => Value::Null,
-        };
-
-        self.env.borrow_mut().define(name, val);
-
-        Ok(Value::Unit)
-    }
-
     fn expression(&mut self, expression: &Expression) -> InterpreterResult {
         match expression {
+            Expression::Let(expr) => self.eval_let_expression(expr),
             Expression::BinOp(expr) => self.eval_binop(expr),
             Expression::Literal(expr) => self.eval_literal(expr),
             Expression::Assign(expr) => self.eval_assignment(expr),
@@ -134,6 +116,17 @@ impl Interpreter {
         }
     }
 
+    fn eval_let_expression(&mut self, expr: &LetExpr) -> InterpreterResult {
+        let name = expr.name.value.to_string();
+        let val = match &expr.value {
+            Some(expr) => self.expression(expr)?,
+            None => Value::Null,
+        };
+
+        self.env.borrow_mut().define(name, val);
+        Ok(Value::Unit)
+    }
+
     fn eval_loop_expr(&mut self, loop_expr: &LoopExpr) -> InterpreterResult {
         let env = Rc::new(RefCell::new(Environment::with_outer(Rc::clone(&self.env))));
         let mut outval = Value::Unit;
@@ -153,7 +146,7 @@ impl Interpreter {
                             self,
                             env.clone(),
                             outval,
-                            eval_statements,
+                            eval_expressions,
                             &loop_expr.body
                         );
                     }
@@ -166,7 +159,7 @@ impl Interpreter {
                             self,
                             env.clone(),
                             outval,
-                            eval_statements,
+                            eval_expressions,
                             &loop_expr.body
                         );
                     }
@@ -175,7 +168,7 @@ impl Interpreter {
             }
         } else {
             while (self.expression(&loop_expr.condition)?).is_truthy() {
-                eval_loop_body!(self, env.clone(), outval, eval_statements, &loop_expr.body);
+                eval_loop_body!(self, env.clone(), outval, eval_expressions, &loop_expr.body);
             }
         }
 
@@ -480,7 +473,7 @@ impl Interpreter {
 
     fn eval_block(&mut self, block: &Block) -> InterpreterResult {
         let env = Rc::new(RefCell::new(Environment::with_outer(self.env.clone())));
-        eval_with_new_env_in_scope!(self, env, eval_statements, &block.stmts)
+        eval_with_new_env_in_scope!(self, env, eval_expressions, &block.exprs)
     }
 
     fn eval_if_conditional(&mut self, ifcond: &IfConditional) -> InterpreterResult {
@@ -489,9 +482,9 @@ impl Interpreter {
         let val = Value::Null;
 
         if cond.is_truthy() {
-            return eval_with_new_env_in_scope!(self, env, eval_statements, &ifcond.then);
+            return eval_with_new_env_in_scope!(self, env, eval_expressions, &ifcond.then);
         } else if let Some(el) = &ifcond.not_then {
-            return eval_with_new_env_in_scope!(self, env, eval_statements, el);
+            return eval_with_new_env_in_scope!(self, env, eval_expressions, el);
         }
 
         Ok(val)
@@ -591,7 +584,7 @@ mod test {
         let scanner = Scanner::new(src.0.to_string(), &mut maker);
         let mut parser = Parser::new(scanner);
 
-        let (stmts, errors) = parser.parse();
+        let (exprs, errors) = parser.parse();
 
         if errors.len() > 0 {
             errors
@@ -602,7 +595,7 @@ mod test {
 
         let mut interpreter = Interpreter::new();
 
-        match interpreter.run(stmts) {
+        match interpreter.run(exprs) {
             Ok(val) => assert_eq!(val, src.1),
             Err(err) => println!("{:#?}", err),
         };
@@ -692,7 +685,7 @@ mod test {
     }
 
     #[test]
-    fn let_statement() {
+    fn eval_let_expression() {
         run(("let name = 123;", Value::Unit));
         run(("let name; name;", Value::Null));
         run(("let name = 123; name;", Value::Int(123)));

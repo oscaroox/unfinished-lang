@@ -1,6 +1,6 @@
-use crate::Statement;
+use crate::Expression;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Block {
-    pub stmts: Vec<Statement>,
+    pub exprs: Vec<Expression>,
 }
