@@ -123,7 +123,7 @@ impl<'a> Parser<'a> {
             true => self.prev_token.clone(),
             false => self.curr_token.clone(),
         };
-        println!("{:#?}", self);
+
         Err(ParserError::ExpectedToken(msg.to_string(), tok))
     }
 
@@ -171,16 +171,8 @@ impl<'a> Parser<'a> {
             return expr;
         } else if self.matches(vec![TokenType::Break, TokenType::Continue]) {
             return self.continue_break_expression();
-        } else if self.check(TokenType::Identifier)
-            && self.check_peek(TokenType::LeftBrace)
-            && self.prev_token.token_type != TokenType::In
-        {
-            // TODO when instantiating a data class the values must be be accessed immedialty
-            // e.g Person {name: "john"}.name;
-            // the above should be possible
-            // MOVE TO PRIMARY
-            return self.data_class_instantiate();
         }
+
         self.assignment()
     }
 
@@ -734,6 +726,13 @@ impl<'a> Parser<'a> {
 
         if self.matches(vec![TokenType::StringConst]) {
             return Ok(Expression::create_literal(Literal::String(token.value)));
+        }
+
+        if self.check(TokenType::Identifier)
+            && self.check_peek(TokenType::LeftBrace)
+            && self.prev_token.token_type != TokenType::In
+        {
+            return self.data_class_instantiate();
         }
 
         if self.matches(vec![TokenType::Identifier]) {
@@ -1663,6 +1662,15 @@ mod test {
                     ],
                 ),
             ],
+        );
+
+        parse(
+            "Person {id: 1}.id;",
+            vec![Expression::create_get_property(
+                data_class_instance("Person", vec![data_class_instance_field("id", int(1))]),
+                ident("id"),
+                false,
+            )],
         );
     }
 

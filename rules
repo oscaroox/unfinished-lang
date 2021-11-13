@@ -7,7 +7,6 @@ expression ::=
                                 | blockExpr 
                                 | returnExpr 
                                 | dataClassExpr 
-                                | dataClassInstanceExpr 
                                 | loopExpr
                                 | breakExpr
                                 | continueExpr
@@ -25,9 +24,6 @@ returnExpr ::=                  "return" ( expression )? ;
 dataClassExpr ::=               "data" IDENTIFIER "{" ( dataClassFields )? "}" "::" "{"  ( dataClassMethod )*  "}";
 dataClassMethod ::=             "fun" IDENTIFIER "(" ( SELF ",") ?   parameters ")" blockExpr
 dataClassFields ::=             IDENTIFIER ("," IDENTIFIER)* ;
-
-dataClassInstanceExpr ::=       IDENTIFIER "{" ( dataClassInstanceFields  )? "}" ; 
-dataClassInstanceFields ::=     IDENTIFIER ( (",", dataClassInstanceField)*  | ":" expression ("," dataClassInstanceField)* ) ;
 
 loopExpr ::=                    "loop" ( expression ( in expression )?   )? blockExpr ;
 breakExpr ::=                   "break" ;
@@ -54,5 +50,9 @@ primary ::=
                                 | FUN
                                 | NULL
                                 | SELF
+                                | DATACLASSINSTANCE
                                 | IDENTIFIER
                                 | "(" expression ")" ;
+
+DATACLASSINSTANCE ::=       IDENTIFIER "{" ( dataClassInstanceFields  )? "}" ; 
+dataClassInstanceFields ::=     IDENTIFIER ( (",", dataClassInstanceField)*  | ":" expression ("," dataClassInstanceField)* ) ;
