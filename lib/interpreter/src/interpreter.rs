@@ -359,7 +359,7 @@ impl Interpreter {
                 let mut env = Environment::with_outer(fun.closure.clone());
                 let mut params = vec![];
 
-                // TODO mark value functions as methods
+                // TODO mark data class functions as methods
                 if fun.params.len() > 0 {
                     if fun.params[0].is_self() {
                         params = fun.params[1..].to_vec();
@@ -444,6 +444,11 @@ impl Interpreter {
                 Value::Bool(s1 != s2)
             }
 
+            (Value::Null, LogicOperation::NotEqual, v) => Value::Bool(left != *v),
+            (v, LogicOperation::NotEqual, Value::Null) => Value::Bool(*v != right),
+
+            (Value::Null, LogicOperation::Equal, v) => Value::Bool(left == *v),
+            (v, LogicOperation::Equal, Value::Null) => Value::Bool(*v == right),
             _ => panic!(
                 "Invalid logic operation {} on {} and {}",
                 logic.op, left, right
@@ -787,6 +792,12 @@ mod test {
         run(("true || false;", Value::Bool(true)));
         run(("false || true;", Value::Bool(true)));
         run(("false || false;", Value::Bool(false)));
+        run(("null == null;", Value::Bool(true)));
+        run(("null != null;", Value::Bool(false)));
+        run(("null == true;", Value::Bool(false)));
+        run(("true == null;", Value::Bool(false)));
+        run(("1 != null;", Value::Bool(true)));
+        run((r#"null != "test";"#, Value::Bool(true)));
     }
 
     #[test]
