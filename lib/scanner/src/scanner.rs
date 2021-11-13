@@ -60,7 +60,7 @@ impl<'a> Scanner<'a> {
      * backtracking is possible by only one token
      */
     pub fn backtrack(&mut self) {
-        if self.checkpoint > 0 && !self.is_end() {
+        if self.checkpoint > 0 && self.checkpoint <= self.source.len() {
             self.pos = self.checkpoint;
             self.ch = self.source[self.pos];
         }
@@ -137,36 +137,6 @@ impl<'a> Scanner<'a> {
         }
 
         Token::int_const(res.into_iter().collect(), self.span(pos, self.pos))
-    }
-
-    fn read_string(&mut self) -> Token {
-        let mut res = vec![];
-        let pos = self.pos;
-        self.advance();
-
-        if self.ch == '"' {
-            return Token::string_const("".to_string(), self.span(pos, self.pos));
-        }
-
-        while self.peek() != '"' && !self.is_end() {
-            res.push(self.ch);
-            if self.peek() == '\n' {
-                self.line += 1;
-                self.advance();
-            } else {
-                self.advance();
-            }
-        }
-
-        if self.is_end() {
-            return Token::bad_token("Unterminated string".to_string(), self.span(pos, self.pos));
-        }
-
-        // push last char
-        res.push(self.ch);
-        self.advance();
-
-        Token::string_const(res.into_iter().collect(), self.span(pos, self.pos))
     }
 
     fn read_identifier(&mut self) -> Token {
@@ -444,6 +414,7 @@ mod tests {
     #[test]
     fn scan_empty() {
         test_scan("", vec![(TokenType::EOF, None)]);
+        test_scan(" ", vec![(TokenType::EOF, None)]);
     }
 
     #[test]
@@ -499,15 +470,16 @@ mod tests {
         assert_eq!(tok.value, String::from("hello, "));
 
         let tok = scanner.next_token();
-        println!("{:#?}", tok);
-        assert_eq!(tok.token_type, TokenType::DollarSign);
 
-        if tok.token_type == TokenType::DollarSign {
-            scanner.set_mode(ScannerMode::Default);
-        }
+        assert_eq!(tok.token_type, TokenType::LeftParen);
+
+        scanner.set_mode(ScannerMode::Default);
 
         let tok = scanner.next_token();
         assert_eq!(tok.token_type, TokenType::Identifier);
+
+        // skip the closing paren
+        scanner.next_token();
 
         scanner.set_mode(ScannerMode::String);
 
@@ -738,9 +710,10 @@ this_is_a_identifier";
         let capital_alpha = alpha.to_uppercase();
 
         test_scan(
-            format!("test test2 _test {} {}", alpha, capital_alpha).as_str(),
+            format!("test; test2 _test {} {}", alpha, capital_alpha).as_str(),
             vec![
                 (TokenType::Identifier, Some("test")),
+                (TokenType::SemiColon, None),
                 (TokenType::Identifier, Some("test2")),
                 (TokenType::Identifier, Some("_test")),
                 (TokenType::Identifier, Some("abcdefghijklmnopqrstuvwxyz")),
