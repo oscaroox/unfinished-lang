@@ -28,14 +28,11 @@ pub enum LoopKind {
     Loop,
 }
 
-pub struct Tes {}
-
 #[derive(Debug)]
 pub struct Parser<'a> {
     scanner: Scanner<'a>,
     prev_token: Token,
     curr_token: Token,
-    // peek_token: Token,
     current_function: FunctionKind,
     current_loop: LoopKind,
 }
@@ -43,12 +40,10 @@ pub struct Parser<'a> {
 impl<'a> Parser<'a> {
     pub fn new(mut scanner: Scanner) -> Parser {
         let curr_token = scanner.next_token();
-        // let peek_token = scanner.next_token();
         Parser {
             scanner,
             prev_token: Token::eof(Span::dummy()),
             curr_token,
-            // peek_token,
             current_function: FunctionKind::None,
             current_loop: LoopKind::None,
         }
@@ -112,9 +107,6 @@ impl<'a> Parser<'a> {
     fn advance(&mut self) -> Token {
         self.prev_token = self.curr_token.clone();
         self.curr_token = self.scanner.next_token();
-        // self.curr_token = self.peek_token.clone();
-        // self.peek_token = self.scanner.next_token();
-
         self.prev_token.clone()
     }
 
@@ -131,7 +123,7 @@ impl<'a> Parser<'a> {
             true => self.prev_token.clone(),
             false => self.curr_token.clone(),
         };
-
+        println!("{:#?}", self);
         Err(ParserError::ExpectedToken(msg.to_string(), tok))
     }
 
@@ -801,7 +793,6 @@ impl<'a> Parser<'a> {
         let quote = self.curr_token.clone();
         let mut out = vec![];
 
-        // println!("{:#?}", self);
         loop {
             match self.peek().token_type {
                 TokenType::DollarSign | TokenType::LeftParen => {
@@ -810,6 +801,12 @@ impl<'a> Parser<'a> {
                     let dollar_sign = self.curr_token.clone();
                     self.advance(); // advance to '(' token
                     self.advance(); // current token should be parsed as
+
+                    // return empty string if interpolation is empty
+                    if self.check(TokenType::RightParen) {
+                        self.advance();
+                        break;
+                    }
 
                     if self.curr_token.token_type == TokenType::DoubleQuote {
                         return Err(ParserError::Error(
@@ -836,7 +833,6 @@ impl<'a> Parser<'a> {
             }
 
             self.advance();
-            // println!("loop {:#?}", self);
             match self.curr_token.token_type {
                 TokenType::StringConst => {
                     out.push(Expression::create_literal(Literal::String(
@@ -885,8 +881,6 @@ impl<'a> Parser<'a> {
             expr = Expression::create_binop(expr, BinaryOperation::ConcatInterpolation, e.clone())
         }
 
-        // println!("{:#?}", self);
-        // println!("{:#?}", out);
         Ok(expr)
     }
 }
@@ -1006,10 +1000,18 @@ mod test {
         parse(
             r#"
         "";
+        " ";
+        "$()";
         "Hello";
         "Hello $(name), how was your day?";
+        "$(name)";
+        "$(name) Hello";
+        "Hello $(if true { "world"; } else { "mars"; })";
+        "Hello $(person.name)";
         "#,
             vec![
+                string_lit(""),
+                string_lit(" "),
                 string_lit(""),
                 string_lit("Hello"),
                 Expression::create_binop(
@@ -1020,6 +1022,30 @@ mod test {
                     ),
                     BinaryOperation::ConcatInterpolation,
                     string_lit(", how was your day?"),
+                ),
+                Expression::create_binop(
+                    string_lit(""),
+                    BinaryOperation::ConcatInterpolation,
+                    let_ref("name"),
+                ),
+                Expression::create_binop(
+                    let_ref("name"),
+                    BinaryOperation::ConcatInterpolation,
+                    string_lit(" Hello"),
+                ),
+                Expression::create_binop(
+                    string_lit("Hello "),
+                    BinaryOperation::ConcatInterpolation,
+                    Expression::create_if(
+                        bool_lit(true),
+                        vec![string_lit("world")],
+                        Some(vec![string_lit("mars")]),
+                    ),
+                ),
+                Expression::create_binop(
+                    string_lit("Hello "),
+                    BinaryOperation::ConcatInterpolation,
+                    Expression::create_get_property(let_ref("person"), ident("name"), false),
                 ),
             ],
         );
