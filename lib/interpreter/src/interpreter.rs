@@ -604,6 +604,41 @@ mod test {
     }
 
     #[test]
+    fn eval_string_interpolation() {
+        run((
+            "
+            let name = \"John\";
+            \"Hello $(name), how was your day?\";
+            ",
+            Value::String("Hello John, how was your day?".to_string()),
+        ));
+
+        run((
+            r#"
+            let john = "John";
+            let jane = "Jane";
+
+            "Hello $(if true {jane;} else {john;}), how was your day?";
+            "#,
+            Value::String("Hello Jane, how was your day?".to_string()),
+        ));
+
+        run((
+            r#"
+
+
+            "Hello $({
+                let first_name = "John";
+                let last_name = "Doe";
+                
+                "$(first_name) $(last_name)";
+            }), how was your day?";
+            "#,
+            Value::String("Hello John Doe, how was your day?".to_string()),
+        ));
+    }
+
+    #[test]
     fn eval_loop() {
         run((
             "
