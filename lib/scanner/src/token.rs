@@ -92,6 +92,8 @@ impl Token {
     impl_token!(assign_star, AssignStar);
     impl_token!(assign_slash, AssignSlash);
 
+    impl_token!(dollar_sign, DollarSign);
+    impl_token!(double_quote, DoubleQuote);
     impl_token!(eof, EOF);
 
     pub fn is_eof(&self) -> bool {

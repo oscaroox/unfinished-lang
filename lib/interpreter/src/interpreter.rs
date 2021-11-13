@@ -526,7 +526,7 @@ impl Interpreter {
         let left = self.expression(&binop.left)?;
         let right = self.expression(&binop.right)?;
 
-        let res = match (left, &binop.op, right) {
+        let res = match (&left, &binop.op, &right) {
             // integer binop
             (Value::Int(n1), BinaryOperation::Add, Value::Int(n2)) => Value::Int(n1 + n2),
             (Value::Int(n1), BinaryOperation::Substract, Value::Int(n2)) => Value::Int(n1 - n2),
@@ -542,7 +542,9 @@ impl Interpreter {
                 Value::Float(n1 * n2)
             }
             (Value::Float(n1), BinaryOperation::Divide, Value::Float(n2)) => Value::Float(n1 / n2),
-
+            (_, BinaryOperation::ConcatInterpolation, _) => {
+                Value::String(format!("{}{}", left, right))
+            }
             (v1, _, v2) => panic!("Invalid binary operation on {} and {}", v1, v2),
         };
 

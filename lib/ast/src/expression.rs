@@ -54,6 +54,13 @@ impl Expression {
         }
     }
 
+    pub fn is_string_lit(&self) -> bool {
+        match self {
+            Expression::Literal(Literal::String(_)) => true,
+            _ => false,
+        }
+    }
+
     pub fn create_let(name: Identifier, value: Option<Expression>) -> Expression {
         let value = if let Some(e) = value {
             Some(Box::new(e))

@@ -2,7 +2,7 @@ use ast::{
     BinaryOperation, DataClassInstanceField, Expression, Identifier, Literal, LogicOperation,
     Program, UnaryOperation,
 };
-use scanner::{Scanner, Token, TokenType};
+use scanner::{Scanner, ScannerMode, Token, TokenType};
 use spanner::Span;
 
 use crate::ParserError;
@@ -35,8 +35,7 @@ pub struct Parser<'a> {
     scanner: Scanner<'a>,
     prev_token: Token,
     curr_token: Token,
-    peek_token: Token,
-
+    // peek_token: Token,
     current_function: FunctionKind,
     current_loop: LoopKind,
 }
@@ -44,12 +43,12 @@ pub struct Parser<'a> {
 impl<'a> Parser<'a> {
     pub fn new(mut scanner: Scanner) -> Parser {
         let curr_token = scanner.next_token();
-        let peek_token = scanner.next_token();
+        // let peek_token = scanner.next_token();
         Parser {
             scanner,
             prev_token: Token::eof(Span::dummy()),
             curr_token,
-            peek_token,
+            // peek_token,
             current_function: FunctionKind::None,
             current_loop: LoopKind::None,
         }
@@ -101,13 +100,20 @@ impl<'a> Parser<'a> {
     }
 
     fn check_peek(&mut self, token_type: TokenType) -> bool {
-        self.peek_token.token_type == token_type
+        self.peek().token_type == token_type
+    }
+
+    fn peek(&mut self) -> Token {
+        let token = self.scanner.next_token();
+        self.scanner.backtrack();
+        token
     }
 
     fn advance(&mut self) -> Token {
         self.prev_token = self.curr_token.clone();
-        self.curr_token = self.peek_token.clone();
-        self.peek_token = self.scanner.next_token();
+        self.curr_token = self.scanner.next_token();
+        // self.curr_token = self.peek_token.clone();
+        // self.peek_token = self.scanner.next_token();
 
         self.prev_token.clone()
     }
@@ -145,7 +151,8 @@ impl<'a> Parser<'a> {
         match self.eat(TokenType::SemiColon, "Expected ';' after expression") {
             Ok(_) => Ok(expr),
             Err(err) => match err {
-                ParserError::ExpectedToken(msg, _) => Err(self.error(msg, self.prev_token.clone())),
+                // TODO find out why i intercept the error message here
+                // ParserError::ExpectedToken(msg, _) => Err(self.error(msg, self.prev_token.clone())),
                 _ => Err(err),
             },
         }
@@ -176,6 +183,10 @@ impl<'a> Parser<'a> {
             && self.check_peek(TokenType::LeftBrace)
             && self.prev_token.token_type != TokenType::In
         {
+            // TODO when instantiating a data class the values must be be accessed immedialty
+            // e.g Person {name: "john"}.name;
+            // the above should be possible
+            // MOVE TO PRIMARY
             return self.data_class_instantiate();
         }
         self.assignment()
@@ -679,7 +690,7 @@ impl<'a> Parser<'a> {
 
                 expr = Expression::create_index(expr, idx);
             } else if self.matches(vec![TokenType::Dot]) {
-                let name = self.eat(TokenType::Identifier, "Expected identifier,")?;
+                let name = self.eat(TokenType::Identifier, "Expected identifier")?;
                 let is_callable = self.check(TokenType::LeftParen);
                 expr = Expression::create_get_property(
                     expr,
@@ -723,6 +734,10 @@ impl<'a> Parser<'a> {
 
         if self.matches(vec![TokenType::Null]) {
             return Ok(Expression::create_literal(Literal::Null));
+        }
+
+        if self.check(TokenType::DoubleQuote) {
+            return self.parse_string();
         }
 
         if self.matches(vec![TokenType::StringConst]) {
@@ -779,6 +794,100 @@ impl<'a> Parser<'a> {
         }
 
         Err(ParserError::UnexpectedToken(self.curr_token.clone()))
+    }
+
+    fn parse_string(&mut self) -> Result<Expression, ParserError> {
+        self.scanner.set_mode(ScannerMode::String);
+        let quote = self.curr_token.clone();
+        let mut out = vec![];
+
+        // println!("{:#?}", self);
+        loop {
+            match self.peek().token_type {
+                TokenType::DollarSign | TokenType::LeftParen => {
+                    self.scanner.set_mode(ScannerMode::Default);
+                    self.advance(); // advance to '$' token
+                    let dollar_sign = self.curr_token.clone();
+                    self.advance(); // advance to '(' token
+                    self.advance(); // current token should be parsed as
+
+                    if self.curr_token.token_type == TokenType::DoubleQuote {
+                        return Err(ParserError::Error(
+                            "Unterminated format".to_string(),
+                            dollar_sign,
+                        ));
+                    }
+
+                    out.push(self.expression()?);
+
+                    if self.check(TokenType::RightParen) {
+                        self.advance();
+                    } else {
+                        return Err(ParserError::Error(
+                            "Unterminated format".to_string(),
+                            dollar_sign,
+                        ));
+                    };
+                    self.scanner.backtrack();
+                    self.scanner.set_mode(ScannerMode::String);
+                    continue;
+                }
+                _ => {}
+            }
+
+            self.advance();
+            // println!("loop {:#?}", self);
+            match self.curr_token.token_type {
+                TokenType::StringConst => {
+                    out.push(Expression::create_literal(Literal::String(
+                        self.curr_token.value.to_string(),
+                    )));
+                }
+                TokenType::DoubleQuote => {
+                    break;
+                }
+                _ => {
+                    self.scanner.set_mode(ScannerMode::Default);
+                    return Err(ParserError::Error("Unterminated string".to_string(), quote));
+                }
+            }
+        }
+        self.scanner.set_mode(ScannerMode::Default);
+        self.advance(); // advance over '"'
+
+        let out_len = out.len();
+
+        if out_len == 0 {
+            // return a empty string if there is no output
+            return Ok(Expression::create_literal(Literal::String("".to_string())));
+        } else if out_len == 1 && out[0].is_string_lit() {
+            // return the only elem in output as string lit
+            // no reason to create a binop expression
+            return Ok(out[0].clone());
+        } else if out_len == 1 {
+            // should be an expression other than string literal
+            // append to empty string so it gets formatted as string
+            return Ok(Expression::create_binop(
+                Expression::create_literal(Literal::String("".to_string())),
+                BinaryOperation::ConcatInterpolation,
+                out[0].clone(),
+            ));
+        }
+
+        // from here on out there should be more than one expression in the output
+        let mut expr = Expression::create_binop(
+            out[0].clone(),
+            BinaryOperation::ConcatInterpolation,
+            out[1].clone(),
+        );
+
+        for e in out[2..].into_iter() {
+            expr = Expression::create_binop(expr, BinaryOperation::ConcatInterpolation, e.clone())
+        }
+
+        // println!("{:#?}", self);
+        // println!("{:#?}", out);
+        Ok(expr)
     }
 }
 
@@ -890,6 +999,30 @@ mod test {
         body: Vec<Expression>,
     ) -> Expression {
         Expression::create_function(name, params, is_static, body)
+    }
+
+    #[test]
+    fn parse_string_interplation() {
+        parse(
+            r#"
+        "";
+        "Hello";
+        "Hello $(name), how was your day?";
+        "#,
+            vec![
+                string_lit(""),
+                string_lit("Hello"),
+                Expression::create_binop(
+                    Expression::create_binop(
+                        string_lit("Hello "),
+                        BinaryOperation::ConcatInterpolation,
+                        let_ref("name"),
+                    ),
+                    BinaryOperation::ConcatInterpolation,
+                    string_lit(", how was your day?"),
+                ),
+            ],
+        );
     }
 
     #[test]
