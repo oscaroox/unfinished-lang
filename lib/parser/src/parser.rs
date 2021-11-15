@@ -53,7 +53,7 @@ impl<'a> Parser<'a> {
         let mut program = Vec::new();
         let mut errors = Vec::new();
         while !self.is_end() {
-            match self.expression_statement() {
+            match self.expression_statement(true) {
                 Ok(stmt) => program.push(stmt),
                 Err(err) => {
                     self.sync();
@@ -138,16 +138,22 @@ impl<'a> Parser<'a> {
         None
     }
 
-    fn expression_statement(&mut self) -> Result<Expression, ParserError> {
+    fn expression_statement(&mut self, require_semicolon: bool) -> Result<Expression, ParserError> {
         let expr = self.expression()?;
-        match self.eat(TokenType::SemiColon, "Expected ';' after expression") {
-            Ok(_) => Ok(expr),
-            Err(err) => match err {
-                // TODO find out why i intercept the error message here
-                // ParserError::ExpectedToken(msg, _) => Err(self.error(msg, self.prev_token.clone())),
-                _ => Err(err),
-            },
-        }
+        if require_semicolon {
+            self.eat(TokenType::SemiColon, "Expected ';' after expression")?;
+        } else {
+            self.eat_optional(TokenType::SemiColon);
+        };
+        Ok(expr)
+        // match self.eat(TokenType::SemiColon, "Expected ';' after expression") {
+        //     Ok(_) => Ok(expr),
+        //     Err(err) => match err {
+        //         // TODO find out why i intercept the error message here
+        //         // ParserError::ExpectedToken(msg, _) => Err(self.error(msg, self.prev_token.clone())),
+        //         _ => Err(err),
+        //     },
+        // }
     }
 
     fn expression(&mut self) -> Result<Expression, ParserError> {
@@ -436,9 +442,22 @@ impl<'a> Parser<'a> {
 
     fn block_expression(&mut self) -> Result<Vec<Expression>, ParserError> {
         let mut exprs = vec![];
-        while self.curr_token.token_type != TokenType::RightBrace && !self.is_end() {
-            exprs.push(self.expression_statement()?);
+        while !self.check(TokenType::RightBrace)
+            && !self.check_peek(TokenType::RightBrace)
+            && !self.is_end()
+        {
+            exprs.push(self.expression_statement(true)?);
         }
+
+        if !self.check(TokenType::RightBrace) && !self.is_end() {
+            exprs.push(self.expression_statement(false)?);
+        }
+
+        if !exprs.is_empty() && !self.prev_token.is_semi_colon() {
+            let expr = exprs.pop().unwrap();
+            exprs.push(Expression::create_return(Some(expr)));
+        }
+
         self.eat(TokenType::RightBrace, "Expected '}'")?;
         Ok(exprs)
     }
@@ -921,8 +940,9 @@ mod test {
 
         let errs: Vec<String> = errors.clone().into_iter().map(|e| e.to_string()).collect();
         // let err: Vec<> = errors.clone().into_iter().map(|e| e.into_spanned_error());
-        println!("{:?}", errs);
-        println!("{:?}", res);
+        println!("errs {:#?}", errs);
+        // println!("{:?}", errs);
+        println!("res {:#?}", res);
         assert_eq!(errors, expected)
     }
 
@@ -962,6 +982,10 @@ mod test {
         Expression::create_let_ref(Identifier::new(val.to_string()))
     }
 
+    fn return_expr(val: Option<Expression>) -> Expression {
+        Expression::create_return(val)
+    }
+
     fn string_lit(val: &str) -> Expression {
         Expression::create_literal(Literal::String(val.to_string()))
     }
@@ -992,6 +1016,41 @@ mod test {
         body: Vec<Expression>,
     ) -> Expression {
         Expression::create_function(name, params, is_static, body)
+    }
+
+    #[test]
+    // last expression in a block can implicitly return by not including the semicolon
+    fn last_expr_in_block_return_on_no_semi() {
+        parse(
+            "
+        {
+            let x = 2;
+            let y = 3;
+            x
+        };
+        {
+            let x = 2;
+            let y = 3;
+            x;
+        };
+        { x };
+        {x;};
+        ",
+            vec![
+                Expression::create_block(vec![
+                    let_expr("x", Some(int(2))),
+                    let_expr("y", Some(int(3))),
+                    return_expr(Some(let_ref("x"))),
+                ]),
+                Expression::create_block(vec![
+                    let_expr("x", Some(int(2))),
+                    let_expr("y", Some(int(3))),
+                    let_ref("x"),
+                ]),
+                Expression::create_block(vec![return_expr(Some(let_ref("x")))]),
+                Expression::create_block(vec![let_ref("x")]),
+            ],
+        );
     }
 
     #[test]
@@ -1399,7 +1458,7 @@ mod test {
     }
 
     #[test]
-    fn return_expr() {
+    fn parse_return_expr() {
         parse(
             "
                 let main = fun {
