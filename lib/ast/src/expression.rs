@@ -1,8 +1,8 @@
 use crate::{
     Assign, BinOp, BinaryOperation, Block, BreakExpr, Call, ContinueExpr, DataClass,
     DataClassInstance, DataClassInstanceField, Function, GetProperty, Grouping, Identifier,
-    IfConditional, Index, LetExpr, LetRef, Literal, Logic, LogicOperation, LoopExpr, ReturnExpr,
-    SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation,
+    IfConditional, ImplicitReturn, Index, LetExpr, LetRef, Literal, Logic, LogicOperation,
+    LoopExpr, ReturnExpr, SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -25,6 +25,7 @@ pub enum Expression {
     DataClassInstance(DataClassInstance),
     Block(Block),
     If(IfConditional),
+    ImplicitReturn(ImplicitReturn),
     Return(ReturnExpr),
     SelfExpr(SelfExpr),
     LoopExpr(LoopExpr),
@@ -197,6 +198,12 @@ impl Expression {
 
     pub fn create_return(value: Option<Expression>) -> Expression {
         Expression::Return(ReturnExpr {
+            value: Box::new(value),
+        })
+    }
+
+    pub fn create_implicit_return(value: Expression) -> Expression {
+        Expression::ImplicitReturn(ImplicitReturn {
             value: Box::new(value),
         })
     }

@@ -3,8 +3,8 @@ use std::{cell::RefCell, collections::HashMap, convert::TryInto, fmt::Debug, rc:
 use crate::{builtin::get_builtins, environment::Environment, Value};
 use ast::{
     Assign, BinOp, BinaryOperation, Block, Call, DataClass, Expression, Function, GetProperty,
-    IfConditional, Index, LetExpr, Literal, Logic, LogicOperation, LoopExpr, Program, ReturnExpr,
-    SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation,
+    IfConditional, ImplicitReturn, Index, LetExpr, Literal, Logic, LogicOperation, LoopExpr,
+    Program, ReturnExpr, SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation,
 };
 
 #[derive(Debug)]
@@ -69,19 +69,36 @@ impl Interpreter {
     }
 
     fn eval(&mut self, exprs: &Program) -> InterpreterResult {
-        let res = self.eval_expressions(exprs)?;
-        match res {
-            Value::ReturnVal(val) => Ok(*val),
-            _ => Ok(res),
+        let mut res = Value::Unit;
+        for expr in exprs {
+            res = self.expression(expr)?;
         }
+        Ok(res)
+    }
+
+    fn eval_function_expressions(&mut self, expression: &Expression) -> InterpreterResult {
+        let block = match expression {
+            Expression::Block(block) => block,
+            _ => unreachable!(),
+        };
+
+        let res = Value::Unit;
+        for expr in &block.exprs {
+            match self.expression(expr)? {
+                Value::ReturnVal(v) | Value::ImplicitReturnVal(v) => return Ok(*v),
+                _ => {}
+            }
+        }
+        Ok(res)
     }
 
     fn eval_expressions(&mut self, exprs: &Program) -> InterpreterResult {
-        let mut res = Value::Unit;
+        let res = Value::Unit;
         for expr in exprs.iter() {
-            res = self.expression(expr)?;
-            match res {
-                Value::ReturnVal(_) | Value::Break | Value::Continue => return Ok(res),
+            let value = self.expression(expr)?;
+            match value {
+                Value::ImplicitReturnVal(v) => return Ok(*v),
+                Value::ReturnVal(_) | Value::Break | Value::Continue => return Ok(value),
                 _ => {}
             }
         }
@@ -105,6 +122,7 @@ impl Interpreter {
             Expression::Index(expr) => self.eval_index(expr),
             Expression::SetIndex(expr) => self.eval_set_index(expr),
             Expression::Return(expr) => self.eval_return(expr),
+            Expression::ImplicitReturn(expr) => self.eval_implicit_return(expr),
             Expression::DataClass(expr) => self.eval_data_class(expr),
             Expression::DataClassInstance(expr) => self.eval_data_class_instance(expr),
             Expression::GetProperty(expr) => self.eval_get_property(expr),
@@ -120,11 +138,11 @@ impl Interpreter {
         let name = expr.name.value.to_string();
         let val = match &expr.value {
             Some(expr) => self.expression(expr)?,
-            None => Value::Null,
+            None => Value::Unit,
         };
 
-        self.env.borrow_mut().define(name, val);
-        Ok(Value::Unit)
+        self.env.borrow_mut().define(name, val.clone());
+        Ok(val)
     }
 
     fn eval_loop_expr(&mut self, loop_expr: &LoopExpr) -> InterpreterResult {
@@ -308,6 +326,9 @@ impl Interpreter {
             None => Ok(Value::return_val(Value::Unit)),
         }
     }
+    fn eval_implicit_return(&mut self, ret: &ImplicitReturn) -> InterpreterResult {
+        Ok(Value::implicit_return_val(self.expression(&ret.value)?))
+    }
 
     fn eval_set_index(&mut self, set_index: &SetIndex) -> InterpreterResult {
         let lhs = self.expression(&set_index.lhs)?;
@@ -380,12 +401,7 @@ impl Interpreter {
 
                 let env = Rc::new(RefCell::new(env));
 
-                match &fun.body {
-                    Expression::Block(block) => {
-                        eval_with_new_env_in_scope!(self, env, eval, &block.exprs)
-                    }
-                    _ => unreachable!(),
-                }
+                eval_with_new_env_in_scope!(self, env, eval_function_expressions, &fun.body)
             }
             Value::NativeFunction(v) => {
                 if args.len() != v.arity.into() {
@@ -589,7 +605,6 @@ mod test {
         }
 
         let mut interpreter = Interpreter::new();
-
         match interpreter.run(exprs) {
             Ok(val) => assert_eq!(val, src.1),
             Err(err) => println!("{:#?}", err),
@@ -613,6 +628,10 @@ mod test {
             instance_methods,
         }
     }
+
+    #[test]
+    // TODO test implicit returns
+    fn implicit_returns() {}
 
     #[test]
     fn eval_string_interpolation() {
@@ -715,8 +734,8 @@ mod test {
 
     #[test]
     fn eval_let_expression() {
-        run(("let name = 123;", Value::Unit));
-        run(("let name; name;", Value::Null));
+        run(("let name = 123;", Value::Int(123)));
+        run(("let name; name;", Value::Unit));
         run(("let name = 123; name;", Value::Int(123)));
     }
 
@@ -838,13 +857,24 @@ mod test {
 
     #[test]
     pub fn eval_function() {
-        run(("fun (){1}();", Value::Int(1)));
+        run(("fun (){ 1 }();", Value::Int(1)));
         run(("let fn = fun (){1}; fn();", Value::Int(1)));
         run(("let fn = fun (x){x}; fn(123);", Value::Int(123)));
     }
 
     #[test]
     pub fn eval_return() {
+        run((
+            "
+            let test = fun() {
+                let x = 23;
+                let y = 22;
+                y;
+            };
+            test();
+            ",
+            Value::Unit,
+        ));
         run((
             "fun() {
                 if true {
@@ -901,9 +931,9 @@ mod test {
             "{
                 1;
                 2;
-                return 22;
                 6;
                 let x = 1;
+                22
              };",
             Value::Int(22),
         ));

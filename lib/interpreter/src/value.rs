@@ -17,6 +17,7 @@ pub enum Value {
     DataClassInstance(Rc<RefCell<DataClassInstance>>),
     NativeFunction(NativeFunction),
     ReturnVal(Box<Value>),
+    ImplicitReturnVal(Box<Value>),
     Break,
     Continue,
     Null,
@@ -128,6 +129,10 @@ impl Value {
         Value::ReturnVal(Box::new(val))
     }
 
+    pub fn implicit_return_val(val: Value) -> Value {
+        Value::ImplicitReturnVal(Box::new(val))
+    }
+
     pub fn data_class(
         name: Identifier,
         fields: Vec<Identifier>,
@@ -175,6 +180,7 @@ impl Value {
             Value::DataClassInstance(_) => String::from("data_class_instance"),
             Value::NativeFunction(_) => String::from("native_function"),
             Value::ReturnVal(_) => String::from("return"),
+            Value::ImplicitReturnVal(_) => String::from("implicit_return"),
             Value::Break => String::from("break"),
             Value::Continue => String::from("continue"),
             Value::Null => String::from("null"),
@@ -227,7 +233,8 @@ impl std::fmt::Display for Value {
                 }
                 write!(f, "{} }}", out.join(", "))
             }
-            Value::ReturnVal(v) => write!(f, "{}", v),
+            Value::ImplicitReturnVal(_) => write!(f, ""),
+            Value::ReturnVal(v) => write!(f, "<return {}>", v),
             Value::Break => write!(f, "<break>"),
             Value::Continue => write!(f, "<continue>"),
         }

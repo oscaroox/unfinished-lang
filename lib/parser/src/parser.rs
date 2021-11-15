@@ -164,10 +164,7 @@ impl<'a> Parser<'a> {
         } else if self.matches(vec![TokenType::If]) {
             return self.if_expression();
         } else if self.matches(vec![TokenType::LeftBrace]) {
-            self.current_function = FunctionKind::Function;
-            let expr = self.block_expression();
-            self.current_function = FunctionKind::None;
-            return expr;
+            return self.block_expression();
         } else if self.matches(vec![TokenType::Return]) {
             return self.return_expression();
         } else if self.matches(vec![TokenType::Data]) {
@@ -453,7 +450,7 @@ impl<'a> Parser<'a> {
 
         if !exprs.is_empty() && !self.prev_token.is_semi_colon() {
             let expr = exprs.pop().unwrap();
-            exprs.push(Expression::create_return(Some(expr)));
+            exprs.push(Expression::create_implicit_return(expr));
         }
 
         self.eat(TokenType::RightBrace, "Expected '}'")?;
@@ -988,6 +985,10 @@ mod test {
         Expression::create_return(val)
     }
 
+    fn implicit_return_expr(val: Expression) -> Expression {
+        Expression::create_implicit_return(val)
+    }
+
     fn string_lit(val: &str) -> Expression {
         Expression::create_literal(Literal::String(val.to_string()))
     }
@@ -1042,14 +1043,14 @@ mod test {
                 Expression::create_block(vec![
                     let_expr("x", Some(int(2))),
                     let_expr("y", Some(int(3))),
-                    return_expr(Some(let_ref("x"))),
+                    implicit_return_expr(let_ref("x")),
                 ]),
                 Expression::create_block(vec![
                     let_expr("x", Some(int(2))),
                     let_expr("y", Some(int(3))),
                     let_ref("x"),
                 ]),
-                Expression::create_block(vec![return_expr(Some(let_ref("x")))]),
+                Expression::create_block(vec![implicit_return_expr(let_ref("x"))]),
                 Expression::create_block(vec![let_ref("x")]),
             ],
         );
@@ -1552,13 +1553,13 @@ mod test {
                 ),
                 Expression::create_if(
                     bool_lit(false),
-                    block_expr(vec![return_expr(Some(Expression::create_assign(
+                    block_expr(vec![implicit_return_expr(Expression::create_assign(
                         ident("x"),
                         int(1),
-                    )))]),
-                    Some(block_expr(vec![return_expr(Some(
+                    ))]),
+                    Some(block_expr(vec![implicit_return_expr(
                         Expression::create_assign(ident("x"), int(2)),
-                    ))])),
+                    )])),
                 ),
             ],
         );
@@ -1585,7 +1586,7 @@ mod test {
                         int(3),
                         int(4),
                         int(5),
-                        return_expr(Some(int(3345))),
+                        implicit_return_expr(int(3345)),
                     ])),
                 ),
             ],
