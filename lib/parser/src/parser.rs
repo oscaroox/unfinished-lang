@@ -1023,7 +1023,7 @@ mod test {
 
     #[test]
     // last expression in a block can implicitly return by not including the semicolon
-    fn last_expr_in_block_return_on_no_semi() {
+    fn parse_last_expr_in_block_return_on_no_semi() {
         parse(
             "
         {
@@ -1113,7 +1113,7 @@ mod test {
     }
 
     #[test]
-    fn loop_for_expr() {
+    fn parse_loop_for_expr() {
         parse(
             "
         loop i in name {};
@@ -1141,7 +1141,7 @@ mod test {
     }
 
     #[test]
-    fn number_literal() {
+    fn parse_number_literal() {
         parse(
             "1;
         2;
@@ -1165,12 +1165,12 @@ mod test {
     }
 
     #[test]
-    fn bool_literal() {
+    fn parse_bool_literal() {
         parse("true; false;", vec![bool_lit(true), bool_lit(false)]);
     }
 
     #[test]
-    fn string_literal() {
+    fn parse_string_literal() {
         parse(
             r#""this is a string"; "string";"#,
             vec![string_lit("this is a string"), string_lit("string")],
@@ -1178,7 +1178,7 @@ mod test {
     }
 
     #[test]
-    fn array_literal() {
+    fn parse_array_literal() {
         parse(
             r#"
             [1, 3, 4, true, false, "string", 2.0, null];
@@ -1203,12 +1203,12 @@ mod test {
     }
 
     #[test]
-    fn null_literal() {
+    fn parse_null_literal() {
         parse("null;", vec![Expression::create_literal(Literal::Null)]);
     }
 
     #[test]
-    fn self_keyword() {
+    fn parse_self_keyword() {
         parse(
             "let main = fun { self; };",
             vec![let_expr(
@@ -1232,12 +1232,12 @@ mod test {
     }
 
     #[test]
-    fn identifier() {
+    fn parse_identifier() {
         parse("num; num2;", vec![let_ref("num"), let_ref("num2")]);
     }
 
     #[test]
-    fn assignment_expr() {
+    fn parse_assignment_expr() {
         parse(
             "
             num = 1;
@@ -1270,7 +1270,7 @@ mod test {
     }
 
     #[test]
-    fn logic_expr() {
+    fn parse_logic_expr() {
         parse(
             "1 && 2; 2 || 1;",
             vec![
@@ -1281,7 +1281,7 @@ mod test {
     }
 
     #[test]
-    fn equality_expr() {
+    fn parse_equality_expr() {
         parse(
             "1 == 2; 2 != 1;",
             vec![
@@ -1292,7 +1292,7 @@ mod test {
     }
 
     #[test]
-    fn comparison_expr() {
+    fn parse_comparison_expr() {
         parse(
             "1 < 2; 2 <= 1;3 > 1; 3 >= 1;",
             vec![
@@ -1305,7 +1305,7 @@ mod test {
     }
 
     #[test]
-    fn binop_expr() {
+    fn parse_binop_expr() {
         parse(
             "1 + 2 * 3 / 2;",
             vec![Expression::create_binop(
@@ -1321,7 +1321,7 @@ mod test {
     }
 
     #[test]
-    fn grouping_expr() {
+    fn parse_grouping_expr() {
         parse(
             "2 * (2 + 1);",
             vec![Expression::create_binop(
@@ -1337,7 +1337,7 @@ mod test {
     }
 
     #[test]
-    fn unary_expr() {
+    fn parse_unary_expr() {
         parse(
             "-1; 1 + -1; !1;",
             vec![
@@ -1353,7 +1353,7 @@ mod test {
     }
 
     #[test]
-    fn expression_stmt() {
+    fn parse_expression_stmt() {
         parse(
             "123; 23;",
             vec![
@@ -1364,7 +1364,7 @@ mod test {
     }
 
     #[test]
-    fn array_access() {
+    fn parse_array_access() {
         parse(
             "array[0]; [1,2,3][2]; [[1], 2][0][0];",
             vec![
@@ -1379,7 +1379,7 @@ mod test {
     }
 
     #[test]
-    fn array_index_assignment() {
+    fn parse_array_index_assignment() {
         parse(
             "array[0] = 1;",
             vec![Expression::create_set_index(
@@ -1438,7 +1438,7 @@ mod test {
     }
 
     #[test]
-    fn function_call() {
+    fn parse_function_call() {
         parse(
             "name(); this_is_a_func(); fnc(1, name, true);",
             vec![
@@ -1475,17 +1475,14 @@ mod test {
                     Some("main".to_string()),
                     vec![],
                     true,
-                    block_expr(vec![
-                        Expression::create_return(None),
-                        Expression::create_return(Some(int(1))),
-                    ]),
+                    block_expr(vec![return_expr(None), return_expr(Some(int(1)))]),
                 )),
             )],
         )
     }
 
     #[test]
-    fn function_expr() {
+    fn parse_function_expr() {
         parse(
             "
         fun {};
@@ -1522,7 +1519,7 @@ mod test {
     }
 
     #[test]
-    fn if_expr() {
+    fn parse_if_expr() {
         parse(
             "
            
@@ -1594,7 +1591,7 @@ mod test {
     }
 
     #[test]
-    fn data_class_expr() {
+    fn parse_data_class_expr() {
         parse(
             "
             data Person {};
@@ -1643,7 +1640,7 @@ mod test {
     }
 
     #[test]
-    fn data_class_methods_expr() {
+    fn parse_data_class_methods_expr() {
         parse(
             "
             data Person {
@@ -1677,7 +1674,7 @@ mod test {
     }
 
     #[test]
-    fn data_class_methods_self_expr() {
+    fn parse_data_class_methods_self_expr() {
         parse(
             "
             data Person {
@@ -1721,7 +1718,7 @@ mod test {
     }
 
     #[test]
-    fn data_class_instantiate_expr() {
+    fn parse_data_class_instantiate_expr() {
         parse(
             "
             data Person {};
@@ -1762,7 +1759,7 @@ mod test {
     }
 
     #[test]
-    fn data_class_instantiate_shorthand_expr() {
+    fn parse_data_class_instantiate_shorthand_expr() {
         parse(
             r#"
             data Person {
@@ -1803,7 +1800,7 @@ mod test {
     }
 
     #[test]
-    fn get_property_expr() {
+    fn parse_get_property_expr() {
         parse(
             "
             data Person {
@@ -1827,7 +1824,7 @@ mod test {
     }
 
     #[test]
-    fn set_property_expr() {
+    fn parse_set_property_expr() {
         parse(
             r#"
             data Person {
@@ -1921,7 +1918,7 @@ mod test {
     }
 
     #[test]
-    fn loop_expr() {
+    fn parse_loop_expr() {
         parse(
             "
             loop {}; 
@@ -1941,7 +1938,7 @@ mod test {
     }
 
     #[test]
-    fn break_continue_expr() {
+    fn parse_break_continue_expr() {
         parse(
             "
         loop { break; }; 

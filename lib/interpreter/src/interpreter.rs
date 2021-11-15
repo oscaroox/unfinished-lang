@@ -631,7 +631,7 @@ mod test {
 
     #[test]
     // TODO test implicit returns
-    fn implicit_returns() {}
+    fn eval_implicit_returns() {}
 
     #[test]
     fn eval_string_interpolation() {
@@ -740,7 +740,7 @@ mod test {
     }
 
     #[test]
-    fn literals() {
+    fn eval_literals() {
         run(("let x = true; x;", Value::Bool(true)));
         run(("let x = false; x;", Value::Bool(false)));
         run(("let x = 123; x;", Value::Int(123)));
@@ -794,7 +794,7 @@ mod test {
     }
 
     #[test]
-    pub fn assignment() {
+    pub fn eval_assignment() {
         run(("let x; x = 1; x;", Value::Int(1)));
         run(("let x = 2; x += 1; x;", Value::Int(3)));
         run(("let x = 2; x *= 3; x;", Value::Int(6)));
@@ -803,7 +803,7 @@ mod test {
     }
 
     #[test]
-    pub fn logic_expression() {
+    pub fn eval_logic_expression() {
         run(("1 == 1;", Value::Bool(true)));
         run(("1 != 1;", Value::Bool(false)));
         run(("1 == 2;", Value::Bool(false)));
@@ -825,7 +825,7 @@ mod test {
     }
 
     #[test]
-    pub fn if_condiditional() {
+    pub fn eval_if_condiditional() {
         run(("if true { 1 };", Value::Int(1)));
         run(("if false { 1 } else { 2 };", Value::Int(2)));
         run(("let x = if false { 1 } else { 2 }; x;", Value::Int(2)));
@@ -848,7 +848,7 @@ mod test {
     }
 
     #[test]
-    pub fn block_expressions() {
+    pub fn eval_block_expressions() {
         run(("{ 1 };", Value::Int(1)));
         run(("{ 2 };", Value::Int(2)));
         run(("{ 3 };", Value::Int(3)));

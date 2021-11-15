@@ -452,7 +452,7 @@ mod tests {
     }
 
     #[test]
-    fn string_interpolation() {
+    fn scan_string_interpolation() {
         let src = r#" "hello, $(world) hows it" "" 123"#;
         let mut manager = SpanManager::default();
         let mut maker = manager.add_source(src.to_string());
@@ -514,7 +514,7 @@ mod tests {
     }
 
     #[test]
-    fn arithmetic_tokens() {
+    fn scan_arithmetic_tokens() {
         test_scan(
             "+-*/",
             vec![
@@ -528,7 +528,7 @@ mod tests {
     }
 
     #[test]
-    fn eof() {
+    fn scan_eof() {
         test_scan(
             "
             
@@ -538,7 +538,7 @@ mod tests {
     }
 
     #[test]
-    fn other_tokens() {
+    fn scan_other_tokens() {
         test_scan(
             "{},;()[]! =>:.::",
             vec![
@@ -561,7 +561,7 @@ mod tests {
     }
 
     #[test]
-    fn illegal_tokens() {
+    fn scan_illegal_tokens() {
         test_scan(
             "$@",
             vec![
@@ -573,7 +573,7 @@ mod tests {
     }
 
     #[test]
-    fn skip_whitespace() {
+    fn scan_skip_whitespace() {
         test_scan(
             "+ - * /",
             vec![
@@ -587,7 +587,7 @@ mod tests {
     }
 
     #[test]
-    fn comments() {
+    fn scan_comments() {
         test_scan(
             "
         // this is a commeents
@@ -608,7 +608,7 @@ mod tests {
     }
 
     #[test]
-    fn span() {
+    fn scan_span() {
         let src = "+
 let
 fun
@@ -637,7 +637,7 @@ this_is_a_identifier";
     }
 
     #[test]
-    fn read_digits() {
+    fn scan_digits() {
         test_scan(
             "123 23 34.2 1 + -1 1234567890",
             vec![
@@ -655,7 +655,7 @@ this_is_a_identifier";
     }
 
     #[test]
-    fn newline() {
+    fn scan_newline() {
         test_scan(
             "2;
             0;
@@ -705,7 +705,7 @@ this_is_a_identifier";
     // }
 
     #[test]
-    fn read_identifier() {
+    fn scan_identifiers() {
         let alpha = "abcdefghijklmnopqrstuvwxyz";
         let capital_alpha = alpha.to_uppercase();
 
@@ -724,7 +724,7 @@ this_is_a_identifier";
     }
 
     #[test]
-    fn logic_tokens() {
+    fn scan_logic_tokens() {
         test_scan(
             "&& || < <= > >= == !=",
             vec![
@@ -742,7 +742,7 @@ this_is_a_identifier";
     }
 
     #[test]
-    fn keywords() {
+    fn scan_keywords() {
         test_scan(
             "let fun true false null if else return data self loop break continue in",
             vec![
@@ -766,7 +766,7 @@ this_is_a_identifier";
     }
 
     #[test]
-    fn assignment() {
+    fn scan_assignment_tokens() {
         test_scan(
             "= += -= *= /= :=",
             vec![
