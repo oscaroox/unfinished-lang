@@ -4,6 +4,7 @@ use crate::{Expression, Identifier};
 pub struct Function {
     pub name: Option<String>,
     pub params: Vec<Identifier>,
-    pub body: Vec<Expression>,
+    // the parser makes sure this is a block expression
+    pub body: Box<Expression>,
     pub is_static: bool,
 }

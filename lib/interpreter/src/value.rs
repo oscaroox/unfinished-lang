@@ -81,7 +81,7 @@ pub struct FunctionValue {
     pub name: Option<String>,
     pub arity: u8,
     pub params: Vec<Identifier>,
-    pub body: Vec<Expression>,
+    pub body: Expression,
     pub closure: Rc<RefCell<Environment>>,
 }
 
@@ -104,7 +104,7 @@ impl Value {
         name: Option<String>,
         params: Vec<Identifier>,
         arity: u8,
-        body: Vec<Expression>,
+        body: Expression,
         closure: Rc<RefCell<Environment>>,
     ) -> Value {
         Value::Function(FunctionValue {
@@ -227,9 +227,9 @@ impl std::fmt::Display for Value {
                 }
                 write!(f, "{} }}", out.join(", "))
             }
-            Value::ReturnVal(_) => write!(f, ""),
-            Value::Break => write!(f, ""),
-            Value::Continue => write!(f, ""),
+            Value::ReturnVal(v) => write!(f, "{}", v),
+            Value::Break => write!(f, "<break>"),
+            Value::Continue => write!(f, "<continue>"),
         }
     }
 }

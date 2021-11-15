@@ -156,24 +156,29 @@ impl Expression {
         name: Option<String>,
         params: Vec<Identifier>,
         is_static: bool,
-        body: Vec<Expression>,
+        body: Expression,
     ) -> Expression {
         Expression::Function(Function {
             name,
             params,
-            body,
+            body: Box::new(body),
             is_static,
         })
     }
 
     pub fn create_if(
         condition: Expression,
-        then: Vec<Expression>,
-        not_then: Option<Vec<Expression>>,
+        then: Expression,
+        not_then: Option<Expression>,
     ) -> Expression {
+        let not_then = if let Some(e) = not_then {
+            Some(Box::new(e))
+        } else {
+            None
+        };
         Expression::If(IfConditional {
             condition: Box::new(condition),
-            then,
+            then: Box::new(then),
             not_then,
         })
     }
@@ -221,7 +226,7 @@ impl Expression {
 
     pub fn create_loop(
         condition: Expression,
-        body: Vec<Expression>,
+        body: Expression,
         iterator: Option<Expression>,
     ) -> Expression {
         let iterator = if let Some(e) = iterator {
@@ -230,7 +235,7 @@ impl Expression {
             None
         };
         Expression::LoopExpr(LoopExpr {
-            body,
+            body: Box::new(body),
             condition: Box::new(condition),
             iterator,
         })
