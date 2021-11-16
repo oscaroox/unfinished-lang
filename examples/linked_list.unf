@@ -8,7 +8,7 @@ data ListNode {
             next: null,
         }
     }
-}
+};
 
 
 data LinkedList {
@@ -20,47 +20,44 @@ data LinkedList {
     
 
     fun size(self) {
-        let count = 0
-        let node = self.head
+        let count = 0;
+        let node = self.head;
         loop node != null {
-            count += 1
-            node = node.next
-        }
+            count += 1;
+            node = node.next;
+        };
         count
     }
 
     fun clear(self) {
-        self.head = null
+        self.head = null;
     }
 
     fun get_last(self) {
-        let last_node = self.head
+        let last_node = self.head;
         if last_node != null {
             loop last_node.next != null {
-                last_node = last_node.next
+                last_node = last_node.next;
             }
-        }
+        };
         last_node
     }
 
     fun get_first(self) => self.head
-}
+};
 
-let node1 = ListNode.new(2)
-let node2 = ListNode.new(5)
-let node3 
+let node1 = ListNode.new(2);
+let node2 = ListNode.new(5);
+let node3 = ListNode.new(77);
 
+node2.next = node3;
+node1.next = node2;
 
-println(node5);
+let list = LinkedList.new(node1);
+println(list);
 
-node3 = ListNode.new(77)
+println("next value: $(list.head.next.value)");
+println("list count: $(list.size())");
 
-node1.next = node2
-
-let list = LinkedList.new(node1)
-
-println("next value: $(list.head.next.value)")
-println("list count: $(list.size())")
-
-println("first_node: $(list.get_first())")
-println("last_node: $(list.get_last())")
+println("first_node: $(list.get_first())");
+println("last_node: $(list.get_last())");
