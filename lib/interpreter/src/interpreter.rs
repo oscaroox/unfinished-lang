@@ -589,10 +589,10 @@ mod test {
     use scanner::Scanner;
     use spanner::SpanManager;
 
-    pub fn run(src: (&str, Value)) {
+    pub fn run(src: &str, expected: Value) {
         let mut manager = SpanManager::default();
-        let mut maker = manager.add_source(src.0.to_string());
-        let scanner = Scanner::new(src.0.to_string(), &mut maker);
+        let mut maker = manager.add_source(src.to_string());
+        let scanner = Scanner::new(src.to_string(), &mut maker);
         let mut parser = Parser::new(scanner);
 
         let (exprs, errors) = parser.parse();
@@ -606,7 +606,7 @@ mod test {
 
         let mut interpreter = Interpreter::new();
         match interpreter.run(exprs) {
-            Ok(val) => assert_eq!(val, src.1),
+            Ok(val) => assert_eq!(val, expected),
             Err(err) => println!("{:#?}", err),
         };
     }
@@ -631,19 +631,71 @@ mod test {
 
     #[test]
     // TODO test implicit returns
-    fn eval_implicit_returns() {}
+    fn eval_implicit_returns() {
+        run(
+            r#"
+        let speed = "quick";
+        "The $(speed) $({
+            let animal = "fox";
+            let color = "brown";
+            "$(color) $(animal)"
+        }) jumps over the lazy dog";
+        "#,
+            Value::String("The quick brown fox jumps over the lazy dog".to_string()),
+        );
+
+        run(
+            r#"
+            let main = fun(val){
+                if val {
+                    1
+                } else {
+                    92
+                }
+            };
+            [main(true), main(false)];
+            "#,
+            Value::array(vec![Value::Int(1), Value::Int(92)]),
+        );
+
+        run(
+            r#"
+            let main = fun(val){
+                if val {
+                    return 99;
+                };
+                234;
+            };
+            [main(true), main(false)];
+            "#,
+            Value::array(vec![Value::Int(99), Value::Unit]),
+        );
+
+        run(
+            r#"
+            let main = fun(val){
+                if val {
+                    99;
+                };
+                234;
+            };
+            [main(true), main(false)];
+            "#,
+            Value::array(vec![Value::Unit, Value::Unit]),
+        );
+    }
 
     #[test]
     fn eval_string_interpolation() {
-        run((
+        run(
             "
             let name = \"John\";
             \"Hello $(name), how was your day?\";
             ",
             Value::String("Hello John, how was your day?".to_string()),
-        ));
+        );
 
-        run((
+        run(
             r#"
             let john = "John";
             let jane = "Jane";
@@ -651,9 +703,9 @@ mod test {
             "Hello $(if true { jane } else { john }), how was your day?";
             "#,
             Value::String("Hello Jane, how was your day?".to_string()),
-        ));
+        );
 
-        run((
+        run(
             r#"
 
             "Hello $({
@@ -664,12 +716,12 @@ mod test {
             }), how was your day?";
             "#,
             Value::String("Hello John Doe, how was your day?".to_string()),
-        ));
+        );
     }
 
     #[test]
     fn eval_loop() {
-        run((
+        run(
             "
         let i = 0;
         loop i < 10 {
@@ -678,9 +730,9 @@ mod test {
         i;
         ",
             Value::Int(10),
-        ));
+        );
 
-        run((
+        run(
             "
         let i = 0;
         loop i < 10 {
@@ -692,66 +744,66 @@ mod test {
         i;
         ",
             Value::Int(5),
-        ));
+        );
 
-        // run((
-        //     "
-        // let names = [2,5,7,8];
-        // let x = 0;
-        // loop name in names {
-        //     if name == 7 {
-        //         continue;
-        //     };
-        //     x += 1;
-        // };
-        // x;
-        // ",
-        //     Value::Int(3),
-        // ));
+        run(
+            "
+        let names = [2,5,7,8];
+        let x = 0;
+        loop name in names {
+            if name == 7 {
+                continue;
+            };
+            x += 1;
+        };
+        x;
+        ",
+            Value::Int(3),
+        );
 
-        // run((
-        //     "
-        // let x = 0;
-        // loop name in range(1, 10) {
-        //     x += 1;
-        // };
-        // x;
-        // ",
-        //     Value::Int(9),
-        // ));
+        run(
+            "
+        let x = 0;
+        loop name in range(1, 10) {
+            x += 1;
+        };
+        x;
+        ",
+            Value::Int(9),
+        );
 
-        // run((
-        //     "
-        // let x = 0;
-        // loop name in range(0, 10) {
-        //     x += 1;
-        // };
-        // x;
-        // ",
-        //     Value::Int(10),
-        // ));
+        run(
+            "
+        let x = 0;
+        loop name in range(0, 10) {
+            x += 1;
+        };
+        x;
+        ",
+            Value::Int(10),
+        );
     }
 
     #[test]
     fn eval_let_expression() {
-        run(("let name = 123;", Value::Int(123)));
-        run(("let name; name;", Value::Unit));
-        run(("let name = 123; name;", Value::Int(123)));
+        run("let name = 123;", Value::Int(123));
+        run("let name; name;", Value::Unit);
+        run("let name = 123; name;", Value::Int(123));
     }
 
     #[test]
     fn eval_literals() {
-        run(("let x = true; x;", Value::Bool(true)));
-        run(("let x = false; x;", Value::Bool(false)));
-        run(("let x = 123; x;", Value::Int(123)));
-        run(("let x = 12.45; x;", Value::Float(12.45)));
-        run(("let x = null; x;", Value::Null));
-        run((
+        run("let x = true; x;", Value::Bool(true));
+        run("let x = false; x;", Value::Bool(false));
+        run("let x = 123; x;", Value::Int(123));
+        run("let x = 12.45; x;", Value::Float(12.45));
+        run("let x = null; x;", Value::Null);
+        run(
             r#"let x = "test string"; x;"#,
             Value::String("test string".to_string()),
-        ));
+        );
 
-        run((
+        run(
             r#"let x = ["test", 1, 1.5, true, false, null]; x;"#,
             Value::array(vec![
                 Value::String("test".to_string()),
@@ -761,110 +813,110 @@ mod test {
                 Value::Bool(false),
                 Value::Null,
             ]),
-        ));
+        );
     }
 
     #[test]
     pub fn eval_binop() {
-        run(("let x = 1 + 2 * 4 / 2 - 2; x;", Value::Int(3)));
-        run(("let x = 1 + 2 * 4; x;", Value::Int(9)));
-        run(("let x = 6 * 4 * 2 * 6; x;", Value::Int(288)));
+        run("let x = 1 + 2 * 4 / 2 - 2; x;", Value::Int(3));
+        run("let x = 1 + 2 * 4; x;", Value::Int(9));
+        run("let x = 6 * 4 * 2 * 6; x;", Value::Int(288));
 
-        run(("let x = 2.5 * 4.5 / 0.2; x;", Value::Float(56.25)));
-        run(("let x = 298.234 + 99.12 - 22.0; x;", Value::Float(375.354)));
-        run(("-2 + -4;", Value::Int(-6)));
-        run(("-2.0 + -4.0;", Value::Float(-6.0)));
+        run("let x = 2.5 * 4.5 / 0.2; x;", Value::Float(56.25));
+        run("let x = 298.234 + 99.12 - 22.0; x;", Value::Float(375.354));
+        run("-2 + -4;", Value::Int(-6));
+        run("-2.0 + -4.0;", Value::Float(-6.0));
     }
 
     #[test]
     pub fn eval_grouping() {
-        run(("let x = (1 + 2) * 4; x;", Value::Int(12)));
-        run(("let x = 3 * 3 / (2 + 4); x;", Value::Int(1)));
-        run(("let x = (1 + 2) * 4; x;", Value::Int(12)));
+        run("let x = (1 + 2) * 4; x;", Value::Int(12));
+        run("let x = 3 * 3 / (2 + 4); x;", Value::Int(1));
+        run("let x = (1 + 2) * 4; x;", Value::Int(12));
     }
 
     #[test]
     pub fn eval_unary() {
-        run(("-12;", Value::Int(-12)));
-        run(("+12;", Value::Int(12)));
-        run(("-12.23;", Value::Float(-12.23)));
-        run(("+12.23;", Value::Float(12.23)));
-        run(("!true;", Value::Bool(false)));
-        run(("!false;", Value::Bool(true)));
+        run("-12;", Value::Int(-12));
+        run("+12;", Value::Int(12));
+        run("-12.23;", Value::Float(-12.23));
+        run("+12.23;", Value::Float(12.23));
+        run("!true;", Value::Bool(false));
+        run("!false;", Value::Bool(true));
     }
 
     #[test]
     pub fn eval_assignment() {
-        run(("let x; x = 1; x;", Value::Int(1)));
-        run(("let x = 2; x += 1; x;", Value::Int(3)));
-        run(("let x = 2; x *= 3; x;", Value::Int(6)));
-        run(("let x = 2; x /= 2; x;", Value::Int(1)));
-        run(("let x = 2; x -= 1; x;", Value::Int(1)));
+        run("let x; x = 1; x;", Value::Int(1));
+        run("let x = 2; x += 1; x;", Value::Int(3));
+        run("let x = 2; x *= 3; x;", Value::Int(6));
+        run("let x = 2; x /= 2; x;", Value::Int(1));
+        run("let x = 2; x -= 1; x;", Value::Int(1));
     }
 
     #[test]
     pub fn eval_logic_expression() {
-        run(("1 == 1;", Value::Bool(true)));
-        run(("1 != 1;", Value::Bool(false)));
-        run(("1 == 2;", Value::Bool(false)));
-        run((r#" "test" == "test";"#, Value::Bool(true)));
-        run((r#" "test" != "test";"#, Value::Bool(false)));
-        run((r#" "test1" == "test";"#, Value::Bool(false)));
-        run(("true && false;", Value::Bool(false)));
-        run(("true && true;", Value::Bool(true)));
-        run(("false && false;", Value::Bool(false)));
-        run(("true || false;", Value::Bool(true)));
-        run(("false || true;", Value::Bool(true)));
-        run(("false || false;", Value::Bool(false)));
-        run(("null == null;", Value::Bool(true)));
-        run(("null != null;", Value::Bool(false)));
-        run(("null == true;", Value::Bool(false)));
-        run(("true == null;", Value::Bool(false)));
-        run(("1 != null;", Value::Bool(true)));
-        run((r#"null != "test";"#, Value::Bool(true)));
+        run("1 == 1;", Value::Bool(true));
+        run("1 != 1;", Value::Bool(false));
+        run("1 == 2;", Value::Bool(false));
+        run(r#" "test" == "test";"#, Value::Bool(true));
+        run(r#" "test" != "test";"#, Value::Bool(false));
+        run(r#" "test1" == "test";"#, Value::Bool(false));
+        run("true && false;", Value::Bool(false));
+        run("true && true;", Value::Bool(true));
+        run("false && false;", Value::Bool(false));
+        run("true || false;", Value::Bool(true));
+        run("false || true;", Value::Bool(true));
+        run("false || false;", Value::Bool(false));
+        run("null == null;", Value::Bool(true));
+        run("null != null;", Value::Bool(false));
+        run("null == true;", Value::Bool(false));
+        run("true == null;", Value::Bool(false));
+        run("1 != null;", Value::Bool(true));
+        run(r#"null != "test";"#, Value::Bool(true));
     }
 
     #[test]
     pub fn eval_if_condiditional() {
-        run(("if true { 1 };", Value::Int(1)));
-        run(("if false { 1 } else { 2 };", Value::Int(2)));
-        run(("let x = if false { 1 } else { 2 }; x;", Value::Int(2)));
-        run((
+        run("if true { 1 };", Value::Int(1));
+        run("if false { 1 } else { 2 };", Value::Int(2));
+        run("let x = if false { 1 } else { 2 }; x;", Value::Int(2));
+        run(
             "
         let x = 1;
         if false { x = 22 } else { x = 99 };
         x;
         ",
             Value::Int(99),
-        ));
-        run((
+        );
+        run(
             "
         let x = 1;
         if true { let x = 22; } else { x = 99 };
         x;
         ",
             Value::Int(1),
-        ));
+        );
     }
 
     #[test]
     pub fn eval_block_expressions() {
-        run(("{ 1 };", Value::Int(1)));
-        run(("{ 2 };", Value::Int(2)));
-        run(("{ 3 };", Value::Int(3)));
-        run(("let x = { 1; 2; 3; 4; 5; 3345 }; x;", Value::Int(3345)));
+        run("{ 1 };", Value::Int(1));
+        run("{ 2 };", Value::Int(2));
+        run("{ 3 };", Value::Int(3));
+        run("let x = { 1; 2; 3; 4; 5; 3345 }; x;", Value::Int(3345));
     }
 
     #[test]
     pub fn eval_function() {
-        run(("fun (){ 1 }();", Value::Int(1)));
-        run(("let fn = fun (){1}; fn();", Value::Int(1)));
-        run(("let fn = fun (x){x}; fn(123);", Value::Int(123)));
+        run("fun (){ 1 }();", Value::Int(1));
+        run("let fn = fun (){1}; fn();", Value::Int(1));
+        run("let fn = fun (x){x}; fn(123);", Value::Int(123));
     }
 
     #[test]
     pub fn eval_return() {
-        run((
+        run(
             "
             let test = fun() {
                 let x = 23;
@@ -874,8 +926,8 @@ mod test {
             test();
             ",
             Value::Unit,
-        ));
-        run((
+        );
+        run(
             "fun() {
                 if true {
                     return 233;
@@ -883,8 +935,8 @@ mod test {
             123;
         }();",
             Value::Int(233),
-        ));
-        run((
+        );
+        run(
             "fun() {
                 if false {
                     return 233;
@@ -892,8 +944,8 @@ mod test {
             123
         }();",
             Value::Int(123),
-        ));
-        run((
+        );
+        run(
             "fun() {
                 if true {
                     return 233;
@@ -902,8 +954,8 @@ mod test {
                 };
         }();",
             Value::Int(233),
-        ));
-        run((
+        );
+        run(
             "
                 let noop = fun () {
                     if (1 < 2) {
@@ -913,9 +965,9 @@ mod test {
                 }; noop();
         ",
             Value::Int(1),
-        ));
+        );
 
-        run((
+        run(
             "
                 let noop = fun () {
                     if (1 < 2) {
@@ -925,9 +977,9 @@ mod test {
                 }; noop();
         ",
             Value::Unit,
-        ));
+        );
 
-        run((
+        run(
             "{
                 1;
                 2;
@@ -936,12 +988,12 @@ mod test {
                 22
              };",
             Value::Int(22),
-        ));
+        );
     }
 
     #[test]
     pub fn eval_scopes() {
-        run((
+        run(
             "
         let x = 23;
             let y = {
@@ -950,8 +1002,8 @@ mod test {
         x;
         ",
             Value::Int(23),
-        ));
-        run((
+        );
+        run(
             "
         let x = 23;
             let y = {
@@ -960,9 +1012,9 @@ mod test {
         x;
         ",
             Value::Int(123),
-        ));
+        );
 
-        run((
+        run(
             "
         let x = 23;
             let y = {
@@ -972,15 +1024,15 @@ mod test {
         y;
         ",
             Value::Unit,
-        ));
+        );
     }
 
     #[test]
     pub fn eval_native_function() {
-        run(("println(1);", Value::Null));
-        run(("range(1, 22);", Value::Range(1, 22)));
-        run((r#"len("this is a string");"#, Value::Int(16)));
-        run((
+        run("println(1);", Value::Null);
+        run("range(1, 22);", Value::Range(1, 22));
+        run(r#"len("this is a string");"#, Value::Int(16));
+        run(
             " 
         let arr = [0];
         let arr2 = clone(arr);
@@ -988,23 +1040,23 @@ mod test {
         arr[0];
         ",
             Value::Int(0),
-        ));
+        );
     }
 
     #[test]
     pub fn eval_array_access() {
-        run(("let x = [123]; x[0];", Value::Int(123)));
-        run(("let x = [123]; x[10];", Value::Null));
-        run(("let x = [1,2,3, 4]; x[1+2];", Value::Int(4)));
-        run(("[[123], 2][0][0];", Value::Int(123)));
-        run(("[[123], 2][0];", Value::array(vec![Value::Int(123)])));
-        run((r#"["test"][0];"#, Value::String("test".to_string())));
+        run("let x = [123]; x[0];", Value::Int(123));
+        run("let x = [123]; x[10];", Value::Null);
+        run("let x = [1,2,3, 4]; x[1+2];", Value::Int(4));
+        run("[[123], 2][0][0];", Value::Int(123));
+        run("[[123], 2][0];", Value::array(vec![Value::Int(123)]));
+        run(r#"["test"][0];"#, Value::String("test".to_string()));
     }
 
     #[test]
     pub fn eval_set_array_index() {
-        run(("let x = [123]; x[0] = 1; x[0];", Value::Int(1)));
-        run((
+        run("let x = [123]; x[0] = 1; x[0];", Value::Int(1));
+        run(
             "
         let x = [123]; 
         x[0] = 1;
@@ -1014,17 +1066,17 @@ mod test {
         x[0] /= 1;
         x[0];",
             Value::Int(4),
-        ));
+        );
     }
 
     #[test]
     pub fn eval_data_class() {
-        run((
+        run(
             "data Person {};",
             Value::data_class(ident("Person"), vec![], HashMap::new(), HashMap::new()),
-        ));
+        );
 
-        run((
+        run(
             "data Person {
                 first_name,
                 last_name,
@@ -1036,7 +1088,7 @@ mod test {
                 HashMap::new(),
                 HashMap::new(),
             ),
-        ));
+        );
     }
 
     #[test]
@@ -1053,7 +1105,7 @@ mod test {
         map.insert(String::from("age"), Value::Int(40));
 
         let field_idents = vec![ident("first_name"), ident("last_name"), ident("age")];
-        run((
+        run(
             r#"data Person {
                 first_name,
                 last_name,
@@ -1073,10 +1125,10 @@ mod test {
                 map.clone(),
                 field_idents.clone(),
             ),
-        ));
+        );
 
         map.insert(String::from("age"), Value::Null);
-        run((
+        run(
             r#"data Person {
                 first_name,
                 last_name,
@@ -1096,12 +1148,12 @@ mod test {
                 map.clone(),
                 field_idents.clone(),
             ),
-        ));
+        );
 
         map.insert(String::from("first_name"), Value::Null);
         map.insert(String::from("last_name"), Value::Null);
         map.insert(String::from("age"), Value::Null);
-        run((
+        run(
             r#"data Person {
                 first_name,
                 last_name,
@@ -1121,12 +1173,12 @@ mod test {
                 map.clone(),
                 field_idents.clone(),
             ),
-        ));
+        );
     }
 
     #[test]
     pub fn eval_property_access() {
-        run((
+        run(
             r#"data Person {
                 first_name,
                 last_name,
@@ -1136,12 +1188,12 @@ mod test {
             person.first_name;
             "#,
             Value::String("John".to_string()),
-        ));
+        );
     }
 
     #[test]
     pub fn eval_property_set() {
-        run((
+        run(
             r#"data Person {
                 first_name,
                 last_name,
@@ -1152,9 +1204,9 @@ mod test {
             person.age;
             "#,
             Value::Int(22),
-        ));
+        );
 
-        run((
+        run(
             r#"data Person {
                 first_name,
                 last_name,
@@ -1165,9 +1217,9 @@ mod test {
             person.age;
             "#,
             Value::Int(41),
-        ));
+        );
 
-        run((
+        run(
             r#"data Person {
                 first_name,
                 last_name,
@@ -1181,12 +1233,12 @@ mod test {
             person.age;
             "#,
             Value::Int(40),
-        ));
+        );
     }
 
     #[test]
     pub fn eval_shorthand_data_class_instantiate() {
-        run((
+        run(
             r#"
             data Person {
                 first_name,
@@ -1200,12 +1252,12 @@ mod test {
             person.age;
             "#,
             Value::Int(40),
-        ));
+        );
     }
 
     #[test]
     pub fn eval_data_class_static_method() {
-        run((
+        run(
             "data Person {
                 id
             } :: {
@@ -1217,12 +1269,12 @@ mod test {
             person.id;
             ",
             Value::Int(1),
-        ));
+        );
     }
 
     #[test]
     pub fn eval_data_class_instance_method() {
-        run((
+        run(
             "data Person {
                 id
             } :: {
@@ -1238,10 +1290,10 @@ mod test {
             person.get_id();
             ",
             Value::Int(22),
-        ));
+        );
 
         // should allow a method with the same name as a data class field to be called
-        run((
+        run(
             "data Person {
                 id
             } :: {
@@ -1257,12 +1309,12 @@ mod test {
             person.id();
             ",
             Value::Int(22),
-        ));
+        );
     }
 
     #[test]
     pub fn eval_data_class_instance_set_method() {
-        run((
+        run(
             "data Person {
                 id
             } :: {
@@ -1283,6 +1335,6 @@ mod test {
             person.get_id();
             ",
             Value::Int(98324),
-        ));
+        );
     }
 }

@@ -459,6 +459,7 @@ impl<'a> Parser<'a> {
 
     fn if_expression(&mut self) -> Result<Expression, ParserError> {
         let left_paren = self.eat_optional(TokenType::LeftParen);
+
         let expr = self.expression()?;
 
         if left_paren.is_some() {
@@ -744,7 +745,24 @@ impl<'a> Parser<'a> {
 
         if self.check(TokenType::Identifier)
             && self.check_peek(TokenType::LeftBrace)
+            // TODO data class instantiation has the same syntax
+            //  When using the In and If expression
+            //  e.g if value {}
+            //        ^^^^^^^^ after the If the parser will try to parse the expression after if as a data class
+            //  possible solution is the one below checking if the the previous token is one of the keywords: If and In
+            //  there should be a better solution: what if we implement pattern matching / destructering
+            //  let Person { name } = person; // will be parsed as data class instantiation
+            //  match person {
+            //      Person { name } => name,
+            //  }
+            //  In the match expression the parser would try to parse the first match arm as
+            //  a data class instantation
+            //
+            //  Possible solution is to use the :: token for instantiation
+            //  e.g: Person :: { id: 1 };
             && self.prev_token.token_type != TokenType::In
+            && self.prev_token.token_type != TokenType::If
+            && self.prev_token.token_type != TokenType::Loop
         {
             return self.data_class_instantiate();
         }
@@ -1533,6 +1551,7 @@ mod test {
                 let y = 2;
             };
             if false { x = 1 } else  { x = 2 };
+            if val { 1 } else { 2 };
             ",
             vec![
                 Expression::create_if(bool_lit(true), block_expr(vec![]), None),
@@ -1557,6 +1576,11 @@ mod test {
                     Some(block_expr(vec![implicit_return_expr(
                         Expression::create_assign(ident("x"), int(2)),
                     )])),
+                ),
+                Expression::create_if(
+                    let_ref("val"),
+                    block_expr(vec![implicit_return_expr(int(1))]),
+                    Some(block_expr(vec![implicit_return_expr(int(2))])),
                 ),
             ],
         );
