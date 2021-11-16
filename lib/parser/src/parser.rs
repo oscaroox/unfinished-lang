@@ -429,7 +429,7 @@ impl<'a> Parser<'a> {
                 name,
                 params,
                 is_static,
-                Expression::create_block(vec![expression]),
+                Expression::create_block(vec![Expression::create_implicit_return(expression)]),
             ));
         }
 
@@ -1486,16 +1486,28 @@ mod test {
                     return; 
                     return 1;
                 };
+                let main = fun() => 1;
             ",
-            vec![let_expr(
-                "main",
-                Some(Expression::create_function(
-                    Some("main".to_string()),
-                    vec![],
-                    true,
-                    block_expr(vec![return_expr(None), return_expr(Some(int(1)))]),
-                )),
-            )],
+            vec![
+                let_expr(
+                    "main",
+                    Some(Expression::create_function(
+                        Some("main".to_string()),
+                        vec![],
+                        true,
+                        block_expr(vec![return_expr(None), return_expr(Some(int(1)))]),
+                    )),
+                ),
+                let_expr(
+                    "main",
+                    Some(Expression::create_function(
+                        Some("main".to_string()),
+                        vec![],
+                        true,
+                        block_expr(vec![implicit_return_expr(int(1))]),
+                    )),
+                ),
+            ],
         )
     }
 
