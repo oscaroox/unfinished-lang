@@ -1,0 +1,34 @@
+let find = fun(arr, f) {
+    let iter = fun(index) {
+        if (len(arr) != index) {
+            if (f(arr[index], index)) {
+                arr[index]
+            } else {
+                iter(index + 1)
+            }
+        }
+    };
+    iter(0)
+};
+
+let id = 0;
+
+data Person {
+    id,
+    name
+} :: {
+    fun new(name) => Person {
+        id: id += 1,
+        name, 
+    }
+};
+
+
+
+let person = [Person.new("Jane"), Person.new("John"), Person.new("Carlos")];
+
+let found = find(person, fun(p, idx) => p.id == 3);
+
+println(found);
+
+println("test");

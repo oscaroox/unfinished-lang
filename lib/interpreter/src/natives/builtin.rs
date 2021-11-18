@@ -84,7 +84,10 @@ pub fn get_builtins() -> HashMap<String, Value> {
 fn builtin_println(args: Vec<Value>) -> BuiltinResult {
     match &args[0] {
         obj => {
-            println!("{}", obj);
+            match &obj {
+                Value::String(v) => println!("{}", v),
+                _ => println!("{}", obj),
+            }
             Ok(Value::Null)
         }
     }
