@@ -22,19 +22,11 @@ pub enum FunctionKind {
     Method,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum LoopKind {
-    None,
-    Loop,
-}
-
 #[derive(Debug)]
 pub struct Parser<'a> {
     scanner: Scanner<'a>,
     prev_token: Token,
     curr_token: Token,
-    current_function: FunctionKind,
-    current_loop: LoopKind,
 }
 
 impl<'a> Parser<'a> {
@@ -44,8 +36,6 @@ impl<'a> Parser<'a> {
             scanner,
             prev_token: Token::eof(Span::dummy()),
             curr_token,
-            current_function: FunctionKind::None,
-            current_loop: LoopKind::None,
         }
     }
 
@@ -170,10 +160,7 @@ impl<'a> Parser<'a> {
         } else if self.matches(vec![TokenType::Data]) {
             return self.data_class_expression();
         } else if self.matches(vec![TokenType::Loop]) {
-            self.current_loop = LoopKind::Loop;
-            let expr = self.loop_expression();
-            self.current_loop = LoopKind::None;
-            return expr;
+            return self.loop_expression();
         } else if self.matches(vec![TokenType::Break, TokenType::Continue]) {
             return self.continue_break_expression();
         }
@@ -222,14 +209,6 @@ impl<'a> Parser<'a> {
     }
 
     fn continue_break_expression(&mut self) -> Result<Expression, ParserError> {
-        if self.current_loop == LoopKind::None {
-            let msg = if self.prev_token.token_type == TokenType::Break {
-                String::from("Cannot use break outside loops")
-            } else {
-                String::from("Cannot use continue outside loops")
-            };
-            return Err(ParserError::Error(msg, self.prev_token.clone()));
-        }
         Ok(match self.prev_token.token_type {
             TokenType::Break => Expression::create_break(),
             TokenType::Continue => Expression::create_continue(),
@@ -345,10 +324,7 @@ impl<'a> Parser<'a> {
 
             while !self.check(TokenType::RightBrace) && !self.is_end() {
                 self.eat(TokenType::Fun, "Expected 'fun'")?;
-                self.current_function = FunctionKind::Method;
-                let expr = self.fun_expression(FunctionKind::Method);
-                self.current_function = FunctionKind::None;
-                methods.push(expr?);
+                methods.push(self.fun_expression(FunctionKind::Method)?);
             }
 
             self.eat(TokenType::RightBrace, "Expected '}'")?;
@@ -362,12 +338,6 @@ impl<'a> Parser<'a> {
     }
 
     fn return_expression(&mut self) -> Result<Expression, ParserError> {
-        if self.current_function == FunctionKind::None {
-            return Err(ParserError::Error(
-                "Cannot use return in top level code".to_string(),
-                self.prev_token.clone(),
-            ));
-        }
         let mut value = None;
 
         if !self.curr_token.is_semi_colon() {
@@ -774,19 +744,10 @@ impl<'a> Parser<'a> {
         }
 
         if self.matches(vec![TokenType::Fun]) {
-            self.current_function = FunctionKind::Function;
-            let expr = self.fun_expression(FunctionKind::Function);
-            self.current_function = FunctionKind::None;
-            return expr;
+            return self.fun_expression(FunctionKind::Function);
         }
 
         if self.matches(vec![TokenType::SELF]) {
-            if self.current_function == FunctionKind::None {
-                return Err(ParserError::Error(
-                    "Cannot use self outside methods".to_string(),
-                    token.clone(),
-                ));
-            }
             return Ok(Expression::create_self(token.value));
         }
 
