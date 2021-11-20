@@ -27,6 +27,7 @@ pub struct Parser<'a> {
     scanner: Scanner<'a>,
     prev_token: Token,
     curr_token: Token,
+    errors: Vec<ParserError>,
 }
 
 impl<'a> Parser<'a> {
@@ -36,23 +37,24 @@ impl<'a> Parser<'a> {
             scanner,
             prev_token: Token::eof(Span::dummy()),
             curr_token,
+            errors: vec![],
         }
     }
 
     pub fn parse(&mut self) -> (Program, Vec<ParserError>) {
         let mut program = Vec::new();
-        let mut errors = Vec::new();
+        // let mut errors = Vec::new();
         while !self.is_end() {
             match self.expression_statement(true) {
                 Ok(stmt) => program.push(stmt),
                 Err(err) => {
                     self.sync();
-                    errors.push(err);
+                    self.errors.push(err);
                 }
             }
         }
 
-        (program, errors)
+        (program, self.errors.clone())
     }
 
     fn sync(&mut self) {
@@ -412,9 +414,17 @@ impl<'a> Parser<'a> {
     fn block_expression(&mut self) -> Result<Expression, ParserError> {
         let mut exprs = vec![];
         while !self.check(TokenType::RightBrace) && !self.is_end() {
-            exprs.push(self.expression_statement(false)?);
-            if !self.check(TokenType::RightBrace) {
-                self.eat_semi()?;
+            match self.expression_statement(false) {
+                Ok(e) => {
+                    exprs.push(e);
+                    if !self.check(TokenType::RightBrace) {
+                        self.eat_semi()?;
+                    }
+                }
+                Err(e) => {
+                    self.errors.push(e);
+                    self.sync();
+                }
             }
         }
 
