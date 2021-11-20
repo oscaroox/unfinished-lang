@@ -13,12 +13,12 @@ pub enum ParserError {
 }
 
 impl ParserError {
-    pub fn into_spanned_error(&mut self) -> SpannedError {
-        let msg = self.to_string();
-        match self {
-            ParserError::ExpectedToken(_, tok)
-            | ParserError::UnexpectedToken(tok)
-            | ParserError::Error(_, tok) => SpannedError::new1(msg, tok.span),
-        }
-    }
+    // pub fn into_spanned_error(&mut self) -> SpannedError {
+    //     let msg = self.to_string();
+    //     match self {
+    //         ParserError::ExpectedToken(_, tok)
+    //         | ParserError::UnexpectedToken(tok)
+    //         | ParserError::Error(_, tok) => SpannedError::new1(msg, tok.span),
+    //     }
+    // }
 }

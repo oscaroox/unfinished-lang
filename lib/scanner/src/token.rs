@@ -1,27 +1,31 @@
-use spanner::Span;
+use std::ops::Range;
 
 use crate::TokenType;
 
 macro_rules! impl_token {
     ($_meth:ident, $tok:ident) => {
-        pub fn $_meth(span: Span) -> Token {
-            Token {
-                token_type: TokenType::$tok,
-                value: TokenType::$tok.to_string(),
-                span,
-            }
+        pub fn $_meth(label: Range<usize>) -> TokenWithLabel {
+            TokenWithLabel::new(
+                Token {
+                    token_type: TokenType::$tok,
+                    value: TokenType::$tok.to_string(),
+                },
+                label,
+            )
         }
     };
 }
 
 macro_rules! impl_value_token {
     ($_meth:ident, $tok:ident) => {
-        pub fn $_meth(value: String, span: Span) -> Token {
-            Token {
-                token_type: TokenType::$tok,
-                value,
-                span,
-            }
+        pub fn $_meth(value: String, label: Range<usize>) -> TokenWithLabel {
+            TokenWithLabel::new(
+                Token {
+                    token_type: TokenType::$tok,
+                    value,
+                },
+                label,
+            )
         }
     };
 }
@@ -30,7 +34,23 @@ macro_rules! impl_value_token {
 pub struct Token {
     pub token_type: TokenType,
     pub value: String,
-    pub span: Span,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct TokenWithLabel(pub Token, pub Range<usize>);
+
+impl TokenWithLabel {
+    pub fn new(token: Token, label: Range<usize>) -> TokenWithLabel {
+        TokenWithLabel(token, label)
+    }
+
+    pub fn token(&self) -> Token {
+        self.0.clone()
+    }
+
+    pub fn range(&self) -> Range<usize> {
+        self.1.clone()
+    }
 }
 
 impl Token {

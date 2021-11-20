@@ -157,15 +157,11 @@ impl Analyzer {
 #[cfg(test)]
 mod tests {
     use scanner::Scanner;
-    use spanner::SpanManager;
 
-    use crate::{Analyzer, AnalyzerError, Parser, ParserError};
+    use crate::{Analyzer, AnalyzerError, Parser};
 
     fn analyze(source: &str) -> Vec<AnalyzerError> {
-        let mut manager = SpanManager::default();
-        let mut maker = manager.add_source(source.to_string());
-
-        let scanner = Scanner::new(source.to_string(), &mut maker);
+        let scanner = Scanner::new(source.to_string());
         let mut parser = Parser::new(scanner);
         let (program, parser_errors) = parser.parse();
         if !parser_errors.is_empty() {

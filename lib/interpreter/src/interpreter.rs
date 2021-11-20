@@ -587,20 +587,17 @@ mod test {
     use ast::Identifier;
     use parser::Parser;
     use scanner::Scanner;
-    use spanner::SpanManager;
 
     pub fn run(src: &str, expected: Value) {
-        let mut manager = SpanManager::default();
-        let mut maker = manager.add_source(src.to_string());
-        let scanner = Scanner::new(src.to_string(), &mut maker);
+        let scanner = Scanner::new(src.to_string());
         let mut parser = Parser::new(scanner);
 
         let (exprs, errors) = parser.parse();
 
         if errors.len() > 0 {
-            errors
-                .into_iter()
-                .for_each(|mut e| println!("{}", e.into_spanned_error().print(&manager)));
+            // errors
+            //     .into_iter()
+            //     .for_each(|mut e| println!("{}", e.into_spanned_error().print(&manager)));
             panic!("parser errors")
         }
 

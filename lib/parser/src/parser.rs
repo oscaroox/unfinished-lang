@@ -2,7 +2,7 @@ use ast::{
     BinaryOperation, DataClassInstanceField, Expression, Identifier, Literal, LogicOperation,
     Program, UnaryOperation,
 };
-use scanner::{Scanner, ScannerMode, Token, TokenType};
+use scanner::{Scanner, ScannerMode, Token, TokenType, TokenWithLabel};
 use spanner::Span;
 
 use crate::ParserError;
@@ -23,18 +23,18 @@ pub enum FunctionKind {
 }
 
 #[derive(Debug)]
-pub struct Parser<'a> {
-    scanner: Scanner<'a>,
-    prev_token: Token,
-    curr_token: Token,
+pub struct Parser {
+    scanner: Scanner,
+    prev_token: TokenWithLabel,
+    curr_token: TokenWithLabel,
 }
 
-impl<'a> Parser<'a> {
+impl Parser {
     pub fn new(mut scanner: Scanner) -> Parser {
         let curr_token = scanner.next_token();
         Parser {
             scanner,
-            prev_token: Token::eof(Span::dummy()),
+            prev_token: Token::eof(0..0),
             curr_token,
         }
     }
@@ -59,11 +59,11 @@ impl<'a> Parser<'a> {
         self.advance();
 
         while !self.is_end() {
-            if self.prev_token.token_type == TokenType::SemiColon {
+            if self.prev_token.0.token_type == TokenType::SemiColon {
                 return;
             }
 
-            if RECOVER_SET.contains(&self.curr_token.token_type) {
+            if RECOVER_SET.contains(&self.curr_token.0.token_type) {
                 return;
             }
             self.advance();
@@ -72,7 +72,7 @@ impl<'a> Parser<'a> {
 
     fn matches(&mut self, types: Vec<TokenType>) -> bool {
         for token_type in types.iter() {
-            if *token_type == self.curr_token.token_type {
+            if *token_type == self.curr_token.0.token_type {
                 self.advance();
                 return true;
             }
@@ -81,7 +81,7 @@ impl<'a> Parser<'a> {
     }
 
     fn check(&mut self, token_type: TokenType) -> bool {
-        self.curr_token.token_type == token_type
+        self.curr_token.0.token_type == token_type
     }
 
     fn check_peek(&mut self, token_type: TokenType) -> bool {
@@ -91,30 +91,30 @@ impl<'a> Parser<'a> {
     fn peek(&mut self) -> Token {
         let token = self.scanner.next_token();
         self.scanner.backtrack();
-        token
+        token.0
     }
 
     fn advance(&mut self) -> Token {
         self.prev_token = self.curr_token.clone();
         self.curr_token = self.scanner.next_token();
-        self.prev_token.clone()
+        self.prev_token.clone().0
     }
 
     fn is_end(&self) -> bool {
-        self.curr_token.is_eof()
+        self.curr_token.0.is_eof()
     }
 
     fn eat(&mut self, token_type: TokenType, msg: &str) -> Result<Token, ParserError> {
-        if self.curr_token.token_type == token_type {
+        if self.curr_token.0.token_type == token_type {
             return Ok(self.advance());
         }
 
-        let tok = match self.curr_token.is_eof() {
+        let tok = match self.curr_token.0.is_eof() {
             true => self.prev_token.clone(),
             false => self.curr_token.clone(),
         };
 
-        Err(ParserError::ExpectedToken(msg.to_string(), tok))
+        Err(ParserError::ExpectedToken(msg.to_string(), tok.0))
     }
 
     fn error(&mut self, msg: String, token: Token) -> ParserError {
@@ -122,7 +122,7 @@ impl<'a> Parser<'a> {
     }
 
     fn eat_optional(&mut self, token_type: TokenType) -> Option<Token> {
-        if self.curr_token.token_type == token_type {
+        if self.curr_token.0.token_type == token_type {
             return Some(self.advance());
         }
         None
@@ -187,7 +187,7 @@ impl<'a> Parser<'a> {
                     ParserError::UnexpectedToken(_) => {
                         return Err(ParserError::ExpectedToken(
                             "Expected expression".to_string(),
-                            self.curr_token.clone(),
+                            self.curr_token.0.clone(),
                         ));
                     }
                     e => return Err(e),
@@ -209,7 +209,7 @@ impl<'a> Parser<'a> {
     }
 
     fn continue_break_expression(&mut self) -> Result<Expression, ParserError> {
-        Ok(match self.prev_token.token_type {
+        Ok(match self.prev_token.0.token_type {
             TokenType::Break => Expression::create_break(),
             TokenType::Continue => Expression::create_continue(),
             _ => unreachable!(),
@@ -243,7 +243,7 @@ impl<'a> Parser<'a> {
                 )),
                 _ => Err(ParserError::ExpectedToken(
                     "Expected variable".to_string(),
-                    token,
+                    token.0,
                 )),
             };
         }
@@ -256,19 +256,19 @@ impl<'a> Parser<'a> {
 
         let mut fields = vec![];
 
-        if self.curr_token.token_type != TokenType::RightBrace {
-            while !self.curr_token.is_eof() {
+        if self.curr_token.0.token_type != TokenType::RightBrace {
+            while !self.curr_token.0.is_eof() {
                 let id = self.eat(TokenType::Identifier, "Expected identifier")?;
 
                 if self.matches(vec![TokenType::Comma])
-                    || self.curr_token.token_type == TokenType::RightBrace
+                    || self.curr_token.0.token_type == TokenType::RightBrace
                 {
                     let ident = Identifier::new(id.value.to_string());
                     fields.push(DataClassInstanceField::new(
                         ident.clone(),
                         Expression::create_let_ref(ident),
                     ));
-                    if self.curr_token.token_type == TokenType::RightBrace {
+                    if self.curr_token.0.token_type == TokenType::RightBrace {
                         break;
                     }
                     continue;
@@ -281,7 +281,7 @@ impl<'a> Parser<'a> {
                 fields.push(field);
 
                 if !self.matches(vec![TokenType::Comma])
-                    || self.curr_token.token_type == TokenType::RightBrace
+                    || self.curr_token.0.token_type == TokenType::RightBrace
                 {
                     break;
                 }
@@ -302,13 +302,13 @@ impl<'a> Parser<'a> {
         let mut fields = vec![];
         let mut methods = vec![];
 
-        if self.curr_token.token_type != TokenType::RightBrace {
-            while !self.curr_token.is_eof() {
+        if self.curr_token.0.token_type != TokenType::RightBrace {
+            while !self.curr_token.0.is_eof() {
                 let id = self.eat(TokenType::Identifier, "Expected identifier")?;
                 fields.push(Identifier::new(id.value.to_string()));
 
                 if !self.matches(vec![TokenType::Comma])
-                    || self.curr_token.token_type == TokenType::RightBrace
+                    || self.curr_token.0.token_type == TokenType::RightBrace
                 {
                     break;
                 }
@@ -340,7 +340,7 @@ impl<'a> Parser<'a> {
     fn return_expression(&mut self) -> Result<Expression, ParserError> {
         let mut value = None;
 
-        if !self.curr_token.is_semi_colon() {
+        if !self.curr_token.0.is_semi_colon() {
             value = Some(self.expression()?);
         }
 
@@ -368,15 +368,15 @@ impl<'a> Parser<'a> {
             } else if kind == FunctionKind::Function && self.check(TokenType::SELF) {
                 return Err(ParserError::Error(
                     "Keyword 'self' can only be used in methods not functions".to_string(),
-                    self.curr_token.clone(),
+                    self.curr_token.0.clone(),
                 ));
             }
-            if self.curr_token.token_type != TokenType::RightParen {
+            if self.curr_token.0.token_type != TokenType::RightParen {
                 loop {
                     if self.check(TokenType::SELF) {
                         return Err(ParserError::Error(
                             "Expected 'self' to be the first parameter in a method".to_string(),
-                            self.curr_token.clone(),
+                            self.curr_token.0.clone(),
                         ));
                     }
 
@@ -384,7 +384,7 @@ impl<'a> Parser<'a> {
                     params.push(Identifier::new(ident.value));
 
                     if !self.matches(vec![TokenType::Comma])
-                        || self.curr_token.token_type == TokenType::RightParen
+                        || self.curr_token.0.token_type == TokenType::RightParen
                     {
                         break;
                     }
@@ -418,7 +418,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        if !exprs.is_empty() && !self.prev_token.is_semi_colon() {
+        if !exprs.is_empty() && !self.prev_token.0.is_semi_colon() {
             let expr = exprs.pop().unwrap();
             exprs.push(Expression::create_implicit_return(expr));
         }
@@ -463,7 +463,7 @@ impl<'a> Parser<'a> {
             let rhs = self.assignment()?;
 
             match &expr {
-                Expression::LetRef(let_ref) => match assignment_tok.token_type {
+                Expression::LetRef(let_ref) => match assignment_tok.0.token_type {
                     TokenType::Assign => {
                         return Ok(Expression::create_assign(let_ref.name.clone(), rhs))
                     }
@@ -472,13 +472,13 @@ impl<'a> Parser<'a> {
                             let_ref.name.clone(),
                             Expression::create_binop(
                                 Expression::create_let_ref(let_ref.name.clone()),
-                                BinaryOperation::from_token(assignment_tok.clone()),
+                                BinaryOperation::from_token(assignment_tok.0.clone()),
                                 rhs,
                             ),
                         ))
                     }
                 },
-                Expression::Index(idx) => match assignment_tok.token_type {
+                Expression::Index(idx) => match assignment_tok.0.token_type {
                     TokenType::Assign => {
                         return Ok(Expression::create_set_index(
                             *idx.lhs.clone(),
@@ -492,13 +492,13 @@ impl<'a> Parser<'a> {
                             *idx.index.clone(),
                             Expression::create_binop(
                                 expr,
-                                BinaryOperation::from_token(assignment_tok.clone()),
+                                BinaryOperation::from_token(assignment_tok.0.clone()),
                                 rhs,
                             ),
                         ))
                     }
                 },
-                Expression::GetProperty(get) => match assignment_tok.token_type {
+                Expression::GetProperty(get) => match assignment_tok.0.token_type {
                     TokenType::Assign => {
                         return Ok(Expression::create_set_property(
                             *get.object.clone(),
@@ -512,7 +512,7 @@ impl<'a> Parser<'a> {
                             get.name.clone(),
                             Expression::create_binop(
                                 expr,
-                                BinaryOperation::from_token(assignment_tok.clone()),
+                                BinaryOperation::from_token(assignment_tok.0.clone()),
                                 rhs,
                             ),
                         ))
@@ -521,7 +521,7 @@ impl<'a> Parser<'a> {
                 _ => {
                     return Err(ParserError::Error(
                         "Invalid assignment target".to_string(),
-                        curr_token,
+                        curr_token.0,
                     ))
                 }
             }
@@ -554,7 +554,7 @@ impl<'a> Parser<'a> {
         while self.matches(vec![TokenType::EqualEqual, TokenType::NotEqual]) {
             let tok = self.prev_token.clone();
             let rhs = self.comparison()?;
-            let op = match tok.token_type {
+            let op = match tok.0.token_type {
                 TokenType::EqualEqual => LogicOperation::Equal,
                 _ => LogicOperation::NotEqual,
             };
@@ -573,7 +573,7 @@ impl<'a> Parser<'a> {
         ]) {
             let tok = self.prev_token.clone();
             let rhs = self.term()?;
-            let op = match tok.token_type {
+            let op = match tok.0.token_type {
                 TokenType::LessThan => LogicOperation::LessThan,
                 TokenType::LessThanEqual => LogicOperation::LessThanEqual,
                 TokenType::GreaterThan => LogicOperation::GreaterThan,
@@ -590,7 +590,7 @@ impl<'a> Parser<'a> {
         while self.matches(vec![TokenType::Plus, TokenType::Minus]) {
             let tok = self.prev_token.clone();
             let rhs = self.factor()?;
-            let op = match tok.token_type {
+            let op = match tok.0.token_type {
                 TokenType::Plus => BinaryOperation::Add,
                 _ => BinaryOperation::Substract,
             };
@@ -604,7 +604,7 @@ impl<'a> Parser<'a> {
         while self.matches(vec![TokenType::Star, TokenType::Slash]) {
             let tok = self.prev_token.clone();
             let rhs = self.unary()?;
-            let op = match tok.token_type {
+            let op = match tok.0.token_type {
                 TokenType::Star => BinaryOperation::Multiply,
                 _ => BinaryOperation::Divide,
             };
@@ -617,11 +617,11 @@ impl<'a> Parser<'a> {
         if self.matches(vec![TokenType::Plus, TokenType::Minus, TokenType::Bang]) {
             let tok = self.prev_token.clone();
             let rhs = self.unary()?;
-            let op = match tok.token_type {
+            let op = match tok.0.token_type {
                 TokenType::Plus => UnaryOperation::Plus,
                 TokenType::Minus => UnaryOperation::Minus,
                 TokenType::Bang => UnaryOperation::Not,
-                _ => return Err(ParserError::Error("".to_string(), tok.clone())),
+                _ => return Err(ParserError::Error("".to_string(), tok.0.clone())),
             };
             return Ok(Expression::create_unaryop(op, rhs));
         }
@@ -636,7 +636,7 @@ impl<'a> Parser<'a> {
 
                 let mut args = vec![];
 
-                if self.curr_token.token_type != TokenType::RightParen && !self.is_end() {
+                if self.curr_token.0.token_type != TokenType::RightParen && !self.is_end() {
                     loop {
                         args.push(self.expression()?);
 
@@ -648,7 +648,9 @@ impl<'a> Parser<'a> {
 
                 match self.eat_optional(TokenType::RightParen) {
                     Some(_) => {}
-                    None => return Err(self.error("Unterminated function call".to_string(), paren)),
+                    None => {
+                        return Err(self.error("Unterminated function call".to_string(), paren.0))
+                    }
                 }
 
                 expr = Expression::create_call(expr, args);
@@ -677,7 +679,7 @@ impl<'a> Parser<'a> {
     fn primary(&mut self) -> Result<Expression, ParserError> {
         let token = self.curr_token.clone();
         if self.matches(vec![TokenType::IntConst]) {
-            let val: i64 = match token.value.parse() {
+            let val: i64 = match token.0.value.parse() {
                 Ok(v) => v,
                 Err(msg) => panic!("not a integer {}", msg),
             };
@@ -685,7 +687,7 @@ impl<'a> Parser<'a> {
         }
 
         if self.matches(vec![TokenType::True, TokenType::False]) {
-            let bool = match token.token_type {
+            let bool = match token.0.token_type {
                 TokenType::True => true,
                 _ => false,
             };
@@ -694,7 +696,7 @@ impl<'a> Parser<'a> {
         }
 
         if self.matches(vec![TokenType::FloatConst]) {
-            let val: f64 = match token.value.parse() {
+            let val: f64 = match token.0.value.parse() {
                 Ok(v) => v,
                 Err(msg) => panic!("not a float {}", msg),
             };
@@ -710,7 +712,7 @@ impl<'a> Parser<'a> {
         }
 
         if self.matches(vec![TokenType::StringConst]) {
-            return Ok(Expression::create_literal(Literal::String(token.value)));
+            return Ok(Expression::create_literal(Literal::String(token.0.value)));
         }
 
         if self.check(TokenType::Identifier)
@@ -730,16 +732,16 @@ impl<'a> Parser<'a> {
             //
             //  Possible solution is to use the :: token for instantiation
             //  e.g: Person :: { id: 1 };
-            && self.prev_token.token_type != TokenType::In
-            && self.prev_token.token_type != TokenType::If
-            && self.prev_token.token_type != TokenType::Loop
+            && self.prev_token.0.token_type != TokenType::In
+            && self.prev_token.0.token_type != TokenType::If
+            && self.prev_token.0.token_type != TokenType::Loop
         {
             return self.data_class_instantiate();
         }
 
         if self.matches(vec![TokenType::Identifier]) {
             return Ok(Expression::create_let_ref(Identifier::new(
-                token.value.to_string(),
+                token.0.value.to_string(),
             )));
         }
 
@@ -748,18 +750,18 @@ impl<'a> Parser<'a> {
         }
 
         if self.matches(vec![TokenType::SELF]) {
-            return Ok(Expression::create_self(token.value));
+            return Ok(Expression::create_self(token.0.value));
         }
 
         if self.matches(vec![TokenType::LeftBracket]) {
             let mut exprs = vec![];
-            if self.curr_token.token_type != TokenType::RightBracket {
+            if self.curr_token.0.token_type != TokenType::RightBracket {
                 loop {
                     let expr = self.expression()?;
                     exprs.push(expr);
 
                     if !self.matches(vec![TokenType::Comma])
-                        || self.curr_token.token_type == TokenType::RightBracket
+                        || self.curr_token.0.token_type == TokenType::RightBracket
                     {
                         break;
                     }
@@ -777,7 +779,7 @@ impl<'a> Parser<'a> {
             return Ok(Expression::create_grouping(expr));
         }
 
-        Err(ParserError::UnexpectedToken(self.curr_token.clone()))
+        Err(ParserError::UnexpectedToken(self.curr_token.0.clone()))
     }
 
     fn parse_string(&mut self) -> Result<Expression, ParserError> {
@@ -800,10 +802,10 @@ impl<'a> Parser<'a> {
                         break;
                     }
 
-                    if self.curr_token.token_type == TokenType::DoubleQuote {
+                    if self.curr_token.0.token_type == TokenType::DoubleQuote {
                         return Err(ParserError::Error(
                             "Unterminated format".to_string(),
-                            dollar_sign,
+                            dollar_sign.0,
                         ));
                     }
 
@@ -814,7 +816,7 @@ impl<'a> Parser<'a> {
                     } else {
                         return Err(ParserError::Error(
                             "Unterminated format".to_string(),
-                            dollar_sign,
+                            dollar_sign.0,
                         ));
                     };
                     self.scanner.backtrack();
@@ -825,10 +827,10 @@ impl<'a> Parser<'a> {
             }
 
             self.advance();
-            match self.curr_token.token_type {
+            match self.curr_token.0.token_type {
                 TokenType::StringConst => {
                     out.push(Expression::create_literal(Literal::String(
-                        self.curr_token.value.to_string(),
+                        self.curr_token.0.value.to_string(),
                     )));
                 }
                 TokenType::DoubleQuote => {
@@ -836,7 +838,10 @@ impl<'a> Parser<'a> {
                 }
                 _ => {
                     self.scanner.set_mode(ScannerMode::Default);
-                    return Err(ParserError::Error("Unterminated string".to_string(), quote));
+                    return Err(ParserError::Error(
+                        "Unterminated string".to_string(),
+                        quote.0,
+                    ));
                 }
             }
         }
@@ -888,13 +893,9 @@ mod test {
         Program, UnaryOperation,
     };
     use scanner::{Scanner, TokenType};
-    use spanner::SpanManager;
 
     fn run_parser(source: &str) -> (Program, Vec<ParserError>) {
-        let mut manager = SpanManager::default();
-        let mut maker = manager.add_source(source.to_string());
-
-        let scanner = Scanner::new(source.to_string(), &mut maker);
+        let scanner = Scanner::new(source.to_string());
         let mut parser = Parser::new(scanner);
         parser.parse()
     }

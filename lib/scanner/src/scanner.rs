@@ -1,5 +1,4 @@
-use crate::token::Token;
-use spanner::{Span, SpanMaker};
+use crate::{token::Token, TokenWithLabel};
 
 #[derive(Debug)]
 pub enum ScannerMode {
@@ -8,18 +7,17 @@ pub enum ScannerMode {
 }
 
 #[derive(Debug)]
-pub struct Scanner<'a> {
+pub struct Scanner {
     source: Vec<char>,
     mode: ScannerMode,
     line: usize,
     pos: usize,
     ch: char,
     checkpoint: usize,
-    span_maker: &'a mut SpanMaker<'a>,
 }
 
-impl<'a> Scanner<'a> {
-    pub fn new(source: String, span_maker: &'a mut SpanMaker<'a>) -> Scanner<'a> {
+impl Scanner {
+    pub fn new(source: String) -> Scanner {
         let mut scanner = Scanner {
             source: source.chars().collect(),
             mode: ScannerMode::Default,
@@ -27,7 +25,6 @@ impl<'a> Scanner<'a> {
             pos: 0,
             ch: '\0',
             checkpoint: 0,
-            span_maker,
         };
 
         if scanner.source.len() > 0 {
@@ -90,10 +87,6 @@ impl<'a> Scanner<'a> {
         ch == ' ' || ch == '\t'
     }
 
-    pub fn span(&mut self, left: usize, right: usize) -> Span {
-        self.span_maker.span(left, right)
-    }
-
     fn peek(&self) -> char {
         let pos = self.pos + 1;
         if pos >= self.source.len() {
@@ -111,7 +104,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn read_digit(&mut self) -> Token {
+    fn read_digit(&mut self) -> TokenWithLabel {
         let mut res = vec![];
         let pos = self.pos;
         while !self.is_end() && self.is_digit(self.ch) {
@@ -133,13 +126,13 @@ impl<'a> Scanner<'a> {
                 }
             }
 
-            return Token::float_const(res.into_iter().collect(), self.span(pos, self.pos));
+            return Token::float_const(res.into_iter().collect(), pos..self.pos);
         }
 
-        Token::int_const(res.into_iter().collect(), self.span(pos, self.pos))
+        Token::int_const(res.into_iter().collect(), pos..self.pos)
     }
 
-    fn read_identifier(&mut self) -> Token {
+    fn read_identifier(&mut self) -> TokenWithLabel {
         let mut res = vec![];
         let pos = self.pos;
         while !self.is_end() && self.is_alphanumeric(self.ch) {
@@ -148,29 +141,28 @@ impl<'a> Scanner<'a> {
         }
 
         let value: String = res.into_iter().collect();
-
-        let span = self.span_maker.span(pos, self.pos);
+        let label = pos..self.pos;
 
         match value.as_str() {
-            "let" => Token::let_token(span),
-            "fun" => Token::fun_token(span),
-            "if" => Token::if_token(span),
-            "else" => Token::else_token(span),
-            "true" => Token::true_token(span),
-            "false" => Token::false_token(span),
-            "return" => Token::return_token(span),
-            "data" => Token::data(span),
-            "null" => Token::null(span),
-            "self" => Token::self_token(span),
-            "loop" => Token::loop_token(span),
-            "break" => Token::break_token(span),
-            "continue" => Token::continue_token(span),
-            "in" => Token::in_token(span),
-            _ => Token::identifier(value, span),
+            "let" => Token::let_token(label),
+            "fun" => Token::fun_token(label),
+            "if" => Token::if_token(label),
+            "else" => Token::else_token(label),
+            "true" => Token::true_token(label),
+            "false" => Token::false_token(label),
+            "return" => Token::return_token(label),
+            "data" => Token::data(label),
+            "null" => Token::null(label),
+            "self" => Token::self_token(label),
+            "loop" => Token::loop_token(label),
+            "break" => Token::break_token(label),
+            "continue" => Token::continue_token(label),
+            "in" => Token::in_token(label),
+            _ => Token::identifier(value, label),
         }
     }
 
-    pub fn next_token(&mut self) -> Token {
+    pub fn next_token(&mut self) -> TokenWithLabel {
         self.set_checkpoint();
         match self.mode {
             ScannerMode::Default => self.scan_normal(),
@@ -178,7 +170,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn scan_normal(&mut self) -> Token {
+    fn scan_normal(&mut self) -> TokenWithLabel {
         self.skip_whitespace();
 
         let curr_ch = self.ch;
@@ -189,9 +181,9 @@ impl<'a> Scanner<'a> {
                 if self.peek() == '=' {
                     self.advance();
                     self.advance();
-                    return Token::assign_plus(self.span(pos, self.pos));
+                    return Token::assign_plus(pos..self.pos);
                 }
-                Token::plus(self.span(pos, self.pos))
+                Token::plus(pos..self.pos)
             }
             ':' => {
                 let peek = self.peek();
@@ -199,34 +191,34 @@ impl<'a> Scanner<'a> {
                     self.advance();
                     self.advance();
                     if peek == '=' {
-                        return Token::assign_colon(self.span(pos, self.pos));
+                        return Token::assign_colon(pos..self.pos);
                     } else {
-                        return Token::colon_colon(self.span(pos, self.pos));
+                        return Token::colon_colon(pos..self.pos);
                     }
                 }
-                Token::colon(self.span(pos, self.pos))
+                Token::colon(pos..self.pos)
             }
             '-' => {
                 if self.peek() == '=' {
                     self.advance();
                     self.advance();
-                    return Token::assign_minus(self.span(pos, self.pos));
+                    return Token::assign_minus(pos..self.pos);
                 }
-                Token::minus(self.span(pos, self.pos))
+                Token::minus(pos..self.pos)
             }
             '*' => {
                 if self.peek() == '=' {
                     self.advance();
                     self.advance();
-                    return Token::assign_star(self.span(pos, self.pos));
+                    return Token::assign_star(pos..self.pos);
                 }
-                Token::star(self.span(pos, self.pos))
+                Token::star(pos..self.pos)
             }
             '/' => {
                 if self.peek() == '=' {
                     self.advance();
                     self.advance();
-                    return Token::assign_slash(self.span(pos, self.pos));
+                    return Token::assign_slash(pos..self.pos);
                 } else if self.peek() == '/' {
                     while self.peek() != '\n' && !self.is_end() {
                         self.advance();
@@ -247,79 +239,79 @@ impl<'a> Scanner<'a> {
                     self.advance();
                     return self.next_token();
                 }
-                Token::slash(self.span(pos, self.pos))
+                Token::slash(pos..self.pos)
             }
             '&' => {
                 if self.peek() == '&' {
                     self.advance();
                     self.advance();
-                    return Token::and(self.span(pos, self.pos));
+                    return Token::and(pos..self.pos);
                 }
-                Token::illegal(curr_ch.to_string(), self.span(pos, self.pos))
+                Token::illegal(curr_ch.to_string(), pos..self.pos)
             }
             '|' => {
                 if self.peek() == '|' {
                     self.advance();
                     self.advance();
-                    return Token::or(self.span(pos, self.pos));
+                    return Token::or(pos..self.pos);
                 }
-                Token::illegal(curr_ch.to_string(), self.span(pos, self.pos))
+                Token::illegal(curr_ch.to_string(), pos..self.pos)
             }
             '>' => {
                 if self.peek() == '=' {
                     self.advance();
                     self.advance();
-                    return Token::greater_than_equal(self.span(pos, self.pos));
+                    return Token::greater_than_equal(pos..self.pos);
                 }
-                Token::greater_than(self.span(pos, self.pos))
+                Token::greater_than(pos..self.pos)
             }
             '<' => {
                 if self.peek() == '=' {
                     self.advance();
                     self.advance();
-                    return Token::less_than_equal(self.span(pos, self.pos));
+                    return Token::less_than_equal(pos..self.pos);
                 }
-                Token::less_than(self.span(pos, self.pos))
+                Token::less_than(pos..self.pos)
             }
             '=' => {
                 if self.peek() == '=' {
                     self.advance();
                     self.advance();
-                    return Token::equal_equal(self.span(pos, self.pos));
+                    return Token::equal_equal(pos..self.pos);
                 } else if self.peek() == '>' {
                     self.advance();
                     self.advance();
-                    return Token::arrow(self.span(pos, self.pos));
+                    return Token::arrow(pos..self.pos);
                 }
-                Token::assign(self.span(pos, self.pos))
+                Token::assign(pos..self.pos)
             }
             '!' => {
                 if self.peek() == '=' {
                     self.advance();
                     self.advance();
-                    return Token::not_equal(self.span(pos, self.pos));
+                    return Token::not_equal(pos..self.pos);
                 }
-                Token::bang(self.span(pos, self.pos))
+                Token::bang(pos..self.pos)
             }
-            '.' => Token::dot(self.span(pos, self.pos)),
-            '(' => Token::left_paren(self.span(pos, self.pos)),
-            ')' => Token::right_paren(self.span(pos, self.pos)),
-            '{' => Token::left_brace(self.span(pos, self.pos)),
-            '}' => Token::right_brace(self.span(pos, self.pos)),
-            '[' => Token::left_bracket(self.span(pos, self.pos)),
-            ']' => Token::right_bracket(self.span(pos, self.pos)),
-            ',' => Token::comma(self.span(pos, self.pos)),
-            ';' => Token::semi_colon(self.span(pos, self.pos)),
-            '\0' => Token::eof(self.span(pos, self.pos)),
+            '.' => Token::dot(pos..self.pos),
+            '(' => Token::left_paren(pos..self.pos),
+            ')' => Token::right_paren(pos..self.pos),
+            '{' => Token::left_brace(pos..self.pos),
+            '}' => Token::right_brace(pos..self.pos),
+            '[' => Token::left_bracket(pos..self.pos),
+            ']' => Token::right_bracket(pos..self.pos),
+            ',' => Token::comma(pos..self.pos),
+            ';' => Token::semi_colon(pos..self.pos),
+            '\0' => Token::eof(pos..self.pos),
             // '"' => self.read_string(),
-            '"' => Token::double_quote(self.span(pos, self.pos)),
+            '"' => Token::double_quote(pos..self.pos),
             _ => {
                 if self.is_digit(curr_ch) {
                     return self.read_digit();
                 } else if self.is_alpha(curr_ch) {
                     return self.read_identifier();
                 } else {
-                    Token::illegal(curr_ch.to_string(), self.span(pos, self.pos))
+                    Token::illegal(curr_ch.to_string(), pos..self.pos)
                 }
             }
         };
@@ -328,11 +320,11 @@ impl<'a> Scanner<'a> {
         token
     }
 
-    fn scan_interpolated(&mut self) -> Token {
+    fn scan_interpolated(&mut self) -> TokenWithLabel {
         let pos = self.pos;
         let token = match self.ch {
-            '"' => Token::double_quote(self.span(pos, self.pos)),
-            '\0' => Token::eof(self.span(pos, self.pos)),
+            '"' => Token::double_quote(pos..self.pos),
+            '\0' => Token::eof(pos..self.pos),
             '$' => match self.peek() {
                 '$' => {
                     self.advance();
@@ -340,7 +332,7 @@ impl<'a> Scanner<'a> {
                 }
                 '(' => {
                     self.advance();
-                    Token::left_paren(self.span(pos, self.pos))
+                    Token::left_paren(pos..self.pos)
                 }
                 _ => self.read_interpolation(self.ch),
             },
@@ -354,7 +346,7 @@ impl<'a> Scanner<'a> {
         token
     }
 
-    fn read_interpolation(&mut self, first_ch: char) -> Token {
+    fn read_interpolation(&mut self, first_ch: char) -> TokenWithLabel {
         let mut out = vec![first_ch];
         let pos = self.pos;
         loop {
@@ -373,7 +365,7 @@ impl<'a> Scanner<'a> {
                 }
             }
         }
-        Token::string_const(out.into_iter().collect(), self.span(pos, self.pos))
+        Token::string_const(out.into_iter().collect(), pos..self.pos)
     }
 
     fn normalize_escape(&self, ch: char) -> char {
@@ -391,22 +383,18 @@ impl<'a> Scanner<'a> {
 mod tests {
     use super::Scanner;
     use crate::{ScannerMode, TokenType};
-    use spanner::SpanManager;
 
     fn test_scan(src: &str, expected: Vec<(TokenType, Option<&str>)>) {
-        let mut manager = SpanManager::default();
-        let mut maker = manager.add_source(src.to_string());
-        let mut scanner = Scanner::new(src.to_string(), &mut maker);
-        let mut spans = vec![];
+        let mut scanner = Scanner::new(src.to_string());
+
         expected.into_iter().for_each(|e| {
             let token_type = e.0;
             let value = e.1;
             let token = scanner.next_token();
 
-            spans.push(token.span);
-            assert_eq!(token.token_type, token_type);
+            assert_eq!(token.token().token_type, token_type);
             if let Some(val) = value {
-                assert_eq!(token.value, val.to_string());
+                assert_eq!(token.token().value, val.to_string());
             }
         });
     }
@@ -420,62 +408,58 @@ mod tests {
     #[test]
     fn backtracking() {
         let src = "let fun hello;";
-        let mut manager = SpanManager::default();
-        let mut maker = manager.add_source(src.to_string());
-        let mut scanner = Scanner::new(src.to_string(), &mut maker);
+        let mut scanner = Scanner::new(src.to_string());
 
-        let token = scanner.next_token();
+        let token = scanner.next_token().token();
         assert_eq!(token.token_type, TokenType::Let);
 
-        let token = scanner.next_token();
+        let token = scanner.next_token().token();
         assert_eq!(token.token_type, TokenType::Fun);
 
         scanner.backtrack();
 
-        let token = scanner.next_token();
+        let token = scanner.next_token().token();
         assert_eq!(token.token_type, TokenType::Fun);
 
-        let token = scanner.next_token();
+        let token = scanner.next_token().token();
         assert_eq!(token.token_type, TokenType::Identifier);
         assert_eq!(token.value, "hello".to_string());
 
-        let token = scanner.next_token();
+        let token = scanner.next_token().token();
         assert_eq!(token.token_type, TokenType::SemiColon);
 
         scanner.backtrack();
 
-        let token = scanner.next_token();
+        let token = scanner.next_token().token();
         assert_eq!(token.token_type, TokenType::SemiColon);
 
-        let token = scanner.next_token();
+        let token = scanner.next_token().token();
         assert_eq!(token.token_type, TokenType::EOF);
     }
 
     #[test]
     fn scan_string_interpolation() {
         let src = r#" "hello, $(world) hows it" "" 123"#;
-        let mut manager = SpanManager::default();
-        let mut maker = manager.add_source(src.to_string());
-        let mut scanner = Scanner::new(src.to_string(), &mut maker);
+        let mut scanner = Scanner::new(src.to_string());
 
-        let tok = scanner.next_token();
+        let tok = scanner.next_token().token();
         assert_eq!(tok.token_type, TokenType::DoubleQuote);
 
         if tok.token_type == TokenType::DoubleQuote {
             scanner.set_mode(ScannerMode::String);
         }
 
-        let tok = scanner.next_token();
+        let tok = scanner.next_token().token();
         assert_eq!(tok.token_type, TokenType::StringConst);
         assert_eq!(tok.value, String::from("hello, "));
 
-        let tok = scanner.next_token();
+        let tok = scanner.next_token().token();
 
         assert_eq!(tok.token_type, TokenType::LeftParen);
 
         scanner.set_mode(ScannerMode::Default);
 
-        let tok = scanner.next_token();
+        let tok = scanner.next_token().token();
         assert_eq!(tok.token_type, TokenType::Identifier);
 
         // skip the closing paren
@@ -483,32 +467,32 @@ mod tests {
 
         scanner.set_mode(ScannerMode::String);
 
-        let tok = scanner.next_token();
+        let tok = scanner.next_token().token();
         assert_eq!(tok.token_type, TokenType::StringConst);
         assert_eq!(tok.value, String::from(" hows it"));
 
-        let tok = scanner.next_token();
+        let tok = scanner.next_token().token();
         assert_eq!(tok.token_type, TokenType::DoubleQuote);
 
         if tok.token_type == TokenType::DoubleQuote {
             scanner.set_mode(ScannerMode::Default);
         }
 
-        let tok = scanner.next_token();
+        let tok = scanner.next_token().token();
         assert_eq!(tok.token_type, TokenType::DoubleQuote);
 
         if tok.token_type == TokenType::DoubleQuote {
             scanner.set_mode(ScannerMode::String);
         }
 
-        let tok = scanner.next_token();
+        let tok = scanner.next_token().token();
         assert_eq!(tok.token_type, TokenType::DoubleQuote);
 
         if tok.token_type == TokenType::DoubleQuote {
             scanner.set_mode(ScannerMode::Default);
         }
 
-        let tok = scanner.next_token();
+        let tok = scanner.next_token().token();
         assert_eq!(tok.token_type, TokenType::IntConst);
         assert_eq!(tok.value, "123");
     }
@@ -608,32 +592,21 @@ mod tests {
     }
 
     #[test]
-    fn scan_span() {
+    fn scan_label() {
         let src = "+
 let
 fun
 this_is_a_identifier";
-        let mut manager = SpanManager::default();
-        let mut maker = manager.add_source(src.to_string());
-        let mut scanner = Scanner::new(src.to_string(), &mut maker);
+        let mut scanner = Scanner::new(src.to_string());
+        let plus = scanner.next_token().range();
+        let let_kw = scanner.next_token().range();
+        let fun_kw = scanner.next_token().range();
+        let ident = scanner.next_token().range();
 
-        let plus = scanner.next_token();
-        let let_kw = scanner.next_token();
-        let fun_kw = scanner.next_token();
-        let ident = scanner.next_token();
-
-        let (_, l, r) = manager.resolve_span(plus.span);
-        assert_eq!(l, 0);
-        assert_eq!(r, 0);
-        let (_, l, r) = manager.resolve_span(let_kw.span);
-        assert_eq!(l, 2);
-        assert_eq!(r, 5);
-        let (_, l, r) = manager.resolve_span(fun_kw.span);
-        assert_eq!(l, 6);
-        assert_eq!(r, 9);
-        let (_, l, r) = manager.resolve_span(ident.span);
-        assert_eq!(l, 10);
-        assert_eq!(r, 30);
+        assert_eq!(plus, 0..0);
+        assert_eq!(let_kw, 2..5);
+        assert_eq!(fun_kw, 6..9);
+        assert_eq!(ident, 10..30);
     }
 
     #[test]
