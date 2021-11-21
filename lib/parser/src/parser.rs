@@ -1,11 +1,10 @@
+use crate::ParserError;
+use ariadne::{Label, Report, ReportKind};
 use ast::{
     BinaryOperation, DataClassInstanceField, Expression, Identifier, Literal, LogicOperation,
     Program, UnaryOperation,
 };
 use scanner::{Scanner, ScannerMode, Token, TokenType, TokenWithLabel};
-use spanner::Span;
-
-use crate::ParserError;
 
 const RECOVER_SET: [TokenType; 5] = [
     TokenType::Let,
@@ -27,6 +26,7 @@ pub struct Parser {
     scanner: Scanner,
     prev_token: TokenWithLabel,
     curr_token: TokenWithLabel,
+    errors: Vec<ParserError>,
 }
 
 impl Parser {
@@ -36,23 +36,32 @@ impl Parser {
             scanner,
             prev_token: Token::eof(0..0),
             curr_token,
+            errors: vec![],
         }
     }
 
     pub fn parse(&mut self) -> (Program, Vec<ParserError>) {
         let mut program = Vec::new();
-        let mut errors = Vec::new();
         while !self.is_end() {
             match self.expression_statement(true) {
                 Ok(stmt) => program.push(stmt),
                 Err(err) => {
                     self.sync();
-                    errors.push(err);
+                    let label = match &err {
+                        ParserError::UnexpectedToken(token) => token.1.clone(),
+                        _ => panic!("test"),
+                    };
+
+                    Report::build(ReportKind::Error, (), 1)
+                        .with_message("Expected token")
+                        .with_label(Label::new(label))
+                        .finish();
+                    self.errors.push(err);
                 }
             }
         }
 
-        (program, errors)
+        (program, self.errors.clone())
     }
 
     fn sync(&mut self) {
@@ -412,9 +421,17 @@ impl Parser {
     fn block_expression(&mut self) -> Result<Expression, ParserError> {
         let mut exprs = vec![];
         while !self.check(TokenType::RightBrace) && !self.is_end() {
-            exprs.push(self.expression_statement(false)?);
-            if !self.check(TokenType::RightBrace) {
-                self.eat_semi()?;
+            match self.expression_statement(false) {
+                Ok(e) => {
+                    exprs.push(e);
+                    if !self.check(TokenType::RightBrace) {
+                        self.eat_semi()?;
+                    }
+                }
+                Err(e) => {
+                    self.errors.push(e);
+                    self.sync();
+                }
             }
         }
 
@@ -779,7 +796,7 @@ impl Parser {
             return Ok(Expression::create_grouping(expr));
         }
 
-        Err(ParserError::UnexpectedToken(self.curr_token.0.clone()))
+        Err(ParserError::UnexpectedToken(self.curr_token.clone()))
     }
 
     fn parse_string(&mut self) -> Result<Expression, ParserError> {
