@@ -569,6 +569,9 @@ impl Interpreter {
                 Value::Float(n1 * n2)
             }
             (Value::Float(n1), BinaryOperation::Divide, Value::Float(n2)) => Value::Float(n1 / n2),
+            (Value::String(s1), BinaryOperation::ConcatInterpolation, Value::String(s2)) => {
+                Value::String(format!("{}{}", s1, s2))
+            }
             (_, BinaryOperation::ConcatInterpolation, _) => {
                 Value::String(format!("{}{}", left, right))
             }

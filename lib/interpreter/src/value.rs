@@ -213,7 +213,7 @@ impl std::fmt::Display for Value {
                 } else {
                     "anonymous".to_string()
                 };
-                write!(f, "<fun {}/>", n)
+                write!(f, "<fun {}>", n)
             }
             Value::NativeFunction(v) => {
                 write!(f, "<nativeFun {}>", v.name)
