@@ -57,7 +57,7 @@ impl Scanner {
      * backtracking is possible by only one token
      */
     pub fn backtrack(&mut self) {
-        if self.checkpoint > 0 && self.checkpoint <= self.source.len() {
+        if self.checkpoint > 0 && self.checkpoint < self.source.len() {
             self.pos = self.checkpoint;
             self.ch = self.source[self.pos];
         }

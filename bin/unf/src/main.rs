@@ -1,3 +1,4 @@
+use ariadne::Source;
 use ast::Program;
 use clap::{App, Arg, SubCommand};
 use interpreter::{Environment, Interpreter};
@@ -80,17 +81,17 @@ fn main() {
 }
 
 fn parse_contents(source: String) -> Result<Program, Vec<ParserError>> {
-    let mut manager = SpanManager::default();
-    let mut maker = manager.add_source(source.to_string());
-
-    let scanner = Scanner::new(source.to_string(), &mut maker);
+    let scanner = Scanner::new(source.to_string());
     let mut parser = Parser::new(scanner);
 
     let (exprs, errors) = parser.parse();
 
     if errors.len() > 0 {
         for mut err in errors.clone() {
-            println!("{}", err.into_spanned_error().print(&manager));
+            match err.into_report().print(Source::from(source.to_string())) {
+                Ok(_) => {}
+                Err(err) => println!("{}", err),
+            }
         }
         return Err(errors);
     }

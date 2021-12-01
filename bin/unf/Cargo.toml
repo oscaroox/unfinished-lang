@@ -13,3 +13,4 @@ scanner = { path = "../../lib/scanner" }
 parser = { path = "../../lib/parser" }
 interpreter = { path = "../../lib/interpreter" }
 spanner = { path = "../../lib/spanner" }
+ariadne = "0.1.3"

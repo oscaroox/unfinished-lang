@@ -21,6 +21,8 @@ pub enum FunctionKind {
     Method,
 }
 
+type ParserResult = Result<Expression, ParserError>;
+
 #[derive(Debug)]
 pub struct Parser {
     scanner: Scanner,
@@ -45,23 +47,15 @@ impl Parser {
         while !self.is_end() {
             match self.expression_statement(true) {
                 Ok(stmt) => program.push(stmt),
-                Err(err) => {
-                    self.sync();
-                    let label = match &err {
-                        ParserError::UnexpectedToken(token) => token.1.clone(),
-                        _ => panic!("test"),
-                    };
-
-                    Report::build(ReportKind::Error, (), 1)
-                        .with_message("Expected token")
-                        .with_label(Label::new(label))
-                        .finish();
-                    self.errors.push(err);
-                }
+                Err(err) => self.error_and_sync(err),
             }
         }
-
         (program, self.errors.clone())
+    }
+
+    fn error_and_sync(&mut self, err: ParserError) {
+        self.sync();
+        self.errors.push(err);
     }
 
     fn sync(&mut self) {
@@ -123,11 +117,7 @@ impl Parser {
             false => self.curr_token.clone(),
         };
 
-        Err(ParserError::ExpectedToken(msg.to_string(), tok.0))
-    }
-
-    fn error(&mut self, msg: String, token: Token) -> ParserError {
-        ParserError::ExpectedToken(msg, token)
+        Err(ParserError::ExpectedToken(msg.to_string(), tok))
     }
 
     fn eat_optional(&mut self, token_type: TokenType) -> Option<Token> {
@@ -141,7 +131,7 @@ impl Parser {
         self.eat(TokenType::SemiColon, "Expected ';' after expression")
     }
 
-    fn expression_statement(&mut self, require_semicolon: bool) -> Result<Expression, ParserError> {
+    fn expression_statement(&mut self, require_semicolon: bool) -> ParserResult {
         let expr = self.expression()?;
         if require_semicolon {
             self.eat_semi()?;
@@ -157,7 +147,7 @@ impl Parser {
         // }
     }
 
-    fn expression(&mut self) -> Result<Expression, ParserError> {
+    fn expression(&mut self) -> ParserResult {
         if self.matches(vec![TokenType::Let]) {
             return self.let_expression();
         } else if self.matches(vec![TokenType::If]) {
@@ -177,7 +167,7 @@ impl Parser {
         self.assignment()
     }
 
-    fn let_expression(&mut self) -> Result<Expression, ParserError> {
+    fn let_expression(&mut self) -> ParserResult {
         let identifier = self.eat(TokenType::Identifier, "Expected identifier")?;
 
         let mut init = None;
@@ -196,7 +186,7 @@ impl Parser {
                     ParserError::UnexpectedToken(_) => {
                         return Err(ParserError::ExpectedToken(
                             "Expected expression".to_string(),
-                            self.curr_token.0.clone(),
+                            self.curr_token.clone(),
                         ));
                     }
                     e => return Err(e),
@@ -217,7 +207,7 @@ impl Parser {
         ))
     }
 
-    fn continue_break_expression(&mut self) -> Result<Expression, ParserError> {
+    fn continue_break_expression(&mut self) -> ParserResult {
         Ok(match self.prev_token.0.token_type {
             TokenType::Break => Expression::create_break(),
             TokenType::Continue => Expression::create_continue(),
@@ -225,7 +215,7 @@ impl Parser {
         })
     }
 
-    fn loop_expression(&mut self) -> Result<Expression, ParserError> {
+    fn loop_expression(&mut self) -> ParserResult {
         let token = self.curr_token.clone();
         let condition = if !self.check(TokenType::LeftBrace) {
             self.expression()?
@@ -252,14 +242,14 @@ impl Parser {
                 )),
                 _ => Err(ParserError::ExpectedToken(
                     "Expected variable".to_string(),
-                    token.0,
+                    token,
                 )),
             };
         }
         Ok(Expression::create_loop(condition, body, None))
     }
 
-    fn data_class_instantiate(&mut self) -> Result<Expression, ParserError> {
+    fn data_class_instantiate(&mut self) -> ParserResult {
         let ident = self.eat(TokenType::Identifier, "Expected identifier")?;
         self.eat(TokenType::LeftBrace, "Expected '{'")?;
 
@@ -304,7 +294,7 @@ impl Parser {
         ))
     }
 
-    fn data_class_expression(&mut self) -> Result<Expression, ParserError> {
+    fn data_class_expression(&mut self) -> ParserResult {
         let ident = self.eat(TokenType::Identifier, "Expected identifier")?;
         self.eat(TokenType::LeftBrace, "Expected '{'")?;
 
@@ -346,7 +336,7 @@ impl Parser {
         ))
     }
 
-    fn return_expression(&mut self) -> Result<Expression, ParserError> {
+    fn return_expression(&mut self) -> ParserResult {
         let mut value = None;
 
         if !self.curr_token.0.is_semi_colon() {
@@ -356,7 +346,7 @@ impl Parser {
         Ok(Expression::create_return(value))
     }
 
-    fn fun_expression(&mut self, kind: FunctionKind) -> Result<Expression, ParserError> {
+    fn fun_expression(&mut self, kind: FunctionKind) -> ParserResult {
         let mut name = None;
         let mut params = vec![];
         let mut is_static = true;
@@ -377,7 +367,7 @@ impl Parser {
             } else if kind == FunctionKind::Function && self.check(TokenType::SELF) {
                 return Err(ParserError::Error(
                     "Keyword 'self' can only be used in methods not functions".to_string(),
-                    self.curr_token.0.clone(),
+                    self.curr_token.clone(),
                 ));
             }
             if self.curr_token.0.token_type != TokenType::RightParen {
@@ -385,7 +375,7 @@ impl Parser {
                     if self.check(TokenType::SELF) {
                         return Err(ParserError::Error(
                             "Expected 'self' to be the first parameter in a method".to_string(),
-                            self.curr_token.0.clone(),
+                            self.curr_token.clone(),
                         ));
                     }
 
@@ -418,7 +408,7 @@ impl Parser {
         Ok(Expression::create_function(name, params, is_static, block))
     }
 
-    fn block_expression(&mut self) -> Result<Expression, ParserError> {
+    fn block_expression(&mut self) -> ParserResult {
         let mut exprs = vec![];
         while !self.check(TokenType::RightBrace) && !self.is_end() {
             match self.expression_statement(false) {
@@ -428,10 +418,7 @@ impl Parser {
                         self.eat_semi()?;
                     }
                 }
-                Err(e) => {
-                    self.errors.push(e);
-                    self.sync();
-                }
+                Err(err) => self.error_and_sync(err),
             }
         }
 
@@ -444,7 +431,7 @@ impl Parser {
         Ok(Expression::create_block(exprs))
     }
 
-    fn if_expression(&mut self) -> Result<Expression, ParserError> {
+    fn if_expression(&mut self) -> ParserResult {
         let left_paren = self.eat_optional(TokenType::LeftParen);
 
         let expr = self.expression()?;
@@ -466,7 +453,7 @@ impl Parser {
         Ok(Expression::create_if(expr, then, not_then))
     }
 
-    fn assignment(&mut self) -> Result<Expression, ParserError> {
+    fn assignment(&mut self) -> ParserResult {
         let expr = self.or()?;
         if self.matches(vec![
             TokenType::Assign,
@@ -535,18 +522,13 @@ impl Parser {
                         ))
                     }
                 },
-                _ => {
-                    return Err(ParserError::Error(
-                        "Invalid assignment target".to_string(),
-                        curr_token.0,
-                    ))
-                }
+                _ => return Err(ParserError::InvalidAssignmentTarget(curr_token)),
             }
         }
         Ok(expr)
     }
 
-    fn or(&mut self) -> Result<Expression, ParserError> {
+    fn or(&mut self) -> ParserResult {
         let mut expr = self.and()?;
         while self.matches(vec![TokenType::Or]) {
             let rhs = self.and()?;
@@ -556,7 +538,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn and(&mut self) -> Result<Expression, ParserError> {
+    fn and(&mut self) -> ParserResult {
         let mut expr = self.equality()?;
         while self.matches(vec![TokenType::And]) {
             let rhs = self.equality()?;
@@ -566,7 +548,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn equality(&mut self) -> Result<Expression, ParserError> {
+    fn equality(&mut self) -> ParserResult {
         let mut expr = self.comparison()?;
         while self.matches(vec![TokenType::EqualEqual, TokenType::NotEqual]) {
             let tok = self.prev_token.clone();
@@ -580,7 +562,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn comparison(&mut self) -> Result<Expression, ParserError> {
+    fn comparison(&mut self) -> ParserResult {
         let mut expr = self.term()?;
         while self.matches(vec![
             TokenType::LessThan,
@@ -601,7 +583,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn term(&mut self) -> Result<Expression, ParserError> {
+    fn term(&mut self) -> ParserResult {
         let mut res = self.factor()?;
 
         while self.matches(vec![TokenType::Plus, TokenType::Minus]) {
@@ -616,7 +598,7 @@ impl Parser {
 
         Ok(res)
     }
-    fn factor(&mut self) -> Result<Expression, ParserError> {
+    fn factor(&mut self) -> ParserResult {
         let mut res = self.unary()?;
         while self.matches(vec![TokenType::Star, TokenType::Slash]) {
             let tok = self.prev_token.clone();
@@ -630,7 +612,7 @@ impl Parser {
         Ok(res)
     }
 
-    fn unary(&mut self) -> Result<Expression, ParserError> {
+    fn unary(&mut self) -> ParserResult {
         if self.matches(vec![TokenType::Plus, TokenType::Minus, TokenType::Bang]) {
             let tok = self.prev_token.clone();
             let rhs = self.unary()?;
@@ -638,14 +620,14 @@ impl Parser {
                 TokenType::Plus => UnaryOperation::Plus,
                 TokenType::Minus => UnaryOperation::Minus,
                 TokenType::Bang => UnaryOperation::Not,
-                _ => return Err(ParserError::Error("".to_string(), tok.0.clone())),
+                _ => return Err(ParserError::Error("".to_string(), tok)),
             };
             return Ok(Expression::create_unaryop(op, rhs));
         }
         self.call()
     }
 
-    fn call(&mut self) -> Result<Expression, ParserError> {
+    fn call(&mut self) -> ParserResult {
         let mut expr = self.primary()?;
         loop {
             if self.matches(vec![TokenType::LeftParen]) {
@@ -666,7 +648,7 @@ impl Parser {
                 match self.eat_optional(TokenType::RightParen) {
                     Some(_) => {}
                     None => {
-                        return Err(self.error("Unterminated function call".to_string(), paren.0))
+                        return Err(ParserError::UnterminatedFunctionCall(paren));
                     }
                 }
 
@@ -693,7 +675,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn primary(&mut self) -> Result<Expression, ParserError> {
+    fn primary(&mut self) -> ParserResult {
         let token = self.curr_token.clone();
         if self.matches(vec![TokenType::IntConst]) {
             let val: i64 = match token.0.value.parse() {
@@ -799,7 +781,7 @@ impl Parser {
         Err(ParserError::UnexpectedToken(self.curr_token.clone()))
     }
 
-    fn parse_string(&mut self) -> Result<Expression, ParserError> {
+    fn parse_string(&mut self) -> ParserResult {
         self.scanner.set_mode(ScannerMode::String);
         let quote = self.curr_token.clone();
         let mut out = vec![];
@@ -815,15 +797,13 @@ impl Parser {
 
                     // return empty string if interpolation is empty
                     if self.check(TokenType::RightParen) {
-                        self.advance();
-                        break;
+                        // self.advance();
+                        // break;
+                        continue;
                     }
 
                     if self.curr_token.0.token_type == TokenType::DoubleQuote {
-                        return Err(ParserError::Error(
-                            "Unterminated format".to_string(),
-                            dollar_sign.0,
-                        ));
+                        return Err(ParserError::UnterminatedInterpolation(dollar_sign));
                     }
 
                     out.push(self.expression()?);
@@ -831,10 +811,7 @@ impl Parser {
                     if self.check(TokenType::RightParen) {
                         self.advance();
                     } else {
-                        return Err(ParserError::Error(
-                            "Unterminated format".to_string(),
-                            dollar_sign.0,
-                        ));
+                        return Err(ParserError::UnterminatedInterpolation(dollar_sign));
                     };
                     self.scanner.backtrack();
                     self.scanner.set_mode(ScannerMode::String);
@@ -855,10 +832,7 @@ impl Parser {
                 }
                 _ => {
                     self.scanner.set_mode(ScannerMode::Default);
-                    return Err(ParserError::Error(
-                        "Unterminated string".to_string(),
-                        quote.0,
-                    ));
+                    return Err(ParserError::UnterminatedString(quote));
                 }
             }
         }
@@ -1055,6 +1029,9 @@ mod test {
 
     #[test]
     fn parse_string_interplation() {
+        // TODO test parser errors for unterminated string and interpolation
+        // "$() -> this returns a error "Expcted ';' after expression" should be unterminated string
+        // "
         parse(
             r#"
         "";

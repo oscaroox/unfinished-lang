@@ -10,6 +10,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ariadne"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7080ae01b2f0c312065d4914cd0f0de045eb8832e9415b355106a6cff3073cb4"
+dependencies = [
+ "yansi",
+]
+
+[[package]]
 name = "ast"
 version = "0.1.0"
 dependencies = [
@@ -94,6 +103,7 @@ checksum = "7b2f96d100e1cf1929e7719b7edb3b90ab5298072638fccd77be9ce942ecdfce"
 name = "parser"
 version = "0.1.0"
 dependencies = [
+ "ariadne",
  "ast",
  "scanner",
  "spanner",
@@ -179,6 +189,7 @@ dependencies = [
 name = "unf"
 version = "0.1.0"
 dependencies = [
+ "ariadne",
  "ast",
  "clap",
  "interpreter",
@@ -226,3 +237,9 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
+
+[[package]]
+name = "yansi"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fc79f4a1e39857fc00c3f662cbf2651c771f00e9c15fe2abc341806bd46bd71"
