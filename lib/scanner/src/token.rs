@@ -1,16 +1,16 @@
-use std::ops::Range;
-
 use crate::TokenType;
+use span_util::WithSpan;
+use std::ops::Range;
 
 macro_rules! impl_token {
     ($_meth:ident, $tok:ident) => {
-        pub fn $_meth(label: Range<usize>) -> TokenWithLabel {
-            TokenWithLabel::new(
+        pub fn $_meth(label: Range<usize>) -> WithSpan<Token> {
+            WithSpan::new(
                 Token {
                     token_type: TokenType::$tok,
                     value: TokenType::$tok.to_string(),
                 },
-                label,
+                label.into(),
             )
         }
     };
@@ -18,13 +18,13 @@ macro_rules! impl_token {
 
 macro_rules! impl_value_token {
     ($_meth:ident, $tok:ident) => {
-        pub fn $_meth(value: String, label: Range<usize>) -> TokenWithLabel {
-            TokenWithLabel::new(
+        pub fn $_meth(value: String, label: Range<usize>) -> WithSpan<Token> {
+            WithSpan::new(
                 Token {
                     token_type: TokenType::$tok,
                     value,
                 },
-                label,
+                label.into(),
             )
         }
     };
@@ -36,22 +36,7 @@ pub struct Token {
     pub value: String,
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct TokenWithLabel(pub Token, pub Range<usize>);
-
-impl TokenWithLabel {
-    pub fn new(token: Token, label: Range<usize>) -> TokenWithLabel {
-        TokenWithLabel(token, label)
-    }
-
-    pub fn token(&self) -> Token {
-        self.0.clone()
-    }
-
-    pub fn range(&self) -> Range<usize> {
-        self.1.clone()
-    }
-}
+pub type TokenWithSpan = WithSpan<Token>;
 
 impl Token {
     impl_value_token!(identifier, Identifier);

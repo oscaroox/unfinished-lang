@@ -2,8 +2,8 @@ use std::ops::Range;
 
 #[derive(Debug, Clone)]
 pub struct Span {
-    start: usize,
-    end: usize,
+    pub start: usize,
+    pub end: usize,
 }
 
 impl Span {

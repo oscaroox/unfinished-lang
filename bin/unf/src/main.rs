@@ -2,9 +2,8 @@ use ariadne::Source;
 use ast::Program;
 use clap::{App, Arg, SubCommand};
 use interpreter::{Environment, Interpreter};
-use parser::{Parser, ParserError};
+use parser::{Analyzer, Parser};
 use scanner::Scanner;
-use spanner::SpanManager;
 use std::{
     cell::RefCell,
     io::{self, BufRead, Write},
@@ -15,7 +14,7 @@ use std::{
 fn main() {
     let matches = App::new("Unfinished Language")
         .version("0.1")
-        .author("Oscar D. <kbknapp@gmail.com>")
+        .author("Oscar D. <oscr@gmail.com>")
         .about("This is the Unfinished language cli")
         .subcommand(SubCommand::with_name("repl").about("starts the repl"))
         .subcommand(
@@ -80,7 +79,7 @@ fn main() {
     }
 }
 
-fn parse_contents(source: String) -> Result<Program, Vec<ParserError>> {
+fn parse_contents(source: String) -> Result<Program, String> {
     let scanner = Scanner::new(source.to_string());
     let mut parser = Parser::new(scanner);
 
@@ -93,7 +92,21 @@ fn parse_contents(source: String) -> Result<Program, Vec<ParserError>> {
                 Err(err) => println!("{}", err),
             }
         }
-        return Err(errors);
+        return Err("Parser error".to_string());
+    }
+
+    let mut analyzer = Analyzer::new();
+
+    let errors = analyzer.analyze(&exprs);
+
+    if errors.len() > 0 {
+        for mut err in errors {
+            match err.into_report().print(Source::from(source.to_string())) {
+                Ok(_) => {}
+                Err(err) => println!("{}", err),
+            }
+        }
+        return Err("Analyzer error".to_string());
     }
 
     Ok(exprs)

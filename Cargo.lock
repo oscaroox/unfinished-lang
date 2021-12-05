@@ -22,7 +22,9 @@ dependencies = [
 name = "ast"
 version = "0.1.0"
 dependencies = [
+ "derivative",
  "scanner",
+ "span_util",
 ]
 
 [[package]]
@@ -58,14 +60,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "colored"
-version = "2.0.0"
+name = "derivative"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3616f750b84d8f0de8a58bda93e08e2a81ad3f523089b05f1dffecab48c6cbd"
+checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
 dependencies = [
- "atty",
- "lazy_static",
- "winapi",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -84,14 +86,8 @@ dependencies = [
  "ast",
  "parser",
  "scanner",
- "spanner",
+ "span_util",
 ]
-
-[[package]]
-name = "lazy_static"
-version = "1.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
@@ -106,7 +102,7 @@ dependencies = [
  "ariadne",
  "ast",
  "scanner",
- "spanner",
+ "span_util",
  "thiserror",
 ]
 
@@ -131,13 +127,13 @@ dependencies = [
 [[package]]
 name = "scanner"
 version = "0.1.0"
+dependencies = [
+ "span_util",
+]
 
 [[package]]
-name = "spanner"
+name = "span_util"
 version = "0.1.0"
-dependencies = [
- "colored",
-]
 
 [[package]]
 name = "strsim"
@@ -195,7 +191,6 @@ dependencies = [
  "interpreter",
  "parser",
  "scanner",
- "spanner",
 ]
 
 [[package]]

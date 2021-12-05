@@ -1,29 +1,29 @@
 use ariadne::{Label, Report, ReportKind};
-use scanner::{Token, TokenWithLabel};
+use scanner::TokenWithSpan;
 use thiserror::Error;
 
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum ParserError {
     #[error("{0}")]
-    ExpectedToken(String, TokenWithLabel),
+    ExpectedToken(String, TokenWithSpan),
 
     #[error("{0}")]
-    Error(String, TokenWithLabel),
+    Error(String, TokenWithSpan),
 
     #[error("Unexpected token")]
-    UnexpectedToken(TokenWithLabel),
+    UnexpectedToken(TokenWithSpan),
 
     #[error("Unterminated string")]
-    UnterminatedString(TokenWithLabel),
+    UnterminatedString(TokenWithSpan),
 
     #[error("Unterminated string interpolation")]
-    UnterminatedInterpolation(TokenWithLabel),
+    UnterminatedInterpolation(TokenWithSpan),
 
     #[error("Unterminated function call")]
-    UnterminatedFunctionCall(TokenWithLabel),
+    UnterminatedFunctionCall(TokenWithSpan),
 
     #[error("Invalid assignemnt target")]
-    InvalidAssignmentTarget(TokenWithLabel),
+    InvalidAssignmentTarget(TokenWithSpan),
 }
 
 impl ParserError {
@@ -37,7 +37,7 @@ impl ParserError {
             | ParserError::UnterminatedFunctionCall(tok)
             | ParserError::UnterminatedInterpolation(tok)
             | ParserError::UnterminatedString(tok) => {
-                let label = Label::new(tok.1.clone());
+                let label = Label::new(tok.1.to_range());
                 Report::build(ReportKind::Error, (), 99)
                     .with_message("Parser Error")
                     .with_label(label.with_message(msg))

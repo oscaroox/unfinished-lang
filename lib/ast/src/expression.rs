@@ -4,6 +4,8 @@ use crate::{
     IfConditional, ImplicitReturn, Index, LetExpr, LetRef, Literal, Logic, LogicOperation,
     LoopExpr, ReturnExpr, SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation,
 };
+use span_util::{WithSpan};
+use std::ops::Range;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
@@ -14,7 +16,7 @@ pub enum Expression {
     SetIndex(SetIndex),
     GetProperty(GetProperty),
     SetProperty(SetProperty),
-    Let(LetExpr),
+    Let(WithSpan<LetExpr>),
     LetRef(LetRef),
     UnaryOp(UnaryOp),
     Grouping(Grouping),
@@ -26,7 +28,7 @@ pub enum Expression {
     Block(Block),
     If(IfConditional),
     ImplicitReturn(ImplicitReturn),
-    Return(ReturnExpr),
+    Return(WithSpan<ReturnExpr>),
     SelfExpr(SelfExpr),
     LoopExpr(LoopExpr),
     BreakExpr(BreakExpr),
@@ -41,7 +43,7 @@ impl Expression {
         }
     }
 
-    pub fn to_let(&self) -> LetExpr {
+    pub fn to_let(&self) -> WithSpan<LetExpr> {
         match &self {
             Expression::Let(e) => e.clone(),
             _ => panic!("Cannot cast to assign"),
@@ -62,13 +64,17 @@ impl Expression {
         }
     }
 
-    pub fn create_let(name: Identifier, value: Option<Expression>) -> Expression {
+    pub fn create_let(
+        name: Identifier,
+        value: Option<Expression>,
+        span: Range<usize>,
+    ) -> Expression {
         let value = if let Some(e) = value {
             Some(Box::new(e))
         } else {
             None
         };
-        Expression::Let(LetExpr { name, value })
+        Expression::Let(WithSpan(LetExpr { name, value }, span.into()))
     }
 
     pub fn create_binop(left: Expression, op: BinaryOperation, right: Expression) -> Expression {
@@ -196,10 +202,13 @@ impl Expression {
         Expression::Block(Block { exprs })
     }
 
-    pub fn create_return(value: Option<Expression>) -> Expression {
-        Expression::Return(ReturnExpr {
-            value: Box::new(value),
-        })
+    pub fn create_return(value: Option<Expression>, span: Range<usize>) -> Expression {
+        Expression::Return(WithSpan(
+            ReturnExpr {
+                value: Box::new(value),
+            },
+            span.into(),
+        ))
     }
 
     pub fn create_implicit_return(value: Expression) -> Expression {

@@ -1,5 +1,6 @@
-use crate::ParserError;
+use ariadne::{Label, Report, ReportKind};
 use ast::{Expression, Program};
+use span_util::Span;
 use thiserror::Error;
 
 #[derive(Debug, PartialEq)]
@@ -26,13 +27,32 @@ pub enum AnalyzerError {
     #[error("{0}")]
     Error(String),
     #[error("Cannot use return in top-level code")]
-    NoTopLevelReturn,
+    NoTopLevelReturn(Span),
     #[error("Cannot use break outside loop expression")]
     NoBreakOutsideLoop,
     #[error("Cannot use continue outside loop expression")]
     NoContinueOutsideLoop,
     #[error("Cannot use self outside methods")]
     NoSelfOutsideMethod,
+}
+
+impl AnalyzerError {
+    pub fn into_report(&mut self) -> Report {
+        let msg = self.to_string();
+
+        match self {
+            Self::NoTopLevelReturn(span) => {
+                let label = Label::new(span.to_range());
+                Report::build(ReportKind::Error, (), 99)
+                    .with_message("Parser Error")
+                    .with_label(label.with_message(msg))
+                    .finish()
+            }
+            _ => Report::build(ReportKind::Error, (), 99)
+                .with_message(format!("Parser Error: {}", msg))
+                .finish(),
+        }
+    }
 }
 
 type AnalyzerResult = Result<(), AnalyzerError>;
@@ -74,7 +94,7 @@ impl Analyzer {
             Expression::GetProperty(_) => todo!(),
             Expression::SetProperty(_) => todo!(),
             Expression::Let(expr) => {
-                if let Some(e) = &expr.value {
+                if let Some(e) = &expr.0.value {
                     self.expression(e)?;
                 }
             }
@@ -106,10 +126,10 @@ impl Analyzer {
             Expression::Return(expr) => {
                 if !self.is_in_function() {
                     if !self.is_in_method() {
-                        self.error(AnalyzerError::NoTopLevelReturn);
+                        self.error(AnalyzerError::NoTopLevelReturn(expr.1.clone()));
                     }
                 }
-                if let Some(e) = &*expr.value {
+                if let Some(e) = &*expr.0.value {
                     self.expression(e)?
                 }
             }
@@ -157,6 +177,7 @@ impl Analyzer {
 #[cfg(test)]
 mod tests {
     use scanner::Scanner;
+    use span_util::Span;
 
     use crate::{Analyzer, AnalyzerError, Parser};
 
@@ -205,15 +226,21 @@ mod tests {
 
     #[test]
     fn analyze_return_expr() {
-        analyze_error("return;", vec![AnalyzerError::NoTopLevelReturn]);
+        analyze_error(
+            "return;",
+            vec![AnalyzerError::NoTopLevelReturn(Span::fake())],
+        );
         analyze_error(
             "return; return;",
             vec![
-                AnalyzerError::NoTopLevelReturn,
-                AnalyzerError::NoTopLevelReturn,
+                AnalyzerError::NoTopLevelReturn(Span::fake()),
+                AnalyzerError::NoTopLevelReturn(Span::fake()),
             ],
         );
-        analyze_error("{return;};", vec![AnalyzerError::NoTopLevelReturn]);
+        analyze_error(
+            "{return;};",
+            vec![AnalyzerError::NoTopLevelReturn(Span::fake())],
+        );
         analyze_success(
             "
         fun() {

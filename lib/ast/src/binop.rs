@@ -5,6 +5,7 @@ use crate::Expression;
 #[derive(Debug, PartialEq, Clone)]
 pub enum BinaryOperation {
     Add,
+    // TODO while this is convenient, this should be its own expression
     ConcatInterpolation,
     Substract,
     Multiply,

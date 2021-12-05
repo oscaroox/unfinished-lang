@@ -1,10 +1,10 @@
 use crate::ParserError;
-use ariadne::{Label, Report, ReportKind};
 use ast::{
     BinaryOperation, DataClassInstanceField, Expression, Identifier, Literal, LogicOperation,
     Program, UnaryOperation,
 };
-use scanner::{Scanner, ScannerMode, Token, TokenType, TokenWithLabel};
+use scanner::{Scanner, ScannerMode, Token, TokenType, TokenWithSpan};
+
 
 const RECOVER_SET: [TokenType; 5] = [
     TokenType::Let,
@@ -26,8 +26,8 @@ type ParserResult = Result<Expression, ParserError>;
 #[derive(Debug)]
 pub struct Parser {
     scanner: Scanner,
-    prev_token: TokenWithLabel,
-    curr_token: TokenWithLabel,
+    prev_token: TokenWithSpan,
+    curr_token: TokenWithSpan,
     errors: Vec<ParserError>,
 }
 
@@ -117,7 +117,8 @@ impl Parser {
             false => self.curr_token.clone(),
         };
 
-        Err(ParserError::ExpectedToken(msg.to_string(), tok))
+        let msg = format!("{}, found '{}'", msg.to_string(), tok.0);
+        Err(ParserError::ExpectedToken(msg, tok))
     }
 
     fn eat_optional(&mut self, token_type: TokenType) -> Option<Token> {
@@ -168,9 +169,11 @@ impl Parser {
     }
 
     fn let_expression(&mut self) -> ParserResult {
+        let start_span = self.prev_token.1.start;
         let identifier = self.eat(TokenType::Identifier, "Expected identifier")?;
 
         let mut init = None;
+
         if self.matches(vec![TokenType::Assign]) {
             let expr = match self.expression() {
                 Ok(expr) => match expr {
@@ -185,7 +188,10 @@ impl Parser {
                 Err(err) => match err {
                     ParserError::UnexpectedToken(_) => {
                         return Err(ParserError::ExpectedToken(
-                            "Expected expression".to_string(),
+                            format!(
+                                "Expected expression here, found '{}'",
+                                self.curr_token.0.clone()
+                            ),
                             self.curr_token.clone(),
                         ));
                     }
@@ -194,16 +200,13 @@ impl Parser {
             };
             init = Some(expr);
         }
-        // else if !self.curr_token.is_semi_colon() {
-        //     return Err(ParserError::ExpectedToken(
-        //         "Expected '='".to_string(),
-        //         self.curr_token.clone(),
-        //     ));
-        // }
+
+        let span = start_span..self.curr_token.1.end;
 
         Ok(Expression::create_let(
             Identifier::new(identifier.value),
             init,
+            span,
         ))
     }
 
@@ -236,7 +239,7 @@ impl Parser {
         if let Some(iter) = iterator {
             return match &condition {
                 Expression::LetRef(let_ref) => Ok(Expression::create_loop(
-                    Expression::create_let(let_ref.name.clone(), None),
+                    Expression::create_let(let_ref.name.clone(), None, 0..0),
                     body,
                     Some(iter),
                 )),
@@ -337,13 +340,15 @@ impl Parser {
     }
 
     fn return_expression(&mut self) -> ParserResult {
+        let start_span = self.prev_token.1.start;
         let mut value = None;
 
         if !self.curr_token.0.is_semi_colon() {
             value = Some(self.expression()?);
         }
 
-        Ok(Expression::create_return(value))
+        let span = start_span..self.curr_token.1.start;
+        Ok(Expression::create_return(value, span))
     }
 
     fn fun_expression(&mut self, kind: FunctionKind) -> ParserResult {
@@ -913,7 +918,7 @@ mod test {
     }
 
     fn let_expr(id: &str, value: Option<Expression>) -> Expression {
-        Expression::create_let(ident(id), value)
+        Expression::create_let(ident(id), value, 0..0)
     }
 
     fn int(val: i64) -> Expression {
@@ -953,7 +958,7 @@ mod test {
     }
 
     fn return_expr(val: Option<Expression>) -> Expression {
-        Expression::create_return(val)
+        Expression::create_return(val, 0..0)
     }
 
     fn implicit_return_expr(val: Expression) -> Expression {

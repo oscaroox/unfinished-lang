@@ -6,6 +6,7 @@ use ast::{
     IfConditional, ImplicitReturn, Index, LetExpr, Literal, Logic, LogicOperation, LoopExpr,
     Program, ReturnExpr, SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation,
 };
+use span_util::WithSpan;
 
 #[derive(Debug)]
 pub enum RuntimeError {}
@@ -134,7 +135,9 @@ impl Interpreter {
         }
     }
 
-    fn eval_let_expression(&mut self, expr: &LetExpr) -> InterpreterResult {
+    fn eval_let_expression(&mut self, expr: &WithSpan<LetExpr>) -> InterpreterResult {
+        let expr = &expr.0;
+
         let name = expr.name.value.to_string();
         let val = match &expr.value {
             Some(expr) => self.expression(expr)?,
@@ -153,7 +156,7 @@ impl Interpreter {
 
             // condition is a let expr
             self.expression(&loop_expr.condition)?;
-            let let_expr = loop_expr.condition.to_let();
+            let let_expr = loop_expr.condition.to_let().0;
 
             let values = match iter {
                 Value::Array(arr) => arr.borrow().values.clone(),
@@ -320,8 +323,8 @@ impl Interpreter {
         Ok(value)
     }
 
-    fn eval_return(&mut self, ret: &ReturnExpr) -> InterpreterResult {
-        match &*ret.value {
+    fn eval_return(&mut self, ret: &WithSpan<ReturnExpr>) -> InterpreterResult {
+        match &*ret.0.value {
             Some(op) => Ok(Value::return_val(self.expression(op)?)),
             None => Ok(Value::return_val(Value::Unit)),
         }
