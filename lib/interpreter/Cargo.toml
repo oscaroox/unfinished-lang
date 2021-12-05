@@ -10,4 +10,4 @@ edition = "2018"
 ast = { path="../ast" }
 scanner = { path="../scanner" }
 parser = { path="../parser" }
-spanner = { path="../spanner"}
+span_util = { path="../span_util" }

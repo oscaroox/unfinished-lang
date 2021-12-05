@@ -10,6 +10,5 @@ edition = "2018"
 thiserror = "1.0"
 ast = { path = "../ast" }
 scanner = { path = "../scanner" }
-spanner = { path = "../spanner" }
-
+span_util = { path = "../span_util" }
 ariadne = "0.1.3"
