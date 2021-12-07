@@ -4,7 +4,7 @@ use ast::{
     Program, UnaryOperation,
 };
 use scanner::{Scanner, ScannerMode, Token, TokenType, TokenWithSpan};
-
+use span_util::Span;
 
 const RECOVER_SET: [TokenType; 5] = [
     TokenType::Let,
@@ -206,7 +206,7 @@ impl Parser {
         Ok(Expression::create_let(
             Identifier::new(identifier.value),
             init,
-            span,
+            span.into(),
         ))
     }
 
@@ -223,7 +223,7 @@ impl Parser {
         let condition = if !self.check(TokenType::LeftBrace) {
             self.expression()?
         } else {
-            Expression::create_literal(Literal::Bool(true))
+            Expression::create_literal(Literal::Bool(true), (0..0).into())
         };
 
         let iterator = if self.matches(vec![TokenType::In]) {
@@ -239,7 +239,7 @@ impl Parser {
         if let Some(iter) = iterator {
             return match &condition {
                 Expression::LetRef(let_ref) => Ok(Expression::create_loop(
-                    Expression::create_let(let_ref.name.clone(), None, 0..0),
+                    Expression::create_let(let_ref.name.clone(), None, (0..0).into()),
                     body,
                     Some(iter),
                 )),
@@ -460,6 +460,7 @@ impl Parser {
 
     fn assignment(&mut self) -> ParserResult {
         let expr = self.or()?;
+        let start = self.prev_token.1.start;
         if self.matches(vec![
             TokenType::Assign,
             TokenType::AssignPlus,
@@ -467,14 +468,16 @@ impl Parser {
             TokenType::AssignSlash,
             TokenType::AssignStar,
         ]) {
-            let curr_token = self.curr_token.clone();
             let assignment_tok = self.prev_token.clone();
+            let curr_token = self.curr_token.clone();
             let rhs = self.assignment()?;
 
+            let end = self.prev_token.1.end;
+            let span: Span = (start..end).into();
             match &expr {
                 Expression::LetRef(let_ref) => match assignment_tok.0.token_type {
                     TokenType::Assign => {
-                        return Ok(Expression::create_assign(let_ref.name.clone(), rhs))
+                        return Ok(Expression::create_assign(let_ref.name.clone(), rhs, span))
                     }
                     _ => {
                         return Ok(Expression::create_assign(
@@ -483,47 +486,55 @@ impl Parser {
                                 Expression::create_let_ref(let_ref.name.clone()),
                                 BinaryOperation::from_token(assignment_tok.0.clone()),
                                 rhs,
+                                span.clone(),
                             ),
+                            span,
                         ))
                     }
                 },
                 Expression::Index(idx) => match assignment_tok.0.token_type {
                     TokenType::Assign => {
                         return Ok(Expression::create_set_index(
-                            *idx.lhs.clone(),
-                            *idx.index.clone(),
+                            *idx.0.lhs.clone(),
+                            *idx.0.index.clone(),
                             rhs,
+                            span,
                         ))
                     }
                     _ => {
                         return Ok(Expression::create_set_index(
-                            *idx.lhs.clone(),
-                            *idx.index.clone(),
+                            *idx.0.lhs.clone(),
+                            *idx.0.index.clone(),
                             Expression::create_binop(
                                 expr,
                                 BinaryOperation::from_token(assignment_tok.0.clone()),
                                 rhs,
+                                span.clone(),
                             ),
+                            span,
                         ))
                     }
                 },
                 Expression::GetProperty(get) => match assignment_tok.0.token_type {
                     TokenType::Assign => {
                         return Ok(Expression::create_set_property(
-                            *get.object.clone(),
-                            get.name.clone(),
+                            *get.0.object.clone(),
+                            get.0.name.clone(),
                             rhs,
+                            span,
                         ))
                     }
                     _ => {
                         return Ok(Expression::create_set_property(
-                            *get.object.clone(),
-                            get.name.clone(),
+                            *get.0.object.clone(),
+                            get.0.name.clone(),
                             Expression::create_binop(
                                 expr,
                                 BinaryOperation::from_token(assignment_tok.0.clone()),
                                 rhs,
+                                span.clone(),
                             ),
+                            span,
                         ))
                     }
                 },
@@ -590,7 +601,7 @@ impl Parser {
 
     fn term(&mut self) -> ParserResult {
         let mut res = self.factor()?;
-
+        let start = self.prev_token.1.start;
         while self.matches(vec![TokenType::Plus, TokenType::Minus]) {
             let tok = self.prev_token.clone();
             let rhs = self.factor()?;
@@ -598,13 +609,14 @@ impl Parser {
                 TokenType::Plus => BinaryOperation::Add,
                 _ => BinaryOperation::Substract,
             };
-            res = Expression::create_binop(res, op, rhs)
+            res = Expression::create_binop(res, op, rhs, (start..self.prev_token.1.end).into())
         }
 
         Ok(res)
     }
     fn factor(&mut self) -> ParserResult {
         let mut res = self.unary()?;
+        let start = self.prev_token.1.start;
         while self.matches(vec![TokenType::Star, TokenType::Slash]) {
             let tok = self.prev_token.clone();
             let rhs = self.unary()?;
@@ -612,7 +624,7 @@ impl Parser {
                 TokenType::Star => BinaryOperation::Multiply,
                 _ => BinaryOperation::Divide,
             };
-            res = Expression::create_binop(res, op, rhs)
+            res = Expression::create_binop(res, op, rhs, (start..self.prev_token.1.end).into())
         }
         Ok(res)
     }
@@ -634,6 +646,7 @@ impl Parser {
 
     fn call(&mut self) -> ParserResult {
         let mut expr = self.primary()?;
+        let start = self.curr_token.1.start;
         loop {
             if self.matches(vec![TokenType::LeftParen]) {
                 let paren = self.prev_token.clone();
@@ -663,7 +676,7 @@ impl Parser {
 
                 self.eat(TokenType::RightBracket, "Expected ']'")?;
 
-                expr = Expression::create_index(expr, idx);
+                expr = Expression::create_index(expr, idx, (start..self.curr_token.1.start).into());
             } else if self.matches(vec![TokenType::Dot]) {
                 let name = self.eat(TokenType::Identifier, "Expected identifier")?;
                 let is_callable = self.check(TokenType::LeftParen);
@@ -671,6 +684,7 @@ impl Parser {
                     expr,
                     Identifier::new(name.value.to_string()),
                     is_callable,
+                    (start..self.curr_token.1.start).into(),
                 )
             } else {
                 break;
@@ -682,12 +696,13 @@ impl Parser {
 
     fn primary(&mut self) -> ParserResult {
         let token = self.curr_token.clone();
+        let span: Span = (token.1.start..token.1.end).into();
         if self.matches(vec![TokenType::IntConst]) {
             let val: i64 = match token.0.value.parse() {
                 Ok(v) => v,
                 Err(msg) => panic!("not a integer {}", msg),
             };
-            return Ok(Expression::create_literal(Literal::Int(val)));
+            return Ok(Expression::create_literal(Literal::Int(val), span));
         }
 
         if self.matches(vec![TokenType::True, TokenType::False]) {
@@ -696,7 +711,7 @@ impl Parser {
                 _ => false,
             };
 
-            return Ok(Expression::create_literal(Literal::Bool(bool)));
+            return Ok(Expression::create_literal(Literal::Bool(bool), span));
         }
 
         if self.matches(vec![TokenType::FloatConst]) {
@@ -704,11 +719,11 @@ impl Parser {
                 Ok(v) => v,
                 Err(msg) => panic!("not a float {}", msg),
             };
-            return Ok(Expression::create_literal(Literal::Float(val)));
+            return Ok(Expression::create_literal(Literal::Float(val), span));
         }
 
         if self.matches(vec![TokenType::Null]) {
-            return Ok(Expression::create_literal(Literal::Null));
+            return Ok(Expression::create_literal(Literal::Null, span));
         }
 
         if self.check(TokenType::DoubleQuote) {
@@ -716,7 +731,10 @@ impl Parser {
         }
 
         if self.matches(vec![TokenType::StringConst]) {
-            return Ok(Expression::create_literal(Literal::String(token.0.value)));
+            return Ok(Expression::create_literal(
+                Literal::String(token.0.value),
+                span,
+            ));
         }
 
         if self.check(TokenType::Identifier)
@@ -773,8 +791,8 @@ impl Parser {
             }
 
             self.eat(TokenType::RightBracket, "Expcted ']'")?;
-
-            return Ok(Expression::create_literal(Literal::Array(exprs)));
+            let span: Span = (token.1.start..self.curr_token.1.start).into();
+            return Ok(Expression::create_literal(Literal::Array(exprs), span));
         }
 
         if self.matches(vec![TokenType::LeftParen]) {
@@ -828,9 +846,10 @@ impl Parser {
             self.advance();
             match self.curr_token.0.token_type {
                 TokenType::StringConst => {
-                    out.push(Expression::create_literal(Literal::String(
-                        self.curr_token.0.value.to_string(),
-                    )));
+                    out.push(Expression::create_literal(
+                        Literal::String(self.curr_token.0.value.to_string()),
+                        (0..0).into(),
+                    ));
                 }
                 TokenType::DoubleQuote => {
                     break;
@@ -845,10 +864,13 @@ impl Parser {
         self.advance(); // advance over '"'
 
         let out_len = out.len();
-
+        let span: Span = (quote.1.start..self.prev_token.1.end).into();
         if out_len == 0 {
             // return a empty string if there is no output
-            return Ok(Expression::create_literal(Literal::String("".to_string())));
+            return Ok(Expression::create_literal(
+                Literal::String("".to_string()),
+                span,
+            ));
         } else if out_len == 1 && out[0].is_string_lit() {
             // return the only elem in output as string lit
             // no reason to create a binop expression
@@ -857,9 +879,10 @@ impl Parser {
             // should be an expression other than string literal
             // append to empty string so it gets formatted as string
             return Ok(Expression::create_binop(
-                Expression::create_literal(Literal::String("".to_string())),
+                Expression::create_literal(Literal::String("".to_string()), Span::fake()),
                 BinaryOperation::ConcatInterpolation,
                 out[0].clone(),
+                span,
             ));
         }
 
@@ -868,10 +891,16 @@ impl Parser {
             out[0].clone(),
             BinaryOperation::ConcatInterpolation,
             out[1].clone(),
+            span.clone(),
         );
 
         for e in out[2..].into_iter() {
-            expr = Expression::create_binop(expr, BinaryOperation::ConcatInterpolation, e.clone())
+            expr = Expression::create_binop(
+                expr,
+                BinaryOperation::ConcatInterpolation,
+                e.clone(),
+                span.clone(),
+            )
         }
 
         Ok(expr)
@@ -889,6 +918,7 @@ mod test {
         Program, UnaryOperation,
     };
     use scanner::{Scanner, TokenType};
+    use span_util::Span;
 
     fn run_parser(source: &str) -> (Program, Vec<ParserError>) {
         let scanner = Scanner::new(source.to_string());
@@ -918,23 +948,23 @@ mod test {
     }
 
     fn let_expr(id: &str, value: Option<Expression>) -> Expression {
-        Expression::create_let(ident(id), value, 0..0)
+        Expression::create_let(ident(id), value, (0..0).into())
     }
 
     fn int(val: i64) -> Expression {
-        Expression::Literal(Literal::Int(val))
+        Expression::create_literal(Literal::Int(val), Span::fake())
     }
 
     fn float(val: f64) -> Expression {
-        Expression::Literal(Literal::Float(val))
+        Expression::create_literal(Literal::Float(val), Span::fake())
     }
 
     fn array(val: Vec<Expression>) -> Expression {
-        Expression::Literal(Literal::Array(val))
+        Expression::create_literal(Literal::Array(val), Span::fake())
     }
 
     fn bool_lit(val: bool) -> Expression {
-        Expression::create_literal(Literal::Bool(val))
+        Expression::create_literal(Literal::Bool(val), Span::fake())
     }
 
     fn ident(val: &str) -> Identifier {
@@ -945,8 +975,12 @@ mod test {
         Identifier::with_token_type("self".to_string(), TokenType::SELF)
     }
 
+    fn create_binop(left: Expression, op: BinaryOperation, right: Expression) -> Expression {
+        Expression::create_binop(left, op, right, Span::fake())
+    }
+
     fn null() -> Expression {
-        Expression::create_literal(Literal::Null)
+        Expression::create_literal(Literal::Null, Span::fake())
     }
 
     fn let_ref(val: &str) -> Expression {
@@ -966,7 +1000,7 @@ mod test {
     }
 
     fn string_lit(val: &str) -> Expression {
-        Expression::create_literal(Literal::String(val.to_string()))
+        Expression::create_literal(Literal::String(val.into()), Span::fake())
     }
 
     fn data_class(name: &str, fields: Vec<&str>, methods: Vec<Expression>) -> Expression {
@@ -986,6 +1020,26 @@ mod test {
 
     fn data_class_instance_field(name: &str, value: Expression) -> DataClassInstanceField {
         DataClassInstanceField::new(Identifier::new(name.to_string()), value)
+    }
+
+    fn create_assign(name: Identifier, rhs: Expression) -> Expression {
+        Expression::create_assign(name, rhs, Span::fake())
+    }
+
+    fn create_index(lhs: Expression, index: Expression) -> Expression {
+        Expression::create_index(lhs, index, Span::fake())
+    }
+
+    fn create_set_index(lhs: Expression, index: Expression, value: Expression) -> Expression {
+        Expression::create_set_index(lhs, index, value, Span::fake())
+    }
+
+    fn create_get_property(object: Expression, name: Identifier, is_callable: bool) -> Expression {
+        Expression::create_get_property(object, name, is_callable, Span::fake())
+    }
+
+    fn create_set_property(object: Expression, name: Identifier, value: Expression) -> Expression {
+        Expression::create_set_property(object, name, value, Span::fake())
     }
 
     fn fun_expr(
@@ -1054,8 +1108,8 @@ mod test {
                 string_lit(" "),
                 string_lit(""),
                 string_lit("Hello"),
-                Expression::create_binop(
-                    Expression::create_binop(
+                create_binop(
+                    create_binop(
                         string_lit("Hello "),
                         BinaryOperation::ConcatInterpolation,
                         let_ref("name"),
@@ -1063,17 +1117,17 @@ mod test {
                     BinaryOperation::ConcatInterpolation,
                     string_lit(", how was your day?"),
                 ),
-                Expression::create_binop(
+                create_binop(
                     string_lit(""),
                     BinaryOperation::ConcatInterpolation,
                     let_ref("name"),
                 ),
-                Expression::create_binop(
+                create_binop(
                     let_ref("name"),
                     BinaryOperation::ConcatInterpolation,
                     string_lit(" Hello"),
                 ),
-                Expression::create_binop(
+                create_binop(
                     string_lit("Hello "),
                     BinaryOperation::ConcatInterpolation,
                     Expression::create_if(
@@ -1082,10 +1136,10 @@ mod test {
                         Some(block_expr(vec![string_lit("mars")])),
                     ),
                 ),
-                Expression::create_binop(
+                create_binop(
                     string_lit("Hello "),
                     BinaryOperation::ConcatInterpolation,
-                    Expression::create_get_property(let_ref("person"), ident("name"), false),
+                    create_get_property(let_ref("person"), ident("name"), false),
                 ),
             ],
         );
@@ -1183,7 +1237,7 @@ mod test {
 
     #[test]
     fn parse_null_literal() {
-        parse("null;", vec![Expression::create_literal(Literal::Null)]);
+        parse("null;", vec![null()]);
     }
 
     #[test]
@@ -1227,22 +1281,22 @@ mod test {
  
             ",
             vec![
-                Expression::create_assign(ident("num"), int(1)),
-                Expression::create_assign(
+                create_assign(ident("num"), int(1)),
+                create_assign(
                     ident("num"),
-                    Expression::create_binop(let_ref("num"), BinaryOperation::Add, int(1)),
+                    create_binop(let_ref("num"), BinaryOperation::Add, int(1)),
                 ),
-                Expression::create_assign(
+                create_assign(
                     ident("num"),
-                    Expression::create_binop(let_ref("num"), BinaryOperation::Substract, int(1)),
+                    create_binop(let_ref("num"), BinaryOperation::Substract, int(1)),
                 ),
-                Expression::create_assign(
+                create_assign(
                     ident("num"),
-                    Expression::create_binop(let_ref("num"), BinaryOperation::Multiply, int(1)),
+                    create_binop(let_ref("num"), BinaryOperation::Multiply, int(1)),
                 ),
-                Expression::create_assign(
+                create_assign(
                     ident("num"),
-                    Expression::create_binop(let_ref("num"), BinaryOperation::Divide, int(1)),
+                    create_binop(let_ref("num"), BinaryOperation::Divide, int(1)),
                 ),
             ],
         );
@@ -1287,11 +1341,11 @@ mod test {
     fn parse_binop_expr() {
         parse(
             "1 + 2 * 3 / 2;",
-            vec![Expression::create_binop(
+            vec![create_binop(
                 int(1),
                 BinaryOperation::Add,
-                Expression::create_binop(
-                    Expression::create_binop(int(2), BinaryOperation::Multiply, int(3)),
+                create_binop(
+                    create_binop(int(2), BinaryOperation::Multiply, int(3)),
                     BinaryOperation::Divide,
                     int(2),
                 ),
@@ -1303,14 +1357,10 @@ mod test {
     fn parse_grouping_expr() {
         parse(
             "2 * (2 + 1);",
-            vec![Expression::create_binop(
+            vec![create_binop(
                 int(2),
                 BinaryOperation::Multiply,
-                Expression::create_grouping(Expression::create_binop(
-                    int(2),
-                    BinaryOperation::Add,
-                    int(1),
-                )),
+                Expression::create_grouping(create_binop(int(2), BinaryOperation::Add, int(1))),
             )],
         );
     }
@@ -1321,7 +1371,7 @@ mod test {
             "-1; 1 + -1; !1;",
             vec![
                 Expression::create_unaryop(UnaryOperation::Minus, int(1)),
-                Expression::create_binop(
+                create_binop(
                     int(1),
                     BinaryOperation::Add,
                     Expression::create_unaryop(UnaryOperation::Minus, int(1)),
@@ -1333,13 +1383,7 @@ mod test {
 
     #[test]
     fn parse_expression_stmt() {
-        parse(
-            "123; 23;",
-            vec![
-                Expression::Literal(Literal::Int(123)),
-                Expression::Literal(Literal::Int(23)),
-            ],
-        );
+        parse("123; 23;", vec![int(123), int(23)]);
     }
 
     #[test]
@@ -1347,10 +1391,10 @@ mod test {
         parse(
             "array[0]; [1,2,3][2]; [[1], 2][0][0];",
             vec![
-                Expression::create_index(let_ref("array"), int(0)),
-                Expression::create_index(array(vec![int(1), int(2), int(3)]), int(2)),
-                Expression::create_index(
-                    Expression::create_index(array(vec![array(vec![int(1)]), int(2)]), int(0)),
+                create_index(let_ref("array"), int(0)),
+                create_index(array(vec![int(1), int(2), int(3)]), int(2)),
+                create_index(
+                    create_index(array(vec![array(vec![int(1)]), int(2)]), int(0)),
                     int(0),
                 ),
             ],
@@ -1361,11 +1405,7 @@ mod test {
     fn parse_array_index_assignment() {
         parse(
             "array[0] = 1;",
-            vec![Expression::create_set_index(
-                let_ref("array"),
-                int(0),
-                int(1),
-            )],
+            vec![create_set_index(let_ref("array"), int(0), int(1))],
         );
 
         parse(
@@ -1376,38 +1416,38 @@ mod test {
             array[0] /= 1;
             ",
             vec![
-                Expression::create_set_index(
+                create_set_index(
                     let_ref("array"),
                     int(0),
-                    Expression::create_binop(
-                        Expression::create_index(let_ref("array"), int(0)),
+                    create_binop(
+                        create_index(let_ref("array"), int(0)),
                         BinaryOperation::Add,
                         int(1),
                     ),
                 ),
-                Expression::create_set_index(
+                create_set_index(
                     let_ref("array"),
                     int(0),
-                    Expression::create_binop(
-                        Expression::create_index(let_ref("array"), int(0)),
+                    create_binop(
+                        create_index(let_ref("array"), int(0)),
                         BinaryOperation::Substract,
                         int(1),
                     ),
                 ),
-                Expression::create_set_index(
+                create_set_index(
                     let_ref("array"),
                     int(0),
-                    Expression::create_binop(
-                        Expression::create_index(let_ref("array"), int(0)),
+                    create_binop(
+                        create_index(let_ref("array"), int(0)),
                         BinaryOperation::Multiply,
                         int(1),
                     ),
                 ),
-                Expression::create_set_index(
+                create_set_index(
                     let_ref("array"),
                     int(0),
-                    Expression::create_binop(
-                        Expression::create_index(let_ref("array"), int(0)),
+                    create_binop(
+                        create_index(let_ref("array"), int(0)),
                         BinaryOperation::Divide,
                         int(1),
                     ),
@@ -1542,13 +1582,14 @@ mod test {
                 ),
                 Expression::create_if(
                     bool_lit(false),
-                    block_expr(vec![implicit_return_expr(Expression::create_assign(
+                    block_expr(vec![implicit_return_expr(create_assign(
                         ident("x"),
                         int(1),
                     ))]),
-                    Some(block_expr(vec![implicit_return_expr(
-                        Expression::create_assign(ident("x"), int(2)),
-                    )])),
+                    Some(block_expr(vec![implicit_return_expr(create_assign(
+                        ident("x"),
+                        int(2),
+                    ))])),
                 ),
                 Expression::create_if(
                     let_ref("val"),
@@ -1693,7 +1734,7 @@ mod test {
                         Some("name".to_string()),
                         vec![ident_self()],
                         false,
-                        block_expr(vec![Expression::create_get_property(
+                        block_expr(vec![create_get_property(
                             Expression::create_self("self".to_string()),
                             Identifier::new("first_name".to_string()),
                             false,
@@ -1703,7 +1744,7 @@ mod test {
                         Some("set_name".to_string()),
                         vec![ident_self(), ident("name")],
                         false,
-                        block_expr(vec![Expression::create_set_property(
+                        block_expr(vec![create_set_property(
                             Expression::create_self("self".to_string()),
                             ident("first_name"),
                             let_ref("name"),
@@ -1747,7 +1788,7 @@ mod test {
 
         parse(
             "Person {id: 1}.id;",
-            vec![Expression::create_get_property(
+            vec![create_get_property(
                 data_class_instance("Person", vec![data_class_instance_field("id", int(1))]),
                 ident("id"),
                 false,
@@ -1811,7 +1852,7 @@ mod test {
             vec![
                 data_class("Person", vec!["first_name", "last_name", "age"], vec![]),
                 let_expr("p", Some(data_class_instance("Person", vec![]))),
-                Expression::create_get_property(
+                create_get_property(
                     let_ref("p"),
                     Identifier::new("first_name".to_string()),
                     false,
@@ -1835,11 +1876,7 @@ mod test {
             vec![
                 data_class("Person", vec!["first_name", "last_name", "age"], vec![]),
                 let_expr("p", Some(data_class_instance("Person", vec![]))),
-                Expression::create_set_property(
-                    let_ref("p"),
-                    Identifier::new("age".to_string()),
-                    int(1),
-                ),
+                create_set_property(let_ref("p"), ident("age"), int(1)),
             ],
         );
         parse(
@@ -1858,54 +1895,38 @@ mod test {
             vec![
                 data_class("Person", vec!["first_name", "last_name", "age"], vec![]),
                 let_expr("p", Some(data_class_instance("Person", vec![]))),
-                Expression::create_set_property(
+                create_set_property(
                     let_ref("p"),
-                    Identifier::new("age".to_string()),
-                    Expression::create_binop(
-                        Expression::create_get_property(
-                            let_ref("p"),
-                            Identifier::new("age".to_string()),
-                            false,
-                        ),
+                    ident("age"),
+                    create_binop(
+                        create_get_property(let_ref("p"), ident("age"), false),
                         BinaryOperation::Add,
                         int(1),
                     ),
                 ),
-                Expression::create_set_property(
+                create_set_property(
                     let_ref("p"),
-                    Identifier::new("age".to_string()),
-                    Expression::create_binop(
-                        Expression::create_get_property(
-                            let_ref("p"),
-                            Identifier::new("age".to_string()),
-                            false,
-                        ),
+                    ident("age"),
+                    create_binop(
+                        create_get_property(let_ref("p"), ident("age"), false),
                         BinaryOperation::Substract,
                         int(1),
                     ),
                 ),
-                Expression::create_set_property(
+                create_set_property(
                     let_ref("p"),
-                    Identifier::new("age".to_string()),
-                    Expression::create_binop(
-                        Expression::create_get_property(
-                            let_ref("p"),
-                            Identifier::new("age".to_string()),
-                            false,
-                        ),
+                    ident("age"),
+                    create_binop(
+                        create_get_property(let_ref("p"), ident("age"), false),
                         BinaryOperation::Multiply,
                         int(1),
                     ),
                 ),
-                Expression::create_set_property(
+                create_set_property(
                     let_ref("p"),
-                    Identifier::new("age".to_string()),
-                    Expression::create_binop(
-                        Expression::create_get_property(
-                            let_ref("p"),
-                            Identifier::new("age".to_string()),
-                            false,
-                        ),
+                    ident("age"),
+                    create_binop(
+                        create_get_property(let_ref("p"), ident("age"), false),
                         BinaryOperation::Divide,
                         int(1),
                     ),

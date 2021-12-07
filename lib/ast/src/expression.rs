@@ -4,18 +4,18 @@ use crate::{
     IfConditional, ImplicitReturn, Index, LetExpr, LetRef, Literal, Logic, LogicOperation,
     LoopExpr, ReturnExpr, SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation,
 };
-use span_util::{WithSpan};
+use span_util::{Span, WithSpan};
 use std::ops::Range;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
-    BinOp(BinOp),
-    Literal(Literal),
-    Assign(Assign),
-    Index(Index),
-    SetIndex(SetIndex),
-    GetProperty(GetProperty),
-    SetProperty(SetProperty),
+    BinOp(WithSpan<BinOp>),
+    Literal(WithSpan<Literal>),
+    Assign(WithSpan<Assign>),
+    Index(WithSpan<Index>),
+    SetIndex(WithSpan<SetIndex>),
+    GetProperty(WithSpan<GetProperty>),
+    SetProperty(WithSpan<SetProperty>),
     Let(WithSpan<LetExpr>),
     LetRef(LetRef),
     UnaryOp(UnaryOp),
@@ -38,7 +38,7 @@ pub enum Expression {
 impl Expression {
     pub fn to_assign(&self) -> Assign {
         match &self {
-            Expression::Assign(e) => e.clone(),
+            Expression::Assign(e) => e.0.clone(),
             _ => panic!("Cannot cast to assign"),
         }
     }
@@ -59,41 +59,51 @@ impl Expression {
 
     pub fn is_string_lit(&self) -> bool {
         match self {
-            Expression::Literal(Literal::String(_)) => true,
+            Expression::Literal(lit) => match lit.0 {
+                Literal::String(_) => true,
+                _ => false,
+            },
             _ => false,
         }
     }
 
-    pub fn create_let(
-        name: Identifier,
-        value: Option<Expression>,
-        span: Range<usize>,
-    ) -> Expression {
+    pub fn create_let(name: Identifier, value: Option<Expression>, span: Span) -> Expression {
         let value = if let Some(e) = value {
             Some(Box::new(e))
         } else {
             None
         };
-        Expression::Let(WithSpan(LetExpr { name, value }, span.into()))
+        Expression::Let(WithSpan(LetExpr { name, value }, span))
     }
 
-    pub fn create_binop(left: Expression, op: BinaryOperation, right: Expression) -> Expression {
-        Expression::BinOp(BinOp {
-            left: Box::new(left),
-            op,
-            right: Box::new(right),
-        })
+    pub fn create_binop(
+        left: Expression,
+        op: BinaryOperation,
+        right: Expression,
+        span: Span,
+    ) -> Expression {
+        Expression::BinOp(WithSpan(
+            BinOp {
+                left: Box::new(left),
+                op,
+                right: Box::new(right),
+            },
+            span,
+        ))
     }
 
-    pub fn create_literal(lit: Literal) -> Expression {
-        Expression::Literal(lit)
+    pub fn create_literal(lit: Literal, span: Span) -> Expression {
+        Expression::Literal(WithSpan(lit, span))
     }
 
-    pub fn create_assign(name: Identifier, rhs: Expression) -> Expression {
-        Expression::Assign(Assign {
-            name,
-            rhs: Box::new(rhs),
-        })
+    pub fn create_assign(name: Identifier, rhs: Expression, span: Span) -> Expression {
+        Expression::Assign(WithSpan(
+            Assign {
+                name,
+                rhs: Box::new(rhs),
+            },
+            span,
+        ))
     }
 
     pub fn create_let_ref(ident: Identifier) -> Expression {
@@ -120,43 +130,62 @@ impl Expression {
         })
     }
 
-    pub fn create_index(lhs: Expression, index: Expression) -> Expression {
-        Expression::Index(Index {
-            lhs: Box::new(lhs),
-            index: Box::new(index),
-        })
+    pub fn create_index(lhs: Expression, index: Expression, span: Span) -> Expression {
+        Expression::Index(WithSpan(
+            Index {
+                lhs: Box::new(lhs),
+                index: Box::new(index),
+            },
+            span,
+        ))
     }
 
-    pub fn create_set_index(lhs: Expression, index: Expression, value: Expression) -> Expression {
-        Expression::SetIndex(SetIndex {
-            lhs: Box::new(lhs),
-            index: Box::new(index),
-            value: Box::new(value),
-        })
+    pub fn create_set_index(
+        lhs: Expression,
+        index: Expression,
+        value: Expression,
+        span: Span,
+    ) -> Expression {
+        Expression::SetIndex(WithSpan(
+            SetIndex {
+                lhs: Box::new(lhs),
+                index: Box::new(index),
+                value: Box::new(value),
+            },
+            span,
+        ))
     }
 
     pub fn create_get_property(
         object: Expression,
         name: Identifier,
         is_callable: bool,
+        span: Span,
     ) -> Expression {
-        Expression::GetProperty(GetProperty {
-            object: Box::new(object),
-            is_callable,
-            name,
-        })
+        Expression::GetProperty(WithSpan(
+            GetProperty {
+                object: Box::new(object),
+                is_callable,
+                name,
+            },
+            span,
+        ))
     }
 
     pub fn create_set_property(
         object: Expression,
         name: Identifier,
         value: Expression,
+        span: Span,
     ) -> Expression {
-        Expression::SetProperty(SetProperty {
-            object: Box::new(object),
-            name,
-            value: Box::new(value),
-        })
+        Expression::SetProperty(WithSpan(
+            SetProperty {
+                object: Box::new(object),
+                name,
+                value: Box::new(value),
+            },
+            span,
+        ))
     }
 
     pub fn create_function(

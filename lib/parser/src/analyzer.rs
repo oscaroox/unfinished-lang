@@ -80,7 +80,7 @@ impl Analyzer {
     fn expression(&mut self, expression: &Expression) -> AnalyzerResult {
         match expression {
             Expression::BinOp(_) => todo!(),
-            Expression::Literal(lit) => match lit {
+            Expression::Literal(lit) => match lit.0 {
                 ast::Literal::Int(_)
                 | ast::Literal::Float(_)
                 | ast::Literal::Bool(_)

@@ -185,16 +185,17 @@ impl Interpreter {
         }
     }
 
-    fn eval_set_property(&mut self, set_property: &SetProperty) -> InterpreterResult {
-        let obj = self.expression(&set_property.object)?;
+    fn eval_set_property(&mut self, set_property: &WithSpan<SetProperty>) -> InterpreterResult {
+        let expr = &set_property.0;
+        let obj = self.expression(&expr.object)?;
 
         match obj {
             Value::DataClassInstance(instance) => {
-                let value = self.expression(&set_property.value)?;
+                let value = self.expression(&expr.value)?;
 
                 instance
                     .borrow_mut()
-                    .set(set_property.name.value.to_string(), value.clone());
+                    .set(expr.name.value.to_string(), value.clone());
 
                 Ok(value.clone())
             }
@@ -205,17 +206,16 @@ impl Interpreter {
         }
     }
 
-    fn eval_get_property(&mut self, get_property: &GetProperty) -> InterpreterResult {
-        let obj = self.expression(&get_property.object)?;
+    fn eval_get_property(&mut self, get_property: &WithSpan<GetProperty>) -> InterpreterResult {
+        let expr = &get_property.0;
+        let obj = self.expression(&expr.object)?;
 
         match obj {
             Value::DataClassInstance(instance) => {
-                let mut val = if get_property.is_callable {
-                    instance
-                        .borrow()
-                        .get_method(get_property.name.value.to_string())
+                let mut val = if expr.is_callable {
+                    instance.borrow().get_method(expr.name.value.to_string())
                 } else {
-                    instance.borrow().get(get_property.name.value.to_string())
+                    instance.borrow().get(expr.name.value.to_string())
                 };
 
                 // if propery is a function bind self keyword to function closure
@@ -234,10 +234,10 @@ impl Interpreter {
                 Ok(val.clone())
             }
             Value::DataClass(d) => {
-                let fun = d.get(get_property.name.value.to_string());
+                let fun = d.get(expr.name.value.to_string());
                 Ok(Value::Function(fun))
             }
-            Value::Null => panic!("Cannot access {} on null", get_property.name),
+            Value::Null => panic!("Cannot access {} on null", expr.name),
             _ => panic!("Property not found on {}", obj),
         }
     }
@@ -333,10 +333,10 @@ impl Interpreter {
         Ok(Value::implicit_return_val(self.expression(&ret.value)?))
     }
 
-    fn eval_set_index(&mut self, set_index: &SetIndex) -> InterpreterResult {
-        let lhs = self.expression(&set_index.lhs)?;
-        let index = self.expression(&set_index.index)?;
-        let value = self.expression(&set_index.value)?;
+    fn eval_set_index(&mut self, set_index: &WithSpan<SetIndex>) -> InterpreterResult {
+        let lhs = self.expression(&set_index.0.lhs)?;
+        let index = self.expression(&set_index.0.index)?;
+        let value = self.expression(&set_index.0.value)?;
 
         match (&lhs, &index, &value) {
             (Value::Array(arr), Value::Int(i), _) => {
@@ -356,9 +356,9 @@ impl Interpreter {
         }
     }
 
-    fn eval_index(&mut self, index: &Index) -> InterpreterResult {
-        let lhs = self.expression(&index.lhs)?;
-        let idx = self.expression(&index.index)?;
+    fn eval_index(&mut self, index: &WithSpan<Index>) -> InterpreterResult {
+        let lhs = self.expression(&index.0.lhs)?;
+        let idx = self.expression(&index.0.index)?;
 
         match (&lhs, &idx) {
             (Value::Array(arr), Value::Int(i)) => match arr.borrow().values.get(*i as usize) {
@@ -510,8 +510,8 @@ impl Interpreter {
         }
     }
 
-    fn eval_literal(&mut self, lit: &Literal) -> InterpreterResult {
-        Ok(match lit {
+    fn eval_literal(&mut self, lit: &WithSpan<Literal>) -> InterpreterResult {
+        Ok(match &lit.0 {
             Literal::Int(v) => Value::Int(*v),
             Literal::Float(v) => Value::Float(*v),
             Literal::Bool(v) => Value::Bool(*v),
@@ -527,9 +527,9 @@ impl Interpreter {
         })
     }
 
-    fn eval_assignment(&mut self, assign: &Assign) -> InterpreterResult {
-        let name = assign.name.value.clone();
-        let val = self.expression(&assign.rhs)?;
+    fn eval_assignment(&mut self, assign: &WithSpan<Assign>) -> InterpreterResult {
+        let name = assign.0.name.value.clone();
+        let val = self.expression(&assign.0.rhs)?;
         match self.env.borrow_mut().assign(name.to_string(), val) {
             Some(val) => Ok(val),
             None => panic!("Assignment to unknown variable: {}", name),
@@ -552,11 +552,11 @@ impl Interpreter {
         Ok(res)
     }
 
-    fn eval_binop(&mut self, binop: &BinOp) -> InterpreterResult {
-        let left = self.expression(&binop.left)?;
-        let right = self.expression(&binop.right)?;
+    fn eval_binop(&mut self, binop: &WithSpan<BinOp>) -> InterpreterResult {
+        let left = self.expression(&binop.0.left)?;
+        let right = self.expression(&binop.0.right)?;
 
-        let res = match (&left, &binop.op, &right) {
+        let res = match (&left, &binop.0.op, &right) {
             // integer binop
             (Value::Int(n1), BinaryOperation::Add, Value::Int(n2)) => Value::Int(n1 + n2),
             (Value::Int(n1), BinaryOperation::Substract, Value::Int(n2)) => Value::Int(n1 - n2),
