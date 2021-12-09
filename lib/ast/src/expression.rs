@@ -26,13 +26,13 @@ pub enum Expression {
     DataClass(WithSpan<DataClass>),
     DataClassInstance(WithSpan<DataClassInstance>),
     Block(WithSpan<Block>),
-    If(IfConditional),
-    ImplicitReturn(ImplicitReturn),
+    If(WithSpan<IfConditional>),
+    ImplicitReturn(WithSpan<ImplicitReturn>),
     Return(WithSpan<ReturnExpr>),
-    SelfExpr(SelfExpr),
-    LoopExpr(LoopExpr),
-    BreakExpr(BreakExpr),
-    ContinueExpr(ContinueExpr),
+    SelfExpr(WithSpan<SelfExpr>),
+    LoopExpr(WithSpan<LoopExpr>),
+    BreakExpr(WithSpan<BreakExpr>),
+    ContinueExpr(WithSpan<ContinueExpr>),
 }
 
 impl Expression {
@@ -219,17 +219,21 @@ impl Expression {
         condition: Expression,
         then: Expression,
         not_then: Option<Expression>,
+        span: Span,
     ) -> Expression {
         let not_then = if let Some(e) = not_then {
             Some(Box::new(e))
         } else {
             None
         };
-        Expression::If(IfConditional {
-            condition: Box::new(condition),
-            then: Box::new(then),
-            not_then,
-        })
+        Expression::If(WithSpan(
+            IfConditional {
+                condition: Box::new(condition),
+                then: Box::new(then),
+                not_then,
+            },
+            span,
+        ))
     }
 
     pub fn create_logic(
@@ -261,10 +265,13 @@ impl Expression {
         ))
     }
 
-    pub fn create_implicit_return(value: Expression) -> Expression {
-        Expression::ImplicitReturn(ImplicitReturn {
-            value: Box::new(value),
-        })
+    pub fn create_implicit_return(value: Expression, span: Span) -> Expression {
+        Expression::ImplicitReturn(WithSpan(
+            ImplicitReturn {
+                value: Box::new(value),
+            },
+            span,
+        ))
     }
 
     pub fn create_data_class(
@@ -291,32 +298,36 @@ impl Expression {
         Expression::DataClassInstance(WithSpan(DataClassInstance { name, fields }, span))
     }
 
-    pub fn create_self(name: String) -> Expression {
-        Expression::SelfExpr(SelfExpr { name })
+    pub fn create_self(name: String, span: Span) -> Expression {
+        Expression::SelfExpr(WithSpan(SelfExpr { name }, span))
     }
 
     pub fn create_loop(
         condition: Expression,
         body: Expression,
         iterator: Option<Expression>,
+        span: Span,
     ) -> Expression {
         let iterator = if let Some(e) = iterator {
             Some(Box::new(e))
         } else {
             None
         };
-        Expression::LoopExpr(LoopExpr {
-            body: Box::new(body),
-            condition: Box::new(condition),
-            iterator,
-        })
+        Expression::LoopExpr(WithSpan(
+            LoopExpr {
+                body: Box::new(body),
+                condition: Box::new(condition),
+                iterator,
+            },
+            span,
+        ))
     }
 
-    pub fn create_break() -> Expression {
-        Expression::BreakExpr(BreakExpr {})
+    pub fn create_break(span: Span) -> Expression {
+        Expression::BreakExpr(WithSpan(BreakExpr {}, span))
     }
 
-    pub fn create_continue() -> Expression {
-        Expression::ContinueExpr(ContinueExpr {})
+    pub fn create_continue(span: Span) -> Expression {
+        Expression::ContinueExpr(WithSpan(ContinueExpr {}, span))
     }
 }

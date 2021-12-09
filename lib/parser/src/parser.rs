@@ -213,18 +213,19 @@ impl Parser {
 
     fn continue_break_expression(&mut self) -> ParserResult {
         Ok(match self.prev_token.0.token_type {
-            TokenType::Break => Expression::create_break(),
-            TokenType::Continue => Expression::create_continue(),
+            TokenType::Break => Expression::create_break(self.prev_token.1.clone()),
+            TokenType::Continue => Expression::create_continue(self.prev_token.1.clone()),
             _ => unreachable!(),
         })
     }
 
     fn loop_expression(&mut self) -> ParserResult {
+        let if_span = self.prev_token.1.clone();
         let token = self.curr_token.clone();
         let condition = if !self.check(TokenType::LeftBrace) {
             self.expression()?
         } else {
-            Expression::create_literal(Literal::Bool(true), (0..0).into())
+            Expression::create_literal(Literal::Bool(true), if_span)
         };
 
         let iterator = if self.matches(vec![TokenType::In]) {
@@ -240,9 +241,10 @@ impl Parser {
         if let Some(iter) = iterator {
             return match &condition {
                 Expression::LetRef(let_ref) => Ok(Expression::create_loop(
-                    Expression::create_let(let_ref.0.name.clone(), None, (0..0).into()),
+                    Expression::create_let(let_ref.0.name.clone(), None, let_ref.1.clone()),
                     body,
                     Some(iter),
+                    Span::fake(),
                 )),
                 _ => Err(ParserError::ExpectedToken(
                     "Expected variable".to_string(),
@@ -250,7 +252,8 @@ impl Parser {
                 )),
             };
         }
-        Ok(Expression::create_loop(condition, body, None))
+        // TODO get span from expression
+        Ok(Expression::create_loop(condition, body, None, Span::fake()))
     }
 
     fn data_class_instantiate(&mut self) -> ParserResult {
@@ -412,7 +415,7 @@ impl Parser {
                 params,
                 is_static,
                 Expression::create_block(
-                    vec![Expression::create_implicit_return(expression)],
+                    vec![Expression::create_implicit_return(expression, Span::fake())],
                     Span::fake(),
                 ),
                 (fun_span.start..self.prev_token.1.end).into(),
@@ -445,7 +448,8 @@ impl Parser {
 
         if !exprs.is_empty() && !self.prev_token.0.is_semi_colon() {
             let expr = exprs.pop().unwrap();
-            exprs.push(Expression::create_implicit_return(expr));
+            // TODO get span from expression
+            exprs.push(Expression::create_implicit_return(expr, Span::fake()));
         }
 
         self.eat(TokenType::RightBrace, "Expected '}'")?;
@@ -454,7 +458,7 @@ impl Parser {
 
     fn if_expression(&mut self) -> ParserResult {
         let left_paren = self.eat_optional(TokenType::LeftParen);
-
+        // TODO get span from expr
         let expr = self.expression()?;
 
         if left_paren.is_some() {
@@ -471,7 +475,7 @@ impl Parser {
             not_then = Some(self.block_expression()?);
         }
 
-        Ok(Expression::create_if(expr, then, not_then))
+        Ok(Expression::create_if(expr, then, not_then, Span::fake()))
     }
 
     fn assignment(&mut self) -> ParserResult {
@@ -792,7 +796,7 @@ impl Parser {
         }
 
         if self.matches(vec![TokenType::SELF]) {
-            return Ok(Expression::create_self(token.0.value));
+            return Ok(Expression::create_self(token.0.value, token.1));
         }
 
         if self.matches(vec![TokenType::LeftBracket]) {
@@ -1016,8 +1020,8 @@ mod test {
         Expression::create_return(val, 0..0)
     }
 
-    fn implicit_return_expr(val: Expression) -> Expression {
-        Expression::create_implicit_return(val)
+    fn create_implicit_return(val: Expression) -> Expression {
+        Expression::create_implicit_return(val, Span::fake())
     }
 
     fn string_lit(val: &str) -> Expression {
@@ -1072,6 +1076,34 @@ mod test {
         Expression::create_call(callee, args, Span::fake())
     }
 
+    fn create_self(name: &str) -> Expression {
+        Expression::create_self(name.into(), Span::fake())
+    }
+
+    fn create_break() -> Expression {
+        Expression::create_break(Span::fake())
+    }
+
+    fn create_continue() -> Expression {
+        Expression::create_continue(Span::fake())
+    }
+
+    fn create_loop(
+        condition: Expression,
+        body: Expression,
+        iterator: Option<Expression>,
+    ) -> Expression {
+        Expression::create_loop(condition, body, iterator, Span::fake())
+    }
+
+    fn create_if(
+        condition: Expression,
+        then: Expression,
+        not_then: Option<Expression>,
+    ) -> Expression {
+        Expression::create_if(condition, then, not_then, Span::fake())
+    }
+
     fn create_set_index(lhs: Expression, index: Expression, value: Expression) -> Expression {
         Expression::create_set_index(lhs, index, value, Span::fake())
     }
@@ -1115,14 +1147,14 @@ mod test {
                 create_block(vec![
                     let_expr("x", Some(int(2))),
                     let_expr("y", Some(int(3))),
-                    implicit_return_expr(let_ref("x")),
+                    create_implicit_return(let_ref("x")),
                 ]),
                 create_block(vec![
                     let_expr("x", Some(int(2))),
                     let_expr("y", Some(int(3))),
                     let_ref("x"),
                 ]),
-                create_block(vec![implicit_return_expr(let_ref("x"))]),
+                create_block(vec![create_implicit_return(let_ref("x"))]),
                 create_block(vec![let_ref("x")]),
             ],
         );
@@ -1172,7 +1204,7 @@ mod test {
                 create_binop(
                     string_lit("Hello "),
                     BinaryOperation::ConcatInterpolation,
-                    Expression::create_if(
+                    create_if(
                         bool_lit(true),
                         create_block(vec![string_lit("world")]),
                         Some(create_block(vec![string_lit("mars")])),
@@ -1193,7 +1225,7 @@ mod test {
             "
         loop i in name {};
         ",
-            vec![Expression::create_loop(
+            vec![create_loop(
                 let_expr("i", None),
                 create_block(vec![]),
                 Some(let_ref("name")),
@@ -1204,7 +1236,7 @@ mod test {
             "
         loop i in (Person {}) {};
         ",
-            vec![Expression::create_loop(
+            vec![create_loop(
                 let_expr("i", None),
                 create_block(vec![]),
                 Some(create_grouping(create_data_class_instance(
@@ -1292,7 +1324,7 @@ mod test {
                     Some("main".to_string()),
                     vec![],
                     true,
-                    create_block(vec![Expression::create_self("self".to_string())]),
+                    create_block(vec![create_self("self")]),
                 )),
             )],
         );
@@ -1547,7 +1579,7 @@ mod test {
                         Some("main".to_string()),
                         vec![],
                         true,
-                        create_block(vec![implicit_return_expr(int(1))]),
+                        create_block(vec![create_implicit_return(int(1))]),
                     )),
                 ),
             ],
@@ -1609,34 +1641,34 @@ mod test {
             if val { 1 } else { 2 };
             ",
             vec![
-                Expression::create_if(bool_lit(true), create_block(vec![]), None),
-                Expression::create_if(bool_lit(true), create_block(vec![]), None),
-                Expression::create_if(bool_lit(false), create_block(vec![]), None),
-                Expression::create_if(
+                create_if(bool_lit(true), create_block(vec![]), None),
+                create_if(bool_lit(true), create_block(vec![]), None),
+                create_if(bool_lit(false), create_block(vec![]), None),
+                create_if(
                     bool_lit(false),
                     create_block(vec![]),
                     Some(create_block(vec![])),
                 ),
-                Expression::create_if(
+                create_if(
                     int(123),
                     create_block(vec![let_expr("x", Some(int(1)))]),
                     Some(create_block(vec![let_expr("y", Some(int(2)))])),
                 ),
-                Expression::create_if(
+                create_if(
                     bool_lit(false),
-                    create_block(vec![implicit_return_expr(create_assign(
+                    create_block(vec![create_implicit_return(create_assign(
                         ident("x"),
                         int(1),
                     ))]),
-                    Some(create_block(vec![implicit_return_expr(create_assign(
+                    Some(create_block(vec![create_implicit_return(create_assign(
                         ident("x"),
                         int(2),
                     ))])),
                 ),
-                Expression::create_if(
+                create_if(
                     let_ref("val"),
-                    create_block(vec![implicit_return_expr(int(1))]),
-                    Some(create_block(vec![implicit_return_expr(int(2))])),
+                    create_block(vec![create_implicit_return(int(1))]),
+                    Some(create_block(vec![create_implicit_return(int(2))])),
                 ),
             ],
         );
@@ -1663,7 +1695,7 @@ mod test {
                         int(3),
                         int(4),
                         int(5),
-                        implicit_return_expr(int(3345)),
+                        create_implicit_return(int(3345)),
                     ])),
                 ),
             ],
@@ -1777,7 +1809,7 @@ mod test {
                         vec![ident_self()],
                         false,
                         create_block(vec![create_get_property(
-                            Expression::create_self("self".to_string()),
+                            create_self("self"),
                             Identifier::new("first_name".to_string()),
                             false,
                         )]),
@@ -1787,7 +1819,7 @@ mod test {
                         vec![ident_self(), ident("name")],
                         false,
                         create_block(vec![create_set_property(
-                            Expression::create_self("self".to_string()),
+                            create_self("self"),
                             ident("first_name"),
                             let_ref("name"),
                         )]),
@@ -1986,9 +2018,9 @@ mod test {
             loop 1 < 2 {};
             ",
             vec![
-                Expression::create_loop(bool_lit(true), create_block(vec![]), None),
-                Expression::create_loop(bool_lit(true), create_block(vec![]), None),
-                Expression::create_loop(
+                create_loop(bool_lit(true), create_block(vec![]), None),
+                create_loop(bool_lit(true), create_block(vec![]), None),
+                create_loop(
                     create_logic(int(1), LogicOperation::LessThan, int(2)),
                     create_block(vec![]),
                     None,
@@ -2005,16 +2037,8 @@ mod test {
         loop { continue; }; 
         ",
             vec![
-                Expression::create_loop(
-                    bool_lit(true),
-                    create_block(vec![Expression::create_break()]),
-                    None,
-                ),
-                Expression::create_loop(
-                    bool_lit(true),
-                    create_block(vec![Expression::create_continue()]),
-                    None,
-                ),
+                create_loop(bool_lit(true), create_block(vec![create_break()]), None),
+                create_loop(bool_lit(true), create_block(vec![create_continue()]), None),
             ],
         )
     }

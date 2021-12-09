@@ -119,17 +119,17 @@ impl Interpreter {
             Expression::Call(expr) => self.eval_call(&expr.0),
             Expression::Function(expr) => self.eval_function(&expr.0),
             Expression::Block(expr) => self.eval_block(&expr.0),
-            Expression::If(expr) => self.eval_if_conditional(expr),
-            Expression::Index(expr) => self.eval_index(expr),
-            Expression::SetIndex(expr) => self.eval_set_index(expr),
-            Expression::Return(expr) => self.eval_return(expr),
-            Expression::ImplicitReturn(expr) => self.eval_implicit_return(expr),
+            Expression::If(expr) => self.eval_if_conditional(&expr.0),
+            Expression::Index(expr) => self.eval_index(&expr.0),
+            Expression::SetIndex(expr) => self.eval_set_index(&expr.0),
+            Expression::Return(expr) => self.eval_return(&expr.0),
+            Expression::ImplicitReturn(expr) => self.eval_implicit_return(&expr.0),
             Expression::DataClass(expr) => self.eval_data_class(&expr.0),
             Expression::DataClassInstance(expr) => self.eval_data_class_instance(&expr.0),
-            Expression::GetProperty(expr) => self.eval_get_property(expr),
-            Expression::SetProperty(expr) => self.eval_set_property(expr),
-            Expression::SelfExpr(expr) => self.eval_self_expr(expr),
-            Expression::LoopExpr(expr) => self.eval_loop_expr(expr),
+            Expression::GetProperty(expr) => self.eval_get_property(&expr.0),
+            Expression::SetProperty(expr) => self.eval_set_property(&expr.0),
+            Expression::SelfExpr(expr) => self.eval_self_expr(&expr.0),
+            Expression::LoopExpr(expr) => self.eval_loop_expr(&expr.0),
             Expression::BreakExpr(_) => Ok(Value::Break),
             Expression::ContinueExpr(_) => Ok(Value::Continue),
         }
@@ -183,17 +183,16 @@ impl Interpreter {
         }
     }
 
-    fn eval_set_property(&mut self, set_property: &WithSpan<SetProperty>) -> InterpreterResult {
-        let expr = &set_property.0;
-        let obj = self.expression(&expr.object)?;
+    fn eval_set_property(&mut self, set_property: &SetProperty) -> InterpreterResult {
+        let obj = self.expression(&set_property.object)?;
 
         match obj {
             Value::DataClassInstance(instance) => {
-                let value = self.expression(&expr.value)?;
+                let value = self.expression(&set_property.value)?;
 
                 instance
                     .borrow_mut()
-                    .set(expr.name.value.to_string(), value.clone());
+                    .set(set_property.name.value.to_string(), value.clone());
 
                 Ok(value.clone())
             }
@@ -204,16 +203,17 @@ impl Interpreter {
         }
     }
 
-    fn eval_get_property(&mut self, get_property: &WithSpan<GetProperty>) -> InterpreterResult {
-        let expr = &get_property.0;
-        let obj = self.expression(&expr.object)?;
+    fn eval_get_property(&mut self, get_property: &GetProperty) -> InterpreterResult {
+        let obj = self.expression(&get_property.object)?;
 
         match obj {
             Value::DataClassInstance(instance) => {
-                let mut val = if expr.is_callable {
-                    instance.borrow().get_method(expr.name.value.to_string())
+                let mut val = if get_property.is_callable {
+                    instance
+                        .borrow()
+                        .get_method(get_property.name.value.to_string())
                 } else {
-                    instance.borrow().get(expr.name.value.to_string())
+                    instance.borrow().get(get_property.name.value.to_string())
                 };
 
                 // if propery is a function bind self keyword to function closure
@@ -232,10 +232,10 @@ impl Interpreter {
                 Ok(val.clone())
             }
             Value::DataClass(d) => {
-                let fun = d.get(expr.name.value.to_string());
+                let fun = d.get(get_property.name.value.to_string());
                 Ok(Value::Function(fun))
             }
-            Value::Null => panic!("Cannot access {} on null", expr.name),
+            Value::Null => panic!("Cannot access {} on null", get_property.name),
             _ => panic!("Property not found on {}", obj),
         }
     }
@@ -321,8 +321,8 @@ impl Interpreter {
         Ok(value)
     }
 
-    fn eval_return(&mut self, ret: &WithSpan<ReturnExpr>) -> InterpreterResult {
-        match &*ret.0.value {
+    fn eval_return(&mut self, ret: &ReturnExpr) -> InterpreterResult {
+        match &*ret.value {
             Some(op) => Ok(Value::return_val(self.expression(op)?)),
             None => Ok(Value::return_val(Value::Unit)),
         }
@@ -331,10 +331,10 @@ impl Interpreter {
         Ok(Value::implicit_return_val(self.expression(&ret.value)?))
     }
 
-    fn eval_set_index(&mut self, set_index: &WithSpan<SetIndex>) -> InterpreterResult {
-        let lhs = self.expression(&set_index.0.lhs)?;
-        let index = self.expression(&set_index.0.index)?;
-        let value = self.expression(&set_index.0.value)?;
+    fn eval_set_index(&mut self, set_index: &SetIndex) -> InterpreterResult {
+        let lhs = self.expression(&set_index.lhs)?;
+        let index = self.expression(&set_index.index)?;
+        let value = self.expression(&set_index.value)?;
 
         match (&lhs, &index, &value) {
             (Value::Array(arr), Value::Int(i), _) => {
@@ -354,9 +354,9 @@ impl Interpreter {
         }
     }
 
-    fn eval_index(&mut self, index: &WithSpan<Index>) -> InterpreterResult {
-        let lhs = self.expression(&index.0.lhs)?;
-        let idx = self.expression(&index.0.index)?;
+    fn eval_index(&mut self, index: &Index) -> InterpreterResult {
+        let lhs = self.expression(&index.lhs)?;
+        let idx = self.expression(&index.index)?;
 
         match (&lhs, &idx) {
             (Value::Array(arr), Value::Int(i)) => match arr.borrow().values.get(*i as usize) {

@@ -140,8 +140,8 @@ impl Analyzer {
             }
             Expression::LoopExpr(expr) => {
                 self.loop_scopes.push(LoopScope::Loop);
-                self.expression(&expr.condition)?;
-                self.expression(&expr.body)?;
+                self.expression(&expr.0.condition)?;
+                self.expression(&expr.0.body)?;
                 self.loop_scopes.pop();
             }
             Expression::BreakExpr(_) => {
