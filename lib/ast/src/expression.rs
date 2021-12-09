@@ -17,15 +17,15 @@ pub enum Expression {
     GetProperty(WithSpan<GetProperty>),
     SetProperty(WithSpan<SetProperty>),
     Let(WithSpan<LetExpr>),
-    LetRef(LetRef),
-    UnaryOp(UnaryOp),
-    Grouping(Grouping),
-    Logic(Logic),
-    Call(Call),
-    Function(Function),
-    DataClass(DataClass),
-    DataClassInstance(DataClassInstance),
-    Block(Block),
+    LetRef(WithSpan<LetRef>),
+    UnaryOp(WithSpan<UnaryOp>),
+    Grouping(WithSpan<Grouping>),
+    Logic(WithSpan<Logic>),
+    Call(WithSpan<Call>),
+    Function(WithSpan<Function>),
+    DataClass(WithSpan<DataClass>),
+    DataClassInstance(WithSpan<DataClassInstance>),
+    Block(WithSpan<Block>),
     If(IfConditional),
     ImplicitReturn(ImplicitReturn),
     Return(WithSpan<ReturnExpr>),
@@ -52,7 +52,7 @@ impl Expression {
 
     pub fn to_let_ref(&self) -> LetRef {
         match &self {
-            Expression::LetRef(e) => e.clone(),
+            Expression::LetRef(e) => e.0.clone(),
             _ => panic!("Cannot cast to assign"),
         }
     }
@@ -106,28 +106,37 @@ impl Expression {
         ))
     }
 
-    pub fn create_let_ref(ident: Identifier) -> Expression {
-        Expression::LetRef(LetRef { name: ident })
+    pub fn create_let_ref(ident: Identifier, span: Span) -> Expression {
+        Expression::LetRef(WithSpan(LetRef { name: ident }, span))
     }
 
-    pub fn create_unaryop(op: UnaryOperation, rhs: Expression) -> Expression {
-        Expression::UnaryOp(UnaryOp {
-            op,
-            rhs: Box::new(rhs),
-        })
+    pub fn create_unaryop(op: UnaryOperation, rhs: Expression, span: Span) -> Expression {
+        Expression::UnaryOp(WithSpan(
+            UnaryOp {
+                op,
+                rhs: Box::new(rhs),
+            },
+            span,
+        ))
     }
 
-    pub fn create_grouping(expr: Expression) -> Expression {
-        Expression::Grouping(Grouping {
-            expr: Box::new(expr),
-        })
+    pub fn create_grouping(expr: Expression, span: Span) -> Expression {
+        Expression::Grouping(WithSpan(
+            Grouping {
+                expr: Box::new(expr),
+            },
+            span,
+        ))
     }
 
-    pub fn create_call(callee: Expression, args: Vec<Expression>) -> Expression {
-        Expression::Call(Call {
-            callee: Box::new(callee),
-            arguments: args,
-        })
+    pub fn create_call(callee: Expression, args: Vec<Expression>, span: Span) -> Expression {
+        Expression::Call(WithSpan(
+            Call {
+                callee: Box::new(callee),
+                arguments: args,
+            },
+            span,
+        ))
     }
 
     pub fn create_index(lhs: Expression, index: Expression, span: Span) -> Expression {
@@ -193,13 +202,17 @@ impl Expression {
         params: Vec<Identifier>,
         is_static: bool,
         body: Expression,
+        span: Span,
     ) -> Expression {
-        Expression::Function(Function {
-            name,
-            params,
-            body: Box::new(body),
-            is_static,
-        })
+        Expression::Function(WithSpan(
+            Function {
+                name,
+                params,
+                body: Box::new(body),
+                is_static,
+            },
+            span,
+        ))
     }
 
     pub fn create_if(
@@ -219,16 +232,24 @@ impl Expression {
         })
     }
 
-    pub fn create_logic(lhs: Expression, op: LogicOperation, rhs: Expression) -> Expression {
-        Expression::Logic(Logic {
-            lhs: Box::new(lhs),
-            op,
-            rhs: Box::new(rhs),
-        })
+    pub fn create_logic(
+        lhs: Expression,
+        op: LogicOperation,
+        rhs: Expression,
+        span: Span,
+    ) -> Expression {
+        Expression::Logic(WithSpan(
+            Logic {
+                lhs: Box::new(lhs),
+                op,
+                rhs: Box::new(rhs),
+            },
+            span,
+        ))
     }
 
-    pub fn create_block(exprs: Vec<Expression>) -> Expression {
-        Expression::Block(Block { exprs })
+    pub fn create_block(exprs: Vec<Expression>, span: Span) -> Expression {
+        Expression::Block(WithSpan(Block { exprs }, span))
     }
 
     pub fn create_return(value: Option<Expression>, span: Range<usize>) -> Expression {
@@ -250,19 +271,24 @@ impl Expression {
         name: Identifier,
         fields: Vec<Identifier>,
         methods: Vec<Expression>,
+        span: Span,
     ) -> Expression {
-        Expression::DataClass(DataClass {
-            fields,
-            name,
-            methods,
-        })
+        Expression::DataClass(WithSpan(
+            DataClass {
+                fields,
+                name,
+                methods,
+            },
+            span,
+        ))
     }
 
     pub fn create_data_class_instance(
         name: Identifier,
         fields: Vec<DataClassInstanceField>,
+        span: Span,
     ) -> Expression {
-        Expression::DataClassInstance(DataClassInstance { name, fields })
+        Expression::DataClassInstance(WithSpan(DataClassInstance { name, fields }, span))
     }
 
     pub fn create_self(name: String) -> Expression {

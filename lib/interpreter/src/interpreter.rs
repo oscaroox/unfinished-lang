@@ -84,7 +84,7 @@ impl Interpreter {
         };
 
         let res = Value::Unit;
-        for expr in &block.exprs {
+        for expr in &block.0.exprs {
             match self.expression(expr)? {
                 Value::ReturnVal(v) | Value::ImplicitReturnVal(v) => return Ok(*v),
                 _ => {}
@@ -108,24 +108,24 @@ impl Interpreter {
 
     fn expression(&mut self, expression: &Expression) -> InterpreterResult {
         match expression {
-            Expression::Let(expr) => self.eval_let_expression(expr),
-            Expression::BinOp(expr) => self.eval_binop(expr),
-            Expression::Literal(expr) => self.eval_literal(expr),
-            Expression::Assign(expr) => self.eval_assignment(expr),
-            Expression::LetRef(expr) => self.eval_let_reference(expr),
-            Expression::UnaryOp(expr) => self.eval_unaryop(expr),
-            Expression::Grouping(expr) => self.expression(&expr.expr),
-            Expression::Logic(expr) => self.eval_logic_expression(expr),
-            Expression::Call(expr) => self.eval_call(expr),
-            Expression::Function(expr) => self.eval_function(expr),
-            Expression::Block(expr) => self.eval_block(expr),
+            Expression::Let(expr) => self.eval_let_expression(&expr.0),
+            Expression::BinOp(expr) => self.eval_binop(&expr.0),
+            Expression::Literal(expr) => self.eval_literal(&expr.0),
+            Expression::Assign(expr) => self.eval_assignment(&expr.0),
+            Expression::LetRef(expr) => self.eval_let_reference(&expr.0),
+            Expression::UnaryOp(expr) => self.eval_unaryop(&expr.0),
+            Expression::Grouping(expr) => self.expression(&expr.0.expr),
+            Expression::Logic(expr) => self.eval_logic_expression(&expr.0),
+            Expression::Call(expr) => self.eval_call(&expr.0),
+            Expression::Function(expr) => self.eval_function(&expr.0),
+            Expression::Block(expr) => self.eval_block(&expr.0),
             Expression::If(expr) => self.eval_if_conditional(expr),
             Expression::Index(expr) => self.eval_index(expr),
             Expression::SetIndex(expr) => self.eval_set_index(expr),
             Expression::Return(expr) => self.eval_return(expr),
             Expression::ImplicitReturn(expr) => self.eval_implicit_return(expr),
-            Expression::DataClass(expr) => self.eval_data_class(expr),
-            Expression::DataClassInstance(expr) => self.eval_data_class_instance(expr),
+            Expression::DataClass(expr) => self.eval_data_class(&expr.0),
+            Expression::DataClassInstance(expr) => self.eval_data_class_instance(&expr.0),
             Expression::GetProperty(expr) => self.eval_get_property(expr),
             Expression::SetProperty(expr) => self.eval_set_property(expr),
             Expression::SelfExpr(expr) => self.eval_self_expr(expr),
@@ -135,9 +135,7 @@ impl Interpreter {
         }
     }
 
-    fn eval_let_expression(&mut self, expr: &WithSpan<LetExpr>) -> InterpreterResult {
-        let expr = &expr.0;
-
+    fn eval_let_expression(&mut self, expr: &LetExpr) -> InterpreterResult {
         let name = expr.name.value.to_string();
         let val = match &expr.value {
             Some(expr) => self.expression(expr)?,
@@ -295,12 +293,12 @@ impl Interpreter {
             match method {
                 Expression::Function(fun) => match self.expression(method)? {
                     Value::Function(value_fun) => {
-                        if fun.is_static {
+                        if fun.0.is_static {
                             static_methods
-                                .insert(fun.name.as_ref().unwrap().to_string(), value_fun);
+                                .insert(fun.0.name.as_ref().unwrap().to_string(), value_fun);
                         } else {
                             instance_methods
-                                .insert(fun.name.as_ref().unwrap().to_string(), value_fun);
+                                .insert(fun.0.name.as_ref().unwrap().to_string(), value_fun);
                         }
                     }
                     _ => unreachable!(),
@@ -510,8 +508,8 @@ impl Interpreter {
         }
     }
 
-    fn eval_literal(&mut self, lit: &WithSpan<Literal>) -> InterpreterResult {
-        Ok(match &lit.0 {
+    fn eval_literal(&mut self, lit: &Literal) -> InterpreterResult {
+        Ok(match &lit {
             Literal::Int(v) => Value::Int(*v),
             Literal::Float(v) => Value::Float(*v),
             Literal::Bool(v) => Value::Bool(*v),
@@ -527,9 +525,9 @@ impl Interpreter {
         })
     }
 
-    fn eval_assignment(&mut self, assign: &WithSpan<Assign>) -> InterpreterResult {
-        let name = assign.0.name.value.clone();
-        let val = self.expression(&assign.0.rhs)?;
+    fn eval_assignment(&mut self, assign: &Assign) -> InterpreterResult {
+        let name = assign.name.value.clone();
+        let val = self.expression(&assign.rhs)?;
         match self.env.borrow_mut().assign(name.to_string(), val) {
             Some(val) => Ok(val),
             None => panic!("Assignment to unknown variable: {}", name),
@@ -552,11 +550,11 @@ impl Interpreter {
         Ok(res)
     }
 
-    fn eval_binop(&mut self, binop: &WithSpan<BinOp>) -> InterpreterResult {
-        let left = self.expression(&binop.0.left)?;
-        let right = self.expression(&binop.0.right)?;
+    fn eval_binop(&mut self, binop: &BinOp) -> InterpreterResult {
+        let left = self.expression(&binop.left)?;
+        let right = self.expression(&binop.right)?;
 
-        let res = match (&left, &binop.0.op, &right) {
+        let res = match (&left, &binop.op, &right) {
             // integer binop
             (Value::Int(n1), BinaryOperation::Add, Value::Int(n2)) => Value::Int(n1 + n2),
             (Value::Int(n1), BinaryOperation::Substract, Value::Int(n2)) => Value::Int(n1 - n2),

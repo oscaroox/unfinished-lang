@@ -105,11 +105,11 @@ impl Analyzer {
             Expression::Call(_) => todo!(),
             Expression::Function(expr) => {
                 self.function_scopes.push(FunctionScope::Function);
-                self.expression(&expr.body)?;
+                self.expression(&expr.0.body)?;
                 self.function_scopes.pop();
             }
             Expression::DataClass(expr) => {
-                for method in &expr.methods {
+                for method in &expr.0.methods {
                     self.function_scopes.push(FunctionScope::Method);
                     self.expression(method)?;
                     self.function_scopes.pop();
@@ -117,7 +117,7 @@ impl Analyzer {
             }
             Expression::DataClassInstance(_) => todo!(),
             Expression::Block(expr) => {
-                for e in &expr.exprs {
+                for e in &expr.0.exprs {
                     self.expression(e)?
                 }
             }
