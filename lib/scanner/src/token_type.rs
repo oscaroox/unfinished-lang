@@ -5,6 +5,14 @@ pub enum TokenType {
     FloatConst,
     StringConst,
 
+    // types
+    Int,
+    Float,
+    String,
+    Bool,
+    Unit,
+    FunType,
+
     // keywords
     Let,
     Fun,
@@ -70,6 +78,14 @@ impl std::fmt::Display for TokenType {
             TokenType::IntConst => write!(f, "INTCONST"),
             TokenType::FloatConst => write!(f, "FLOATCONST"),
             TokenType::StringConst => write!(f, "STRINGCONST"),
+
+            TokenType::Int => write!(f, "int"),
+            TokenType::Float => write!(f, "float"),
+            TokenType::String => write!(f, "string"),
+            TokenType::Bool => write!(f, "bool"),
+            TokenType::Unit => write!(f, "unit"),
+            TokenType::FunType => write!(f, "Fun"),
+
             TokenType::Let => write!(f, "let"),
             TokenType::Fun => write!(f, "fun"),
             TokenType::If => write!(f, "if"),

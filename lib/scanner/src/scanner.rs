@@ -158,6 +158,13 @@ impl Scanner {
             "break" => Token::break_token(label),
             "continue" => Token::continue_token(label),
             "in" => Token::in_token(label),
+
+            "int" => Token::int(label),
+            "float" => Token::float(label),
+            "bool" => Token::bool(label),
+            "string" => Token::string(label),
+            "unit" => Token::unit(label),
+            "Fun" => Token::fun(label),
             _ => Token::identifier(value, label),
         }
     }
@@ -733,6 +740,24 @@ this_is_a_identifier";
                 (TokenType::Break, None),
                 (TokenType::Continue, None),
                 (TokenType::In, None),
+                (TokenType::EOF, None),
+            ],
+        );
+    }
+
+    #[test]
+    fn scan_types() {
+        test_scan(
+            "
+            int float string bool unit Fun
+            ",
+            vec![
+                (TokenType::Int, None),
+                (TokenType::Float, None),
+                (TokenType::String, None),
+                (TokenType::Bool, None),
+                (TokenType::Unit, None),
+                (TokenType::Fun, None),
                 (TokenType::EOF, None),
             ],
         );

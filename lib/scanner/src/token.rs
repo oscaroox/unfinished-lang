@@ -44,6 +44,13 @@ impl Token {
     impl_value_token!(float_const, FloatConst);
     impl_value_token!(string_const, StringConst);
 
+    impl_token!(int, Int);
+    impl_token!(float, Float);
+    impl_token!(string, String);
+    impl_token!(bool, Bool);
+    impl_token!(unit, Unit);
+    impl_token!(fun, Fun);
+
     impl_value_token!(illegal, Illegal);
     impl_value_token!(bad_token, BadToken);
 
