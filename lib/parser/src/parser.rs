@@ -1,7 +1,7 @@
 use crate::ParserError;
 use ast::{
-    BinaryOperation, DataStructInstanceField, Expression, Identifier, Literal, LogicOperation,
-    Program, UnaryOperation,
+    BinaryOperation, DataStructInstanceField, EType, Expression, Identifier, Literal,
+    LogicOperation, Program, Type, UnaryOperation,
 };
 use scanner::{Scanner, ScannerMode, Token, TokenType, TokenWithSpan};
 use span_util::Span;
@@ -168,9 +168,50 @@ impl Parser {
         self.assignment()
     }
 
+    fn parse_type(&mut self) -> Result<Type, ParserError> {
+        let token = self.curr_token.clone();
+        if self.matches(vec![
+            TokenType::Int,
+            TokenType::Float,
+            TokenType::String,
+            TokenType::Bool,
+            TokenType::Identifier,
+        ]) {
+            let mut is_array = false;
+            let etype = match &token.0.token_type {
+                TokenType::Int => EType::Int,
+                TokenType::Float => EType::Float,
+                TokenType::String => EType::String,
+                TokenType::Bool => EType::Bool,
+                TokenType::Identifier => EType::User(token.0.value.to_string()),
+                _ => unreachable!(),
+            };
+
+            if self.matches(vec![TokenType::LeftBracket]) {
+                self.eat(TokenType::RightBracket, "Expected ']'")?;
+                is_array = true;
+            }
+
+            return Ok(Type::new(etype, is_array));
+        }
+
+        if self.matches(vec![TokenType::Unit]) {
+            return Err(ParserError::InvalidUseOfUnitType(token));
+        }
+
+        Err(ParserError::InvalidType(token))
+    }
+
     fn let_expression(&mut self) -> ParserResult {
         let start_span: Span = self.prev_token.1.clone();
         let identifier = self.eat(TokenType::Identifier, "Expected identifier")?;
+
+        let has_colon = self.eat_optional(TokenType::Colon);
+
+        let itype = match has_colon {
+            Some(_) => Some(self.parse_type()?),
+            None => None,
+        };
 
         let mut init = None;
 
@@ -205,7 +246,7 @@ impl Parser {
         let span: Span = start_span.extend(self.curr_token.1.clone());
 
         Ok(Expression::create_let(
-            Identifier::new(identifier.value),
+            Identifier::with_ident_type(identifier.value, itype),
             init,
             span,
         ))
@@ -960,8 +1001,8 @@ mod test {
 
     use super::Parser;
     use ast::{
-        BinaryOperation, DataStructInstanceField, Expression, Identifier, Literal, LogicOperation,
-        Program, UnaryOperation,
+        BinaryOperation, DataStructInstanceField, EType, Expression, Identifier, Literal,
+        LogicOperation, Program, Type, UnaryOperation,
     };
     use scanner::{Scanner, TokenType};
     use span_util::Span;
@@ -994,7 +1035,11 @@ mod test {
     }
 
     fn create_let(id: &str, value: Option<Expression>) -> Expression {
-        Expression::create_let(ident(id), value, (0..0).into())
+        Expression::create_let(ident(id), value, Span::fake())
+    }
+
+    fn create_let_type(id: Identifier, value: Option<Expression>) -> Expression {
+        Expression::create_let(id, value, Span::fake())
     }
 
     fn int(val: i64) -> Expression {
@@ -1023,6 +1068,14 @@ mod test {
 
     fn ident(val: &str) -> Identifier {
         Identifier::new(val.to_string())
+    }
+
+    fn create_type(etype: EType, is_array: bool) -> Type {
+        Type::new(etype, is_array)
+    }
+
+    fn ident_type(val: &str, value_type: Type) -> Identifier {
+        Identifier::with_ident_type(val.into(), Some(value_type))
     }
 
     fn ident_self() -> Identifier {
@@ -1144,6 +1197,83 @@ mod test {
         body: Expression,
     ) -> Expression {
         Expression::create_function(name, params, is_static, body, Span::fake())
+    }
+
+    #[test]
+    fn parse_type_let_expr() {
+        parse(
+            r#"
+        let cents: int = 2;
+        let pi: float = 3.14;
+        let name: string = "test";
+        let exists: bool = true;
+        "#,
+            vec![
+                create_let_type(
+                    ident_type("cents", create_type(EType::Int, false)),
+                    Some(int(2)),
+                ),
+                create_let_type(
+                    ident_type("pi", create_type(EType::Float, false)),
+                    Some(float(3.14)),
+                ),
+                create_let_type(
+                    ident_type("name", create_type(EType::String, false)),
+                    Some(string_lit("test")),
+                ),
+                create_let_type(
+                    ident_type("exists", create_type(EType::Bool, false)),
+                    Some(bool_lit(true)),
+                ),
+            ],
+        );
+
+        parse(
+            r#"
+        let cents: int[] = [1];
+        let pi: float[] = [1.0];
+        let name: string[] = ["test"];
+        let exists: bool[] = [true];
+        "#,
+            vec![
+                create_let_type(
+                    ident_type("cents", create_type(EType::Int, true)),
+                    Some(array(vec![int(1)])),
+                ),
+                create_let_type(
+                    ident_type("pi", create_type(EType::Float, true)),
+                    Some(array(vec![float(1.0)])),
+                ),
+                create_let_type(
+                    ident_type("name", create_type(EType::String, true)),
+                    Some(array(vec![string_lit("test")])),
+                ),
+                create_let_type(
+                    ident_type("exists", create_type(EType::Bool, true)),
+                    Some(array(vec![bool_lit(true)])),
+                ),
+            ],
+        );
+
+        parse(
+            r#"
+        let joe: Person = Person {};
+        let family: Person[] = [Person{}];
+        "#,
+            vec![
+                create_let_type(
+                    ident_type("joe", create_type(EType::User("Person".into()), false)),
+                    Some(create_data_struct_instance("Person".into(), vec![])),
+                ),
+                create_let_type(
+                    ident_type("family", create_type(EType::User("Person".into()), true)),
+                    Some(array(vec![create_data_struct_instance(
+                        "Person".into(),
+                        vec![],
+                    )])),
+                ),
+            ],
+        );
     }
 
     #[test]

@@ -24,6 +24,7 @@ mod return_expr;
 mod self_expr;
 mod set_index;
 mod set_property;
+mod types;
 mod unaryop;
 
 pub use assign::*;
@@ -52,4 +53,5 @@ pub use return_expr::*;
 pub use self_expr::*;
 pub use set_index::*;
 pub use set_property::*;
+pub use types::*;
 pub use unaryop::*;

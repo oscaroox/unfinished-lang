@@ -27,6 +27,12 @@ pub enum ParserError {
 
     #[error("Invalid unary operation")]
     InvalidUnaryOperation(TokenWithSpan),
+
+    #[error("Invalid use of 'unit' type, cannot use 'unit' as type")]
+    InvalidUseOfUnitType(TokenWithSpan),
+
+    #[error("Invalid type '{0}'")]
+    InvalidType(TokenWithSpan),
 }
 
 impl ParserError {
@@ -40,6 +46,8 @@ impl ParserError {
             | ParserError::UnterminatedFunctionCall(tok)
             | ParserError::UnterminatedInterpolation(tok)
             | ParserError::InvalidUnaryOperation(tok)
+            | ParserError::InvalidUseOfUnitType(tok)
+            | ParserError::InvalidType(tok)
             | ParserError::UnterminatedString(tok) => {
                 let label = Label::new(tok.1.to_range());
                 Report::build(ReportKind::Error, (), 99)
