@@ -107,8 +107,8 @@ fn builtin_len(args: Vec<Value>) -> BuiltinResult {
 }
 
 /**
- * Clones a Data class isntance or Array
- * Data classes and Arrays are references e.g
+ * Clones a Data struct instance or Array
+ * Data structs and Arrays are references e.g
  *
  * let arr1 = [];
  * let arr2 = arr1;
@@ -131,7 +131,7 @@ fn builtin_clone(args: Vec<Value>) -> BuiltinResult {
             let a = arr.borrow();
             Ok(Value::Array(Rc::new(RefCell::new(a.clone()))))
         }
-        _ => panic!("can only clone data classes"),
+        _ => panic!("can only clone data structs"),
     }
 }
 

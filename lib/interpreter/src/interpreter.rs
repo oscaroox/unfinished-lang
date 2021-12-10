@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, convert::TryInto, fmt::Debug, rc:
 
 use crate::{builtin::get_builtins, environment::Environment, Value};
 use ast::{
-    Assign, BinOp, BinaryOperation, Block, Call, DataClass, Expression, Function, GetProperty,
+    Assign, BinOp, BinaryOperation, Block, Call, DataStruct, Expression, Function, GetProperty,
     IfConditional, ImplicitReturn, Index, LetExpr, Literal, Logic, LogicOperation, LoopExpr,
     Program, ReturnExpr, SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation,
 };
@@ -123,8 +123,8 @@ impl Interpreter {
             Expression::SetIndex(expr) => self.eval_set_index(&expr.0),
             Expression::Return(expr) => self.eval_return(&expr.0),
             Expression::ImplicitReturn(expr) => self.eval_implicit_return(&expr.0),
-            Expression::DataClass(expr) => self.eval_data_class(&expr.0),
-            Expression::DataClassInstance(expr) => self.eval_data_class_instance(&expr.0),
+            Expression::DataStruct(expr) => self.eval_data_struct(&expr.0),
+            Expression::DataStructInstance(expr) => self.eval_data_struct_instance(&expr.0),
             Expression::GetProperty(expr) => self.eval_get_property(&expr.0),
             Expression::SetProperty(expr) => self.eval_set_property(&expr.0),
             Expression::SelfExpr(expr) => self.eval_self_expr(&expr.0),
@@ -195,10 +195,7 @@ impl Interpreter {
 
                 Ok(value.clone())
             }
-            _ => panic!(
-                "Can only set properties on data class instances got {}",
-                obj
-            ),
+            _ => panic!("Can only set properties on data instances got {}", obj),
         }
     }
 
@@ -239,56 +236,56 @@ impl Interpreter {
         }
     }
 
-    fn eval_data_class_instance(
+    fn eval_data_struct_instance(
         &mut self,
-        data_class_instance: &ast::DataClassInstance,
+        data_struct_instance: &ast::DataStructInstance,
     ) -> InterpreterResult {
-        let data_class_identifier = data_class_instance.name.clone();
-        let data_class = match self.env.borrow().get(&data_class_identifier.value) {
+        let data_struct_identifier = data_struct_instance.name.clone();
+        let data_struct = match self.env.borrow().get(&data_struct_identifier.value) {
             Some(val) => match val {
                 Value::DataClass(class) => class.clone(),
-                _ => panic!("Cannot only instantiate data classes got {}", val),
+                _ => panic!("Cannot only instantiate data struct got {}", val),
             },
-            None => panic!("Unkown data class {}", data_class_identifier),
+            None => panic!("Unkown data struct {}", data_struct_identifier),
         };
 
         let mut eval_fields = HashMap::new();
 
-        //  check if the instance fields are actually in the Data class e.g
+        //  check if the instance fields are actually in the Data struct e.g
         //  data Person { name };
         //  Person { name: "test", age: 2 } // Error unknown field age
-        for field in &data_class_instance.fields {
-            if data_class.fields.contains(&field.name) {
+        for field in &data_struct_instance.fields {
+            if data_struct.fields.contains(&field.name) {
                 let val = self.expression(&field.value)?;
                 eval_fields.insert(field.name.value.to_string(), val);
             } else {
                 panic!(
-                    "Unknown field {} provided to data class {}",
-                    field.name, data_class_identifier
+                    "Unknown field {} provided to data struct {}",
+                    field.name, data_struct_identifier
                 )
             }
         }
 
         // fill in the missing fields with null value
-        for field in &data_class.fields {
+        for field in &data_struct.fields {
             if !eval_fields.contains_key(&field.value) {
                 eval_fields.insert(field.value.to_string(), Value::Null);
             }
         }
 
-        Ok(Value::data_class_instance(
-            data_class_identifier,
-            data_class.clone(),
+        Ok(Value::data_struct_instance(
+            data_struct_identifier,
+            data_struct.clone(),
             eval_fields,
-            data_class.fields.clone(),
+            data_struct.fields.clone(),
         ))
     }
 
-    fn eval_data_class(&mut self, data_class: &DataClass) -> InterpreterResult {
+    fn eval_data_struct(&mut self, data_struct: &DataStruct) -> InterpreterResult {
         let mut static_methods = HashMap::new();
         let mut instance_methods = HashMap::new();
 
-        for method in &data_class.methods {
+        for method in &data_struct.methods {
             match method {
                 Expression::Function(fun) => match self.expression(method)? {
                     Value::Function(value_fun) => {
@@ -306,16 +303,16 @@ impl Interpreter {
             }
         }
 
-        let value = Value::data_class(
-            data_class.name.to_owned(),
-            data_class.fields.clone(),
+        let value = Value::data_struct(
+            data_struct.name.to_owned(),
+            data_struct.fields.clone(),
             static_methods,
             instance_methods,
         );
 
         self.env
             .borrow_mut()
-            .define(data_class.name.value.to_string(), value.clone());
+            .define(data_struct.name.value.to_string(), value.clone());
 
         Ok(value)
     }
@@ -380,7 +377,7 @@ impl Interpreter {
                 let mut env = Environment::with_outer(fun.closure.clone());
                 let mut params = vec![];
 
-                // TODO mark data class functions as methods
+                // TODO mark data struct functions as methods
                 if fun.params.len() > 0 {
                     if fun.params[0].is_self() {
                         params = fun.params[1..].to_vec();
@@ -586,7 +583,7 @@ impl Interpreter {
 mod test {
     use std::collections::HashMap;
 
-    use crate::{DataClass, FunctionValue, Interpreter, Value};
+    use crate::{DataStruct, FunctionValue, Interpreter, Value};
     use ast::Identifier;
     use parser::Parser;
     use scanner::Scanner;
@@ -598,7 +595,7 @@ mod test {
         let (exprs, errors) = parser.parse();
 
         if errors.len() > 0 {
-            errors.into_iter().for_each(|mut e| println!("{}", e));
+            errors.into_iter().for_each(|e| println!("{}", e));
             panic!("parser errors")
         }
 
@@ -613,13 +610,13 @@ mod test {
         Identifier::new(name.to_string())
     }
 
-    fn data_class(
+    fn data_struct(
         name: &str,
         fields: Vec<Identifier>,
         static_methods: HashMap<String, FunctionValue>,
         instance_methods: HashMap<String, FunctionValue>,
-    ) -> DataClass {
-        DataClass {
+    ) -> DataStruct {
+        DataStruct {
             name: Identifier::new(name.to_string()),
             fields,
             static_methods,
@@ -1068,10 +1065,10 @@ mod test {
     }
 
     #[test]
-    pub fn eval_data_class() {
+    pub fn eval_data_struct() {
         run(
             "data Person {};",
-            Value::data_class(ident("Person"), vec![], HashMap::new(), HashMap::new()),
+            Value::data_struct(ident("Person"), vec![], HashMap::new(), HashMap::new()),
         );
 
         run(
@@ -1080,7 +1077,7 @@ mod test {
                 last_name,
                 age,
             };",
-            Value::data_class(
+            Value::data_struct(
                 ident("Person"),
                 vec![ident("first_name"), ident("last_name"), ident("age")],
                 HashMap::new(),
@@ -1090,7 +1087,7 @@ mod test {
     }
 
     #[test]
-    pub fn eval_data_class_instance() {
+    pub fn eval_data_struct_instance() {
         let mut map = HashMap::new();
         map.insert(
             String::from("first_name"),
@@ -1112,9 +1109,9 @@ mod test {
             let person = Person { first_name: "John", last_name: "Doe", age: 40 };
             person;
             "#,
-            Value::data_class_instance(
+            Value::data_struct_instance(
                 ident("Person"),
-                data_class(
+                data_struct(
                     "Person",
                     field_idents.clone(),
                     HashMap::new(),
@@ -1135,9 +1132,9 @@ mod test {
             let person = Person { first_name: "John", last_name: "Doe" };
             person;
             "#,
-            Value::data_class_instance(
+            Value::data_struct_instance(
                 ident("Person"),
-                data_class(
+                data_struct(
                     "Person",
                     field_idents.clone(),
                     HashMap::new(),
@@ -1160,9 +1157,9 @@ mod test {
             let person = Person {};
             person;
             "#,
-            Value::data_class_instance(
+            Value::data_struct_instance(
                 ident("Person"),
-                data_class(
+                data_struct(
                     "Person",
                     field_idents.clone(),
                     HashMap::new(),
@@ -1235,7 +1232,7 @@ mod test {
     }
 
     #[test]
-    pub fn eval_shorthand_data_class_instantiate() {
+    pub fn eval_shorthand_data_struct_instantiate() {
         run(
             r#"
             data Person {
@@ -1254,7 +1251,7 @@ mod test {
     }
 
     #[test]
-    pub fn eval_data_class_static_method() {
+    pub fn eval_data_struct_static_method() {
         run(
             "data Person {
                 id
@@ -1271,7 +1268,7 @@ mod test {
     }
 
     #[test]
-    pub fn eval_data_class_instance_method() {
+    pub fn eval_data_struct_instance_method() {
         run(
             "data Person {
                 id
@@ -1290,7 +1287,7 @@ mod test {
             Value::Int(22),
         );
 
-        // should allow a method with the same name as a data class field to be called
+        // should allow a method with the same name as a data struct field to be called
         run(
             "data Person {
                 id
@@ -1311,7 +1308,7 @@ mod test {
     }
 
     #[test]
-    pub fn eval_data_class_instance_set_method() {
+    pub fn eval_data_struct_instance_set_method() {
         run(
             "data Person {
                 id

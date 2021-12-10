@@ -1,6 +1,6 @@
 use crate::ParserError;
 use ast::{
-    BinaryOperation, DataClassInstanceField, Expression, Identifier, Literal, LogicOperation,
+    BinaryOperation, DataStructInstanceField, Expression, Identifier, Literal, LogicOperation,
     Program, UnaryOperation,
 };
 use scanner::{Scanner, ScannerMode, Token, TokenType, TokenWithSpan};
@@ -158,7 +158,7 @@ impl Parser {
         } else if self.matches(vec![TokenType::Return]) {
             return self.return_expression();
         } else if self.matches(vec![TokenType::Data]) {
-            return self.data_class_expression();
+            return self.data_struct_expression();
         } else if self.matches(vec![TokenType::Loop]) {
             return self.loop_expression();
         } else if self.matches(vec![TokenType::Break, TokenType::Continue]) {
@@ -257,7 +257,7 @@ impl Parser {
         Ok(Expression::create_loop(condition, body, None, span))
     }
 
-    fn data_class_instantiate(&mut self) -> ParserResult {
+    fn data_struct_instantiate(&mut self) -> ParserResult {
         let identifier_span = self.curr_token.1.clone();
         let ident = self.eat(TokenType::Identifier, "Expected identifier")?;
         self.eat(TokenType::LeftBrace, "Expected '{'")?;
@@ -273,7 +273,7 @@ impl Parser {
                     || self.curr_token.0.token_type == TokenType::RightBrace
                 {
                     let ident = Identifier::new(id.value.to_string());
-                    fields.push(DataClassInstanceField::new(
+                    fields.push(DataStructInstanceField::new(
                         ident.clone(),
                         Expression::create_let_ref(ident, id_span),
                     ));
@@ -286,7 +286,7 @@ impl Parser {
                 self.eat(TokenType::Colon, "Expected ':'")?;
                 let expr = self.expression()?;
                 let field =
-                    DataClassInstanceField::new(Identifier::new(id.value.to_string()), expr);
+                    DataStructInstanceField::new(Identifier::new(id.value.to_string()), expr);
                 fields.push(field);
 
                 if !self.matches(vec![TokenType::Comma])
@@ -298,14 +298,14 @@ impl Parser {
         }
 
         self.eat(TokenType::RightBrace, "Expected '}'")?;
-        Ok(Expression::create_data_class_instance(
+        Ok(Expression::create_data_struct_instance(
             Identifier::new(ident.value.to_string()),
             fields,
             identifier_span,
         ))
     }
 
-    fn data_class_expression(&mut self) -> ParserResult {
+    fn data_struct_expression(&mut self) -> ParserResult {
         let ident_span = self.curr_token.1.clone();
         let ident = self.eat(TokenType::Identifier, "Expected identifier")?;
         self.eat(TokenType::LeftBrace, "Expected '{'")?;
@@ -341,7 +341,7 @@ impl Parser {
             self.eat(TokenType::RightBrace, "Expected '}'")?;
         }
 
-        Ok(Expression::create_data_class(
+        Ok(Expression::create_data_struct(
             Identifier::new(ident.value.to_string()),
             fields,
             methods,
@@ -785,18 +785,18 @@ impl Parser {
 
         if self.check(TokenType::Identifier)
             && self.check_peek(TokenType::LeftBrace)
-            // TODO data class instantiation has the same syntax
+            // TODO data struct instantiation has the same syntax
             //  When using the In and If expression
             //  e.g if value {}
-            //        ^^^^^^^^ after the If the parser will try to parse the expression after if as a data class
+            //        ^^^^^^^^ after the If the parser will try to parse the expression after if as a data struct
             //  possible solution is the one below checking if the the previous token is one of the keywords: If and In
             //  there should be a better solution: what if we implement pattern matching / destructering
-            //  let Person { name } = person; // will be parsed as data class instantiation
+            //  let Person { name } = person; // will be parsed as data struct instantiation
             //  match person {
             //      Person { name } => name,
             //  }
             //  In the match expression the parser would try to parse the first match arm as
-            //  a data class instantation
+            //  a data struct instantation
             //
             //  Possible solution is to use the :: token for instantiation
             //  e.g: Person :: { id: 1 };
@@ -804,7 +804,7 @@ impl Parser {
             && self.prev_token.0.token_type != TokenType::If
             && self.prev_token.0.token_type != TokenType::Loop
         {
-            return self.data_class_instantiate();
+            return self.data_struct_instantiate();
         }
 
         if self.matches(vec![TokenType::Identifier]) {
@@ -960,7 +960,7 @@ mod test {
 
     use super::Parser;
     use ast::{
-        BinaryOperation, DataClassInstanceField, Expression, Identifier, Literal, LogicOperation,
+        BinaryOperation, DataStructInstanceField, Expression, Identifier, Literal, LogicOperation,
         Program, UnaryOperation,
     };
     use scanner::{Scanner, TokenType};
@@ -1049,8 +1049,8 @@ mod test {
         Expression::create_implicit_return(val, Span::fake())
     }
 
-    fn create_data_class(name: &str, fields: Vec<&str>, methods: Vec<Expression>) -> Expression {
-        Expression::create_data_class(
+    fn create_data_struct(name: &str, fields: Vec<&str>, methods: Vec<Expression>) -> Expression {
+        Expression::create_data_struct(
             Identifier::new(name.to_string()),
             fields
                 .iter()
@@ -1061,16 +1061,16 @@ mod test {
         )
     }
 
-    fn create_data_class_instance(name: &str, fields: Vec<DataClassInstanceField>) -> Expression {
-        Expression::create_data_class_instance(
+    fn create_data_struct_instance(name: &str, fields: Vec<DataStructInstanceField>) -> Expression {
+        Expression::create_data_struct_instance(
             Identifier::new(name.to_string()),
             fields,
             Span::fake(),
         )
     }
 
-    fn data_class_instance_field(name: &str, value: Expression) -> DataClassInstanceField {
-        DataClassInstanceField::new(Identifier::new(name.to_string()), value)
+    fn data_struct_instance_field(name: &str, value: Expression) -> DataStructInstanceField {
+        DataStructInstanceField::new(Identifier::new(name.to_string()), value)
     }
 
     fn create_assign(name: Identifier, rhs: Expression) -> Expression {
@@ -1260,7 +1260,7 @@ mod test {
             vec![create_loop(
                 create_let("i", None),
                 create_block(vec![]),
-                Some(create_grouping(create_data_class_instance(
+                Some(create_grouping(create_data_struct_instance(
                     "Person",
                     vec![],
                 ))),
@@ -1727,12 +1727,12 @@ mod test {
     }
 
     #[test]
-    fn parse_data_class_expr() {
+    fn parse_data_struct_expr() {
         parse(
             "
             data Person {};
         ",
-            vec![create_data_class("Person", vec![], vec![])],
+            vec![create_data_struct("Person", vec![], vec![])],
         );
 
         parse(
@@ -1741,7 +1741,7 @@ mod test {
                 first_name,
             };
         ",
-            vec![create_data_class("Person", vec!["first_name"], vec![])],
+            vec![create_data_struct("Person", vec!["first_name"], vec![])],
         );
 
         parse(
@@ -1752,7 +1752,7 @@ mod test {
                 age
             };
         ",
-            vec![create_data_class(
+            vec![create_data_struct(
                 "Person",
                 vec!["first_name", "last_name", "age"],
                 vec![],
@@ -1767,7 +1767,7 @@ mod test {
                 age,
             };
         ",
-            vec![create_data_class(
+            vec![create_data_struct(
                 "Person",
                 vec!["first_name", "last_name", "age"],
                 vec![],
@@ -1776,7 +1776,7 @@ mod test {
     }
 
     #[test]
-    fn parse_data_class_methods_expr() {
+    fn parse_data_struct_methods_expr() {
         parse(
             "
             data Person {
@@ -1790,7 +1790,7 @@ mod test {
                 }
             };
         ",
-            vec![create_data_class(
+            vec![create_data_struct(
                 "Person",
                 vec!["first_name"],
                 vec![
@@ -1810,7 +1810,7 @@ mod test {
     }
 
     #[test]
-    fn parse_data_class_methods_self_expr() {
+    fn parse_data_struct_methods_self_expr() {
         parse(
             "
             data Person {
@@ -1824,7 +1824,7 @@ mod test {
                 }
             };
         ",
-            vec![create_data_class(
+            vec![create_data_struct(
                 "Person",
                 vec!["first_name"],
                 vec![
@@ -1854,15 +1854,15 @@ mod test {
     }
 
     #[test]
-    fn parse_data_class_instantiate_expr() {
+    fn parse_data_struct_instantiate_expr() {
         parse(
             "
             data Person {};
             Person {};
         ",
             vec![
-                create_data_class("Person", vec![], vec![]),
-                create_data_class_instance("Person", vec![]),
+                create_data_struct("Person", vec![], vec![]),
+                create_data_struct_instance("Person", vec![]),
             ],
         );
 
@@ -1872,13 +1872,13 @@ mod test {
             Person { first_name: "john", last_name: "doe", age: 23 };
         "#,
             vec![
-                create_data_class("Person", vec!["first_name", "last_name", "age"], vec![]),
-                create_data_class_instance(
+                create_data_struct("Person", vec!["first_name", "last_name", "age"], vec![]),
+                create_data_struct_instance(
                     "Person",
                     vec![
-                        data_class_instance_field("first_name", string_lit("john")),
-                        data_class_instance_field("last_name", string_lit("doe")),
-                        data_class_instance_field("age", int(23)),
+                        data_struct_instance_field("first_name", string_lit("john")),
+                        data_struct_instance_field("last_name", string_lit("doe")),
+                        data_struct_instance_field("age", int(23)),
                     ],
                 ),
             ],
@@ -1887,7 +1887,10 @@ mod test {
         parse(
             "Person {id: 1}.id;",
             vec![create_get_property(
-                create_data_class_instance("Person", vec![data_class_instance_field("id", int(1))]),
+                create_data_struct_instance(
+                    "Person",
+                    vec![data_struct_instance_field("id", int(1))],
+                ),
                 ident("id"),
                 false,
             )],
@@ -1895,7 +1898,7 @@ mod test {
     }
 
     #[test]
-    fn parse_data_class_instantiate_shorthand_expr() {
+    fn parse_data_struct_instantiate_shorthand_expr() {
         parse(
             r#"
             data Person {
@@ -1914,21 +1917,21 @@ mod test {
             };
         "#,
             vec![
-                create_data_class("Person", vec!["id", "first_name"], vec![]),
+                create_data_struct("Person", vec!["id", "first_name"], vec![]),
                 create_let("id", Some(int(123))),
                 create_let("first_name", Some(string_lit("John"))),
-                create_data_class_instance(
+                create_data_struct_instance(
                     "Person",
                     vec![
-                        data_class_instance_field("id", create_let_ref("id")),
-                        data_class_instance_field("first_name", create_let_ref("first_name")),
+                        data_struct_instance_field("id", create_let_ref("id")),
+                        data_struct_instance_field("first_name", create_let_ref("first_name")),
                     ],
                 ),
-                create_data_class_instance(
+                create_data_struct_instance(
                     "Person",
                     vec![
-                        data_class_instance_field("id", create_let_ref("id")),
-                        data_class_instance_field("first_name", create_let_ref("first_name")),
+                        data_struct_instance_field("id", create_let_ref("id")),
+                        data_struct_instance_field("first_name", create_let_ref("first_name")),
                     ],
                 ),
             ],
@@ -1948,8 +1951,8 @@ mod test {
             p.first_name;
         ",
             vec![
-                create_data_class("Person", vec!["first_name", "last_name", "age"], vec![]),
-                create_let("p", Some(create_data_class_instance("Person", vec![]))),
+                create_data_struct("Person", vec!["first_name", "last_name", "age"], vec![]),
+                create_let("p", Some(create_data_struct_instance("Person", vec![]))),
                 create_get_property(
                     create_let_ref("p"),
                     Identifier::new("first_name".to_string()),
@@ -1972,8 +1975,8 @@ mod test {
             p.age = 1;
         "#,
             vec![
-                create_data_class("Person", vec!["first_name", "last_name", "age"], vec![]),
-                create_let("p", Some(create_data_class_instance("Person", vec![]))),
+                create_data_struct("Person", vec!["first_name", "last_name", "age"], vec![]),
+                create_let("p", Some(create_data_struct_instance("Person", vec![]))),
                 create_set_property(create_let_ref("p"), ident("age"), int(1)),
             ],
         );
@@ -1991,8 +1994,8 @@ mod test {
             p.age /= 1;
         "#,
             vec![
-                create_data_class("Person", vec!["first_name", "last_name", "age"], vec![]),
-                create_let("p", Some(create_data_class_instance("Person", vec![]))),
+                create_data_struct("Person", vec!["first_name", "last_name", "age"], vec![]),
+                create_let("p", Some(create_data_struct_instance("Person", vec![]))),
                 create_set_property(
                     create_let_ref("p"),
                     ident("age"),

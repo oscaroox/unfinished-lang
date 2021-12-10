@@ -1,6 +1,6 @@
 use crate::{
-    Assign, BinOp, BinaryOperation, Block, BreakExpr, Call, ContinueExpr, DataClass,
-    DataClassInstance, DataClassInstanceField, Function, GetProperty, Grouping, Identifier,
+    Assign, BinOp, BinaryOperation, Block, BreakExpr, Call, ContinueExpr, DataStruct,
+    DataStructInstance, DataStructInstanceField, Function, GetProperty, Grouping, Identifier,
     IfConditional, ImplicitReturn, Index, LetExpr, LetRef, Literal, Logic, LogicOperation,
     LoopExpr, ReturnExpr, SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation,
 };
@@ -22,8 +22,8 @@ pub enum Expression {
     Logic(WithSpan<Logic>),
     Call(WithSpan<Call>),
     Function(WithSpan<Function>),
-    DataClass(WithSpan<DataClass>),
-    DataClassInstance(WithSpan<DataClassInstance>),
+    DataStruct(WithSpan<DataStruct>),
+    DataStructInstance(WithSpan<DataStructInstance>),
     Block(WithSpan<Block>),
     If(WithSpan<IfConditional>),
     ImplicitReturn(WithSpan<ImplicitReturn>),
@@ -273,14 +273,14 @@ impl Expression {
         ))
     }
 
-    pub fn create_data_class(
+    pub fn create_data_struct(
         name: Identifier,
         fields: Vec<Identifier>,
         methods: Vec<Expression>,
         span: Span,
     ) -> Expression {
-        Expression::DataClass(WithSpan(
-            DataClass {
+        Expression::DataStruct(WithSpan(
+            DataStruct {
                 fields,
                 name,
                 methods,
@@ -289,12 +289,12 @@ impl Expression {
         ))
     }
 
-    pub fn create_data_class_instance(
+    pub fn create_data_struct_instance(
         name: Identifier,
-        fields: Vec<DataClassInstanceField>,
+        fields: Vec<DataStructInstanceField>,
         span: Span,
     ) -> Expression {
-        Expression::DataClassInstance(WithSpan(DataClassInstance { name, fields }, span))
+        Expression::DataStructInstance(WithSpan(DataStructInstance { name, fields }, span))
     }
 
     pub fn create_self(name: String, span: Span) -> Expression {
@@ -346,8 +346,8 @@ impl Expression {
             Expression::Logic(s) => s.1.clone(),
             Expression::Call(s) => s.1.clone(),
             Expression::Function(s) => s.1.clone(),
-            Expression::DataClass(s) => s.1.clone(),
-            Expression::DataClassInstance(s) => s.1.clone(),
+            Expression::DataStruct(s) => s.1.clone(),
+            Expression::DataStructInstance(s) => s.1.clone(),
             Expression::Block(s) => s.1.clone(),
             Expression::If(s) => s.1.clone(),
             Expression::ImplicitReturn(s) => s.1.clone(),

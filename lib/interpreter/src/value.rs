@@ -13,8 +13,8 @@ pub enum Value {
     Array(Rc<RefCell<Array>>),
     Range(i64, i64),
     Function(FunctionValue),
-    DataClass(DataClass),
-    DataClassInstance(Rc<RefCell<DataClassInstance>>),
+    DataClass(DataStruct),
+    DataClassInstance(Rc<RefCell<DataStructInstance>>),
     NativeFunction(NativeFunction),
     ReturnVal(Box<Value>),
     ImplicitReturnVal(Box<Value>),
@@ -25,18 +25,18 @@ pub enum Value {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct DataClassInstance {
+pub struct DataStructInstance {
     pub name: Identifier,
-    pub data_class: DataClass,
+    pub data_struct: DataStruct,
     pub keys: Vec<Identifier>,
     pub fields: HashMap<String, Value>,
 }
 
-impl DataClassInstance {
+impl DataStructInstance {
     pub fn get(&self, name: String) -> Value {
         match self.fields.get(&name) {
             Some(v) => v.clone(),
-            None => match self.data_class.instance_methods.get(&name) {
+            None => match self.data_struct.instance_methods.get(&name) {
                 Some(v) => Value::Function(v.clone()),
                 None => panic!("Undefined property {}", name),
             },
@@ -44,7 +44,7 @@ impl DataClassInstance {
     }
 
     pub fn get_method(&self, name: String) -> Value {
-        match self.data_class.instance_methods.get(&name) {
+        match self.data_struct.instance_methods.get(&name) {
             Some(v) => Value::Function(v.clone()),
             None => panic!("Undefined method {}", name),
         }
@@ -56,14 +56,14 @@ impl DataClassInstance {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct DataClass {
+pub struct DataStruct {
     pub name: Identifier,
     pub fields: Vec<Identifier>,
     pub static_methods: HashMap<String, FunctionValue>,
     pub instance_methods: HashMap<String, FunctionValue>,
 }
 
-impl DataClass {
+impl DataStruct {
     pub fn get(&self, name: String) -> FunctionValue {
         match self.static_methods.get(&name) {
             Some(v) => v.clone(),
@@ -133,13 +133,13 @@ impl Value {
         Value::ImplicitReturnVal(Box::new(val))
     }
 
-    pub fn data_class(
+    pub fn data_struct(
         name: Identifier,
         fields: Vec<Identifier>,
         static_methods: HashMap<String, FunctionValue>,
         instance_methods: HashMap<String, FunctionValue>,
     ) -> Value {
-        Value::DataClass(DataClass {
+        Value::DataClass(DataStruct {
             name,
             fields,
             static_methods,
@@ -151,15 +151,15 @@ impl Value {
         Value::Array(Rc::new(RefCell::new(Array { values })))
     }
 
-    pub fn data_class_instance(
+    pub fn data_struct_instance(
         name: Identifier,
-        data_class: DataClass,
+        data_struct: DataStruct,
         fields: HashMap<String, Value>,
         keys: Vec<Identifier>,
     ) -> Value {
-        Value::DataClassInstance(Rc::new(RefCell::new(DataClassInstance {
+        Value::DataClassInstance(Rc::new(RefCell::new(DataStructInstance {
             name,
-            data_class,
+            data_struct,
             fields,
             keys,
         })))
@@ -176,8 +176,8 @@ impl Value {
             Value::Array(_) => String::from("array"),
             Value::Range(_, _) => String::from("range"),
             Value::Function(_) => String::from("function"),
-            Value::DataClass(_) => String::from("data_class"),
-            Value::DataClassInstance(_) => String::from("data_class_instance"),
+            Value::DataClass(_) => String::from("data_struct"),
+            Value::DataClassInstance(_) => String::from("data_struct_instance"),
             Value::NativeFunction(_) => String::from("native_function"),
             Value::ReturnVal(_) => String::from("return"),
             Value::ImplicitReturnVal(_) => String::from("implicit_return"),
