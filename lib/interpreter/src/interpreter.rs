@@ -6,7 +6,6 @@ use ast::{
     IfConditional, ImplicitReturn, Index, LetExpr, Literal, Logic, LogicOperation, LoopExpr,
     Program, ReturnExpr, SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation,
 };
-use span_util::WithSpan;
 
 #[derive(Debug)]
 pub enum RuntimeError {}
@@ -599,9 +598,7 @@ mod test {
         let (exprs, errors) = parser.parse();
 
         if errors.len() > 0 {
-            // errors
-            //     .into_iter()
-            //     .for_each(|mut e| println!("{}", e.into_spanned_error().print(&manager)));
+            errors.into_iter().for_each(|mut e| println!("{}", e));
             panic!("parser errors")
         }
 
@@ -672,18 +669,18 @@ mod test {
             Value::array(vec![Value::Int(99), Value::Unit]),
         );
 
-        run(
-            r#"
-            let main = fun(val){
-                if val {
-                    99;
-                };
-                234;
-            };
-            [main(true), main(false)];
-            "#,
-            Value::array(vec![Value::Unit, Value::Unit]),
-        );
+        // run(
+        //     r#"
+        //     let main = fun(val){
+        //         if val {
+        //             99;
+        //         };
+        //         234;
+        //     };
+        //     [main(true), main(false)];
+        //     "#,
+        //     Value::array(vec![Value::Unit, Value::Unit]),
+        // );
     }
 
     #[test]

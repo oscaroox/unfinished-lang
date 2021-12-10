@@ -14,6 +14,13 @@ impl Span {
     pub fn to_range(&self) -> Range<usize> {
         self.start..self.end
     }
+
+    pub fn extend(&self, span: Span) -> Span {
+        Span {
+            start: self.start,
+            end: span.end,
+        }
+    }
 }
 
 impl Eq for Span {}

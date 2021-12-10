@@ -10,7 +10,7 @@ pub enum ParserError {
     #[error("{0}")]
     Error(String, TokenWithSpan),
 
-    #[error("Unexpected token")]
+    #[error("Unexpected token {0}")]
     UnexpectedToken(TokenWithSpan),
 
     #[error("Unterminated string")]
@@ -24,6 +24,9 @@ pub enum ParserError {
 
     #[error("Invalid assignemnt target")]
     InvalidAssignmentTarget(TokenWithSpan),
+
+    #[error("Invalid unary operation")]
+    InvalidUnaryOperation(TokenWithSpan),
 }
 
 impl ParserError {
@@ -36,6 +39,7 @@ impl ParserError {
             | ParserError::InvalidAssignmentTarget(tok)
             | ParserError::UnterminatedFunctionCall(tok)
             | ParserError::UnterminatedInterpolation(tok)
+            | ParserError::InvalidUnaryOperation(tok)
             | ParserError::UnterminatedString(tok) => {
                 let label = Label::new(tok.1.to_range());
                 Report::build(ReportKind::Error, (), 99)

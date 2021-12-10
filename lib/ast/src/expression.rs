@@ -5,7 +5,6 @@ use crate::{
     LoopExpr, ReturnExpr, SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation,
 };
 use span_util::{Span, WithSpan};
-use std::ops::Range;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
@@ -256,7 +255,7 @@ impl Expression {
         Expression::Block(WithSpan(Block { exprs }, span))
     }
 
-    pub fn create_return(value: Option<Expression>, span: Range<usize>) -> Expression {
+    pub fn create_return(value: Option<Expression>, span: Span) -> Expression {
         Expression::Return(WithSpan(
             ReturnExpr {
                 value: Box::new(value),
@@ -329,5 +328,34 @@ impl Expression {
 
     pub fn create_continue(span: Span) -> Expression {
         Expression::ContinueExpr(WithSpan(ContinueExpr {}, span))
+    }
+
+    pub fn get_span(&self) -> Span {
+        match &self {
+            Expression::BinOp(s) => s.1.clone(),
+            Expression::Literal(s) => s.1.clone(),
+            Expression::Assign(s) => s.1.clone(),
+            Expression::Index(s) => s.1.clone(),
+            Expression::SetIndex(s) => s.1.clone(),
+            Expression::GetProperty(s) => s.1.clone(),
+            Expression::SetProperty(s) => s.1.clone(),
+            Expression::Let(s) => s.1.clone(),
+            Expression::LetRef(s) => s.1.clone(),
+            Expression::UnaryOp(s) => s.1.clone(),
+            Expression::Grouping(s) => s.1.clone(),
+            Expression::Logic(s) => s.1.clone(),
+            Expression::Call(s) => s.1.clone(),
+            Expression::Function(s) => s.1.clone(),
+            Expression::DataClass(s) => s.1.clone(),
+            Expression::DataClassInstance(s) => s.1.clone(),
+            Expression::Block(s) => s.1.clone(),
+            Expression::If(s) => s.1.clone(),
+            Expression::ImplicitReturn(s) => s.1.clone(),
+            Expression::Return(s) => s.1.clone(),
+            Expression::SelfExpr(s) => s.1.clone(),
+            Expression::LoopExpr(s) => s.1.clone(),
+            Expression::BreakExpr(s) => s.1.clone(),
+            Expression::ContinueExpr(s) => s.1.clone(),
+        }
     }
 }

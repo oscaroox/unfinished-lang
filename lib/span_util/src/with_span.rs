@@ -9,6 +9,12 @@ impl<T> WithSpan<T> {
     }
 }
 
+impl<T: std::fmt::Display> std::fmt::Display for WithSpan<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl<T: PartialEq> Eq for WithSpan<T> {}
 
 impl<T: PartialEq> PartialEq for WithSpan<T> {
