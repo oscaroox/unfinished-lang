@@ -204,6 +204,7 @@ impl Parser {
 
     fn let_expression(&mut self) -> ParserResult {
         let start_span: Span = self.prev_token.1.clone();
+        let ident = self.curr_token.clone();
         let identifier = self.eat(TokenType::Identifier, "Expected identifier")?;
 
         let has_colon = self.eat_optional(TokenType::Colon);
@@ -241,6 +242,10 @@ impl Parser {
                 },
             };
             init = Some(expr);
+        }
+
+        if itype.is_none() && init.is_none() {
+            return Err(ParserError::TypeAnnotationNeeded(ident));
         }
 
         let span: Span = start_span.extend(self.curr_token.1.clone());
@@ -1004,8 +1009,8 @@ mod test {
         BinaryOperation, DataStructInstanceField, EType, Expression, Identifier, Literal,
         LogicOperation, Program, Type, UnaryOperation,
     };
-    use scanner::{Scanner, TokenType};
-    use span_util::Span;
+    use scanner::{Scanner, Token, TokenType};
+    use span_util::{Span, WithSpan};
 
     fn run_parser(source: &str) -> (Program, Vec<ParserError>) {
         let scanner = Scanner::new(source.to_string());
@@ -1022,16 +1027,28 @@ mod test {
         assert_eq!(res, expected);
     }
 
-    // TODO check errors
-    fn _parse_error(source: &str, expected: Vec<ParserError>) {
-        let (res, errors) = run_parser(source);
+    fn parse_error(source: &str, expected_errors: Vec<ParserError>) {
+        let (_, errors) = run_parser(source);
 
-        let errs: Vec<String> = errors.clone().into_iter().map(|e| e.to_string()).collect();
-        // let err: Vec<> = errors.clone().into_iter().map(|e| e.into_spanned_error());
-        println!("errs {:#?}", errs);
-        // println!("{:?}", errs);
-        println!("res {:#?}", res);
-        assert_eq!(errors, expected)
+        if errors.is_empty() {
+            panic!("parser did not emit errors");
+        };
+
+        if errors.len() != expected_errors.len() {
+            println!("{:#?}", errors);
+            panic!(
+                "parser emmitted {} errors, expected errors has {} errors",
+                errors.len(),
+                expected_errors.len()
+            );
+        }
+        for (err, expected) in errors.iter().zip(expected_errors) {
+            assert_eq!(*err, expected);
+        }
+    }
+
+    fn create_token(token: Token) -> WithSpan<Token> {
+        WithSpan(token, Span::fake())
     }
 
     fn create_let(id: &str, value: Option<Expression>) -> Expression {
@@ -1277,6 +1294,39 @@ mod test {
     }
 
     #[test]
+    fn parse_type_error_let_expr() {
+        parse_error(
+            "
+            let name;
+            let name: +;
+            let name: 123 = 2;
+            let name: @23432 = 2;
+            let name: unit;
+            let name: int[ ;
+            let name: int] ;
+        ",
+            vec![
+                ParserError::TypeAnnotationNeeded(Token::identifier(
+                    "name".into(),
+                    Span::fake().into(),
+                )),
+                ParserError::InvalidType(Token::plus(Span::fake().into())),
+                ParserError::InvalidType(Token::int_const("123".into(), Span::fake().into())),
+                ParserError::InvalidType(Token::illegal("@".into(), Span::fake().into())),
+                ParserError::InvalidUseOfUnitType(Token::unit(Span::fake().into())),
+                ParserError::ExpectedToken(
+                    "Expected ']', found ';'".into(),
+                    Token::semi_colon(Span::fake().into()),
+                ),
+                ParserError::ExpectedToken(
+                    "Expected ';' after expression, found ']'".into(),
+                    Token::right_bracket(Span::fake().into()),
+                ),
+            ],
+        )
+    }
+
+    #[test]
     // last expression in a block can implicitly return by not including the semicolon
     fn parse_last_expr_in_block_return_on_no_semi() {
         parse(
@@ -1484,8 +1534,11 @@ mod test {
     #[test]
     fn parse_let_stmt() {
         parse(
-            "let num; let _num = 1;",
-            vec![create_let("num", None), create_let("_num", Some(int(1)))],
+            "let num: int; let _num = 1;",
+            vec![
+                create_let_type(ident_type("num", Type::new(EType::Int, false)), None),
+                create_let("_num", Some(int(1))),
+            ],
         );
     }
 
