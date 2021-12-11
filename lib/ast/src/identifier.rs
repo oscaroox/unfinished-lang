@@ -5,8 +5,8 @@ use crate::Type;
 #[derive(Debug, PartialEq, Clone)]
 pub struct Identifier {
     pub value: String,
-    token_type: Option<TokenType>,
-    value_type: Option<Type>,
+    pub token_type: Option<TokenType>,
+    pub value_type: Option<Type>,
 }
 
 impl Identifier {
@@ -18,6 +18,14 @@ impl Identifier {
         }
     }
 
+    pub fn with_all(value: String, token_type: TokenType, value_type: Type) -> Identifier {
+        Identifier {
+            value,
+            value_type: Some(value_type),
+            token_type: Some(token_type),
+        }
+    }
+
     pub fn with_token_type(value: String, token_type: TokenType) -> Identifier {
         Identifier {
             value,
@@ -26,7 +34,7 @@ impl Identifier {
         }
     }
 
-    pub fn with_ident_type(value: String, value_type: Option<Type>) -> Identifier {
+    pub fn with_value_type(value: String, value_type: Option<Type>) -> Identifier {
         Identifier {
             value,
             value_type,

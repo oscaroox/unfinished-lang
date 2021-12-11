@@ -164,7 +164,7 @@ impl Scanner {
             "bool" => Token::bool(label),
             "string" => Token::string(label),
             "unit" => Token::unit(label),
-            "Fun" => Token::fun(label),
+            "Fun" => Token::fun_type(label),
             _ => Token::identifier(value, label),
         }
     }
@@ -757,7 +757,7 @@ this_is_a_identifier";
                 (TokenType::String, None),
                 (TokenType::Bool, None),
                 (TokenType::Unit, None),
-                (TokenType::Fun, None),
+                (TokenType::FunType, None),
                 (TokenType::EOF, None),
             ],
         );

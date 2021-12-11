@@ -255,17 +255,22 @@ impl Interpreter {
         //  data Person { name };
         //  Person { name: "test", age: 2 } // Error unknown field age
         for field in &data_struct_instance.fields {
-            if data_struct.fields.contains(&field.name) {
+            let matches = data_struct
+                .fields
+                .iter()
+                .any(|e| e.value == field.name.value);
+            if matches {
                 let val = self.expression(&field.value)?;
                 eval_fields.insert(field.name.value.to_string(), val);
             } else {
                 panic!(
-                    "Unknown field {} provided to data struct {}",
+                    "Unknown field '{}' provided to data struct '{}'",
                     field.name, data_struct_identifier
                 )
             }
         }
 
+        // TODO require all fields to be filled in
         // fill in the missing fields with null value
         for field in &data_struct.fields {
             if !eval_fields.contains_key(&field.value) {
@@ -584,7 +589,7 @@ mod test {
     use std::collections::HashMap;
 
     use crate::{DataStruct, FunctionValue, Interpreter, Value};
-    use ast::Identifier;
+    use ast::{Identifier, Type};
     use parser::Parser;
     use scanner::Scanner;
 
@@ -608,6 +613,18 @@ mod test {
 
     fn ident(name: &str) -> Identifier {
         Identifier::new(name.to_string())
+    }
+
+    fn ident_string(name: &str) -> Identifier {
+        Identifier::with_value_type(name.into(), Some(Type::string()))
+    }
+
+    fn ident_int(name: &str) -> Identifier {
+        Identifier::with_value_type(name.into(), Some(Type::int()))
+    }
+
+    fn ident_bool(name: &str) -> Identifier {
+        Identifier::with_value_type(name.into(), Some(Type::bool()))
     }
 
     fn data_struct(
@@ -641,7 +658,7 @@ mod test {
 
         run(
             r#"
-            let main = fun(val){
+            let main = fun(val: bool){
                 if val {
                     1
                 } else {
@@ -655,7 +672,7 @@ mod test {
 
         run(
             r#"
-            let main = fun(val){
+            let main = fun(val: bool) {
                 if val {
                     return 99;
                 };
@@ -666,18 +683,18 @@ mod test {
             Value::array(vec![Value::Int(99), Value::Unit]),
         );
 
-        // run(
-        //     r#"
-        //     let main = fun(val){
-        //         if val {
-        //             99;
-        //         };
-        //         234;
-        //     };
-        //     [main(true), main(false)];
-        //     "#,
-        //     Value::array(vec![Value::Unit, Value::Unit]),
-        // );
+        run(
+            r#"
+            let main = fun(val: bool){
+                if val {
+                    99;
+                };
+                234;
+            };
+            [main(true), main(false)];
+            "#,
+            Value::array(vec![Value::Unit, Value::Unit]),
+        );
     }
 
     #[test]
@@ -782,7 +799,7 @@ mod test {
     #[test]
     fn eval_let_expression() {
         run("let name = 123;", Value::Int(123));
-        run("let name; name;", Value::Unit);
+        run("let name: string; name;", Value::Unit);
         run("let name = 123; name;", Value::Int(123));
     }
 
@@ -842,7 +859,7 @@ mod test {
 
     #[test]
     pub fn eval_assignment() {
-        run("let x; x = 1; x;", Value::Int(1));
+        run("let x: int; x = 1; x;", Value::Int(1));
         run("let x = 2; x += 1; x;", Value::Int(3));
         run("let x = 2; x *= 3; x;", Value::Int(6));
         run("let x = 2; x /= 2; x;", Value::Int(1));
@@ -906,7 +923,7 @@ mod test {
     pub fn eval_function() {
         run("fun (){ 1 }();", Value::Int(1));
         run("let fn = fun (){1}; fn();", Value::Int(1));
-        run("let fn = fun (x){x}; fn(123);", Value::Int(123));
+        run("let fn = fun (x: int){x}; fn(123);", Value::Int(123));
     }
 
     #[test]
@@ -1073,13 +1090,17 @@ mod test {
 
         run(
             "data Person {
-                first_name,
-                last_name,
-                age,
+                first_name: string,
+                last_name: string,
+                age: int,
             };",
             Value::data_struct(
                 ident("Person"),
-                vec![ident("first_name"), ident("last_name"), ident("age")],
+                vec![
+                    ident_string("first_name"),
+                    ident_string("last_name"),
+                    ident_int("age"),
+                ],
                 HashMap::new(),
                 HashMap::new(),
             ),
@@ -1099,12 +1120,16 @@ mod test {
         );
         map.insert(String::from("age"), Value::Int(40));
 
-        let field_idents = vec![ident("first_name"), ident("last_name"), ident("age")];
+        let field_idents = vec![
+            ident_string("first_name"),
+            ident_string("last_name"),
+            ident_int("age"),
+        ];
         run(
             r#"data Person {
-                first_name,
-                last_name,
-                age,
+                first_name: string,
+                last_name: string,
+                age: int,
             };
             let person = Person { first_name: "John", last_name: "Doe", age: 40 };
             person;
@@ -1125,9 +1150,9 @@ mod test {
         map.insert(String::from("age"), Value::Null);
         run(
             r#"data Person {
-                first_name,
-                last_name,
-                age,
+                first_name: string,
+                last_name: string,
+                age: int,
             };
             let person = Person { first_name: "John", last_name: "Doe" };
             person;
@@ -1150,9 +1175,9 @@ mod test {
         map.insert(String::from("age"), Value::Null);
         run(
             r#"data Person {
-                first_name,
-                last_name,
-                age,
+                first_name: string,
+                last_name: string,
+                age: int,
             };
             let person = Person {};
             person;
@@ -1175,9 +1200,9 @@ mod test {
     pub fn eval_property_access() {
         run(
             r#"data Person {
-                first_name,
-                last_name,
-                age,
+                first_name: string,
+                last_name: string,
+                age: int,
             };
             let person = Person { first_name: "John", last_name: "Doe", age: 40 };
             person.first_name;
@@ -1190,9 +1215,9 @@ mod test {
     pub fn eval_property_set() {
         run(
             r#"data Person {
-                first_name,
-                last_name,
-                age,
+                first_name: string,
+                last_name: string,
+                age: int,
             };
             let person = Person { first_name: "John", last_name: "Doe", age: 40 };
             person.age = 22;
@@ -1203,9 +1228,9 @@ mod test {
 
         run(
             r#"data Person {
-                first_name,
-                last_name,
-                age,
+                first_name: string,
+                last_name: string,
+                age: int,
             };
             let person = Person { first_name: "John", last_name: "Doe", age: 40 };
             person.age += 1;
@@ -1216,9 +1241,9 @@ mod test {
 
         run(
             r#"data Person {
-                first_name,
-                last_name,
-                age,
+                first_name: string,
+                last_name: string,
+                age: int,
             };
             let person = Person { first_name: "John", last_name: "Doe", age: 40 };
             person.age += 10;
@@ -1236,9 +1261,9 @@ mod test {
         run(
             r#"
             data Person {
-                first_name,
-                last_name,
-                age,
+                first_name: string,
+                last_name: string,
+                age: int,
             };
             let first_name = "John";
             let last_name = "Doe";
@@ -1254,7 +1279,7 @@ mod test {
     pub fn eval_data_struct_static_method() {
         run(
             "data Person {
-                id
+                id: int
             } :: {
                 fun new {
                     Person { id: 1 }
@@ -1271,7 +1296,7 @@ mod test {
     pub fn eval_data_struct_instance_method() {
         run(
             "data Person {
-                id
+                id: int
             } :: {
                 fun new {
                     Person { id: 22 }
@@ -1290,7 +1315,7 @@ mod test {
         // should allow a method with the same name as a data struct field to be called
         run(
             "data Person {
-                id
+                id: int
             } :: {
                 fun new {
                     Person { id: 22 }
@@ -1311,13 +1336,13 @@ mod test {
     pub fn eval_data_struct_instance_set_method() {
         run(
             "data Person {
-                id
+                id: int
             } :: {
                 fun new {
                     Person { id: 22 }
                 }
 
-                fun set_id(self, new_id) {
+                fun set_id(self, new_id: int) {
                     self.id = new_id;
                 }
 

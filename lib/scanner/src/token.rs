@@ -49,7 +49,7 @@ impl Token {
     impl_token!(string, String);
     impl_token!(bool, Bool);
     impl_token!(unit, Unit);
-    impl_token!(fun, Fun);
+    impl_token!(fun_type, FunType);
 
     impl_value_token!(illegal, Illegal);
     impl_value_token!(bad_token, BadToken);

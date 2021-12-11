@@ -1,10 +1,10 @@
-use crate::{Expression, Identifier};
+use crate::{Expression, Identifier, Type};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Function {
     pub name: Option<String>,
     pub params: Vec<Identifier>,
-    // the parser makes sure this is a block expression
+    pub return_type: Type,
     pub body: Box<Expression>,
     pub is_static: bool,
 }

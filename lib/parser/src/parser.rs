@@ -1,7 +1,7 @@
 use crate::ParserError;
 use ast::{
-    BinaryOperation, DataStructInstanceField, EType, Expression, Identifier, Literal,
-    LogicOperation, Program, Type, UnaryOperation,
+    BinaryOperation, DataStructInstanceField, Expression, Identifier, Literal, LogicOperation,
+    Program, Type, UnaryOperation,
 };
 use scanner::{Scanner, ScannerMode, Token, TokenType, TokenWithSpan};
 use span_util::Span;
@@ -18,7 +18,7 @@ const RECOVER_SET: [TokenType; 5] = [
 pub enum FunctionKind {
     None,
     Function,
-    Method,
+    Method(String),
 }
 
 type ParserResult = Result<Expression, ParserError>;
@@ -97,17 +97,17 @@ impl Parser {
         token.0
     }
 
-    fn advance(&mut self) -> Token {
+    fn advance(&mut self) -> TokenWithSpan {
         self.prev_token = self.curr_token.clone();
         self.curr_token = self.scanner.next_token();
-        self.prev_token.clone().0
+        self.prev_token.clone()
     }
 
     fn is_end(&self) -> bool {
         self.curr_token.0.is_eof()
     }
 
-    fn eat(&mut self, token_type: TokenType, msg: &str) -> Result<Token, ParserError> {
+    fn eat(&mut self, token_type: TokenType, msg: &str) -> Result<TokenWithSpan, ParserError> {
         if self.curr_token.0.token_type == token_type {
             return Ok(self.advance());
         }
@@ -121,14 +121,14 @@ impl Parser {
         Err(ParserError::ExpectedToken(msg, tok))
     }
 
-    fn eat_optional(&mut self, token_type: TokenType) -> Option<Token> {
+    fn eat_optional(&mut self, token_type: TokenType) -> Option<TokenWithSpan> {
         if self.curr_token.0.token_type == token_type {
             return Some(self.advance());
         }
         None
     }
 
-    fn eat_semi(&mut self) -> Result<Token, ParserError> {
+    fn eat_semi(&mut self) -> Result<TokenWithSpan, ParserError> {
         self.eat(TokenType::SemiColon, "Expected ';' after expression")
     }
 
@@ -168,35 +168,92 @@ impl Parser {
         self.assignment()
     }
 
-    fn parse_type(&mut self) -> Result<Type, ParserError> {
+    fn parse_parameters(&mut self, token_end: TokenType) -> Result<Vec<Identifier>, ParserError> {
+        let mut params = vec![];
+        if self.curr_token.0.token_type != token_end {
+            loop {
+                if self.check(TokenType::SELF) {
+                    return Err(ParserError::Error(
+                        "Expected 'self' to be the first parameter in a method".to_string(),
+                        self.curr_token.clone(),
+                    ));
+                }
+
+                let ident = self.eat(TokenType::Identifier, "Expected 'identifier'")?;
+                if self.eat_optional(TokenType::Colon).is_none() {
+                    return Err(ParserError::TypeAnnotationNeeded(ident));
+                }
+
+                let ttype = self.parse_type(false)?;
+
+                params.push(Identifier::with_value_type(ident.0.value, Some(ttype)));
+
+                if !self.matches(vec![TokenType::Comma])
+                    || self.curr_token.0.token_type == token_end
+                {
+                    break;
+                }
+            }
+        }
+        Ok(params)
+    }
+
+    fn parse_type(&mut self, allow_unit: bool) -> Result<Type, ParserError> {
         let token = self.curr_token.clone();
-        if self.matches(vec![
+
+        let ttype = if self.matches(vec![TokenType::LeftParen]) {
+            let ttype = self.parse_type(false)?;
+            self.eat(TokenType::RightParen, "Expected ')'")?;
+            Some(ttype)
+        } else if self.matches(vec![
             TokenType::Int,
             TokenType::Float,
             TokenType::String,
             TokenType::Bool,
             TokenType::Identifier,
         ]) {
-            let mut is_array = false;
-            let etype = match &token.0.token_type {
-                TokenType::Int => EType::Int,
-                TokenType::Float => EType::Float,
-                TokenType::String => EType::String,
-                TokenType::Bool => EType::Bool,
-                TokenType::Identifier => EType::User(token.0.value.to_string()),
+            let ttype = match &token.0.token_type {
+                TokenType::Int => Type::int(),
+                TokenType::Float => Type::float(),
+                TokenType::String => Type::string(),
+                TokenType::Bool => Type::bool(),
+                TokenType::Identifier => Type::identifier(token.0.value.to_string()),
                 _ => unreachable!(),
             };
-
-            if self.matches(vec![TokenType::LeftBracket]) {
-                self.eat(TokenType::RightBracket, "Expected ']'")?;
-                is_array = true;
+            Some(ttype)
+        } else if self.matches(vec![TokenType::FunType]) {
+            self.eat(TokenType::LeftParen, "Expected '('")?;
+            let params = self.parse_parameters(TokenType::RightParen)?;
+            self.eat(TokenType::RightParen, "Expected ')'")?;
+            let mut return_type = Type::unit();
+            if self.eat_optional(TokenType::Colon).is_some() {
+                return_type = self.parse_type(true)?;
             }
-
-            return Ok(Type::new(etype, is_array));
-        }
+            Some(Type::fun(params, return_type))
+        } else {
+            None
+        };
 
         if self.matches(vec![TokenType::Unit]) {
+            // we can allow unit to be used in function return type
+            // using unit in other context is forbidden,
+            // there should be a Option type like in rust
+            // maybe an built in enum type
+            if allow_unit {
+                return Ok(Type::unit());
+            }
             return Err(ParserError::InvalidUseOfUnitType(token));
+        }
+
+        match ttype {
+            Some(t) => {
+                if self.matches(vec![TokenType::LeftBracket]) {
+                    self.eat(TokenType::RightBracket, "Expected ']'")?;
+                    return Ok(Type::array(t));
+                }
+                return Ok(t);
+            }
+            None => {}
         }
 
         Err(ParserError::InvalidType(token))
@@ -210,7 +267,7 @@ impl Parser {
         let has_colon = self.eat_optional(TokenType::Colon);
 
         let itype = match has_colon {
-            Some(_) => Some(self.parse_type()?),
+            Some(_) => Some(self.parse_type(false)?),
             None => None,
         };
 
@@ -220,8 +277,9 @@ impl Parser {
             let expr = match self.expression() {
                 Ok(expr) => match expr {
                     Expression::Function(fun) => Expression::create_function(
-                        Some(identifier.value.to_string()),
+                        Some(identifier.0.value.to_string()),
                         fun.0.params,
+                        fun.0.return_type,
                         fun.0.is_static,
                         *fun.0.body,
                         fun.1,
@@ -251,7 +309,7 @@ impl Parser {
         let span: Span = start_span.extend(self.curr_token.1.clone());
 
         Ok(Expression::create_let(
-            Identifier::with_ident_type(identifier.value, itype),
+            Identifier::with_value_type(identifier.0.value, itype),
             init,
             span,
         ))
@@ -318,7 +376,7 @@ impl Parser {
                 if self.matches(vec![TokenType::Comma])
                     || self.curr_token.0.token_type == TokenType::RightBrace
                 {
-                    let ident = Identifier::new(id.value.to_string());
+                    let ident = Identifier::new(id.0.value.to_string());
                     fields.push(DataStructInstanceField::new(
                         ident.clone(),
                         Expression::create_let_ref(ident, id_span),
@@ -332,7 +390,7 @@ impl Parser {
                 self.eat(TokenType::Colon, "Expected ':'")?;
                 let expr = self.expression()?;
                 let field =
-                    DataStructInstanceField::new(Identifier::new(id.value.to_string()), expr);
+                    DataStructInstanceField::new(Identifier::new(id.0.value.to_string()), expr);
                 fields.push(field);
 
                 if !self.matches(vec![TokenType::Comma])
@@ -345,7 +403,7 @@ impl Parser {
 
         self.eat(TokenType::RightBrace, "Expected '}'")?;
         Ok(Expression::create_data_struct_instance(
-            Identifier::new(ident.value.to_string()),
+            Identifier::new(ident.0.value.to_string()),
             fields,
             identifier_span,
         ))
@@ -356,21 +414,8 @@ impl Parser {
         let ident = self.eat(TokenType::Identifier, "Expected identifier")?;
         self.eat(TokenType::LeftBrace, "Expected '{'")?;
 
-        let mut fields = vec![];
+        let fields = self.parse_parameters(TokenType::RightBrace)?;
         let mut methods = vec![];
-
-        if self.curr_token.0.token_type != TokenType::RightBrace {
-            while !self.curr_token.0.is_eof() {
-                let id = self.eat(TokenType::Identifier, "Expected identifier")?;
-                fields.push(Identifier::new(id.value.to_string()));
-
-                if !self.matches(vec![TokenType::Comma])
-                    || self.curr_token.0.token_type == TokenType::RightBrace
-                {
-                    break;
-                }
-            }
-        }
 
         self.eat(TokenType::RightBrace, "Expected '}'")?;
 
@@ -381,14 +426,14 @@ impl Parser {
 
             while !self.check(TokenType::RightBrace) && !self.is_end() {
                 self.eat(TokenType::Fun, "Expected 'fun'")?;
-                methods.push(self.fun_expression(FunctionKind::Method)?);
+                methods.push(self.fun_expression(FunctionKind::Method(ident.0.value.clone()))?);
             }
 
             self.eat(TokenType::RightBrace, "Expected '}'")?;
         }
 
         Ok(Expression::create_data_struct(
-            Identifier::new(ident.value.to_string()),
+            Identifier::new(ident.0.value.to_string()),
             fields,
             methods,
             ident_span,
@@ -415,46 +460,43 @@ impl Parser {
         let mut params = vec![];
         let mut is_static = true;
 
-        if kind == FunctionKind::Method {
+        if let FunctionKind::Method(_) = kind {
             let ident = self.eat(TokenType::Identifier, "Expected method identifier")?;
-            name = Some(ident.value);
+            name = Some(ident.0.value);
         }
 
         let left_param = self.eat_optional(TokenType::LeftParen);
 
         if let Some(_) = left_param {
-            if kind == FunctionKind::Method && self.check(TokenType::SELF) {
-                let token = self.eat(TokenType::SELF, "Expected 'self'")?;
-                self.eat_optional(TokenType::Comma);
-                is_static = false;
-                params.push(Identifier::with_token_type(token.value, token.token_type));
-            } else if kind == FunctionKind::Function && self.check(TokenType::SELF) {
-                return Err(ParserError::Error(
-                    "Keyword 'self' can only be used in methods not functions".to_string(),
-                    self.curr_token.clone(),
-                ));
-            }
-            if self.curr_token.0.token_type != TokenType::RightParen {
-                loop {
-                    if self.check(TokenType::SELF) {
-                        return Err(ParserError::Error(
-                            "Expected 'self' to be the first parameter in a method".to_string(),
-                            self.curr_token.clone(),
-                        ));
-                    }
-
-                    let ident = self.eat(TokenType::Identifier, "Expected 'identifier'")?;
-                    params.push(Identifier::new(ident.value));
-
-                    if !self.matches(vec![TokenType::Comma])
-                        || self.curr_token.0.token_type == TokenType::RightParen
-                    {
-                        break;
-                    }
+            match (kind, self.check(TokenType::SELF)) {
+                (FunctionKind::Method(data_struct_indentifier), true) => {
+                    let token = self.eat(TokenType::SELF, "Expected 'self'")?;
+                    self.eat_optional(TokenType::Comma);
+                    is_static = false;
+                    params.push(Identifier::with_all(
+                        token.0.value,
+                        token.0.token_type,
+                        Type::Identifier(data_struct_indentifier),
+                    ));
                 }
+                (FunctionKind::Function, true) => {
+                    return Err(ParserError::Error(
+                        "Keyword 'self' can only be used in methods not functions".to_string(),
+                        self.curr_token.clone(),
+                    ))
+                }
+                _ => {}
             }
+
+            params.append(&mut self.parse_parameters(TokenType::RightParen)?);
+
             self.eat(TokenType::RightParen, "Expected ')' after parameters")?;
         }
+
+        let return_type = match self.eat_optional(TokenType::Colon) {
+            Some(_) => self.parse_type(true)?,
+            None => Type::unit(),
+        };
 
         if self.matches(vec![TokenType::Arrow]) {
             let arrow_span: Span = self.prev_token.1.clone();
@@ -464,6 +506,7 @@ impl Parser {
             return Ok(Expression::create_function(
                 name,
                 params,
+                return_type,
                 is_static,
                 Expression::create_block(
                     vec![Expression::create_implicit_return(
@@ -477,11 +520,17 @@ impl Parser {
         }
 
         let span = fun_span.extend(self.prev_token.1.clone());
+
         self.eat(TokenType::LeftBrace, "Expected '{'")?;
         let block = self.block_expression()?;
 
         Ok(Expression::create_function(
-            name, params, is_static, block, span,
+            name,
+            params,
+            return_type,
+            is_static,
+            block,
+            span,
         ))
     }
 
@@ -774,7 +823,7 @@ impl Parser {
                 let is_callable = self.check(TokenType::LeftParen);
                 expr = Expression::create_get_property(
                     expr,
-                    Identifier::new(name.value.to_string()),
+                    Identifier::new(name.0.value.to_string()),
                     is_callable,
                     ident_span,
                 )
@@ -1006,11 +1055,11 @@ mod test {
 
     use super::Parser;
     use ast::{
-        BinaryOperation, DataStructInstanceField, EType, Expression, Identifier, Literal,
-        LogicOperation, Program, Type, UnaryOperation,
+        BinaryOperation, DataStructInstanceField, Expression, Identifier, Literal, LogicOperation,
+        Program, Type, UnaryOperation,
     };
     use scanner::{Scanner, Token, TokenType};
-    use span_util::{Span, WithSpan};
+    use span_util::Span;
 
     fn run_parser(source: &str) -> (Program, Vec<ParserError>) {
         let scanner = Scanner::new(source.to_string());
@@ -1045,10 +1094,6 @@ mod test {
         for (err, expected) in errors.iter().zip(expected_errors) {
             assert_eq!(*err, expected);
         }
-    }
-
-    fn create_token(token: Token) -> WithSpan<Token> {
-        WithSpan(token, Span::fake())
     }
 
     fn create_let(id: &str, value: Option<Expression>) -> Expression {
@@ -1087,16 +1132,16 @@ mod test {
         Identifier::new(val.to_string())
     }
 
-    fn create_type(etype: EType, is_array: bool) -> Type {
-        Type::new(etype, is_array)
-    }
-
     fn ident_type(val: &str, value_type: Type) -> Identifier {
-        Identifier::with_ident_type(val.into(), Some(value_type))
+        Identifier::with_value_type(val.into(), Some(value_type))
     }
 
-    fn ident_self() -> Identifier {
-        Identifier::with_token_type("self".to_string(), TokenType::SELF)
+    fn ident_self(r#type: &str) -> Identifier {
+        Identifier {
+            value: "self".to_string(),
+            token_type: Some(TokenType::SELF),
+            value_type: Some(Type::Identifier(r#type.into())),
+        }
     }
 
     fn create_binop(left: Expression, op: BinaryOperation, right: Expression) -> Expression {
@@ -1119,12 +1164,16 @@ mod test {
         Expression::create_implicit_return(val, Span::fake())
     }
 
-    fn create_data_struct(name: &str, fields: Vec<&str>, methods: Vec<Expression>) -> Expression {
+    fn create_data_struct(
+        name: &str,
+        fields: Vec<(&str, Type)>,
+        methods: Vec<Expression>,
+    ) -> Expression {
         Expression::create_data_struct(
             Identifier::new(name.to_string()),
             fields
                 .iter()
-                .map(|v| Identifier::new(v.to_string()))
+                .map(|v| ident_type(v.0, v.1.clone()))
                 .collect(),
             methods,
             Span::fake(),
@@ -1210,10 +1259,11 @@ mod test {
     fn create_function(
         name: Option<String>,
         params: Vec<Identifier>,
+        return_type: Type,
         is_static: bool,
         body: Expression,
     ) -> Expression {
-        Expression::create_function(name, params, is_static, body, Span::fake())
+        Expression::create_function(name, params, return_type, is_static, body, Span::fake())
     }
 
     #[test]
@@ -1226,22 +1276,10 @@ mod test {
         let exists: bool = true;
         "#,
             vec![
-                create_let_type(
-                    ident_type("cents", create_type(EType::Int, false)),
-                    Some(int(2)),
-                ),
-                create_let_type(
-                    ident_type("pi", create_type(EType::Float, false)),
-                    Some(float(3.14)),
-                ),
-                create_let_type(
-                    ident_type("name", create_type(EType::String, false)),
-                    Some(string_lit("test")),
-                ),
-                create_let_type(
-                    ident_type("exists", create_type(EType::Bool, false)),
-                    Some(bool_lit(true)),
-                ),
+                create_let_type(ident_type("cents", Type::int()), Some(int(2))),
+                create_let_type(ident_type("pi", Type::float()), Some(float(3.14))),
+                create_let_type(ident_type("name", Type::string()), Some(string_lit("test"))),
+                create_let_type(ident_type("exists", Type::Bool), Some(bool_lit(true))),
             ],
         );
 
@@ -1254,40 +1292,119 @@ mod test {
         "#,
             vec![
                 create_let_type(
-                    ident_type("cents", create_type(EType::Int, true)),
+                    ident_type("cents", Type::array(Type::int())),
                     Some(array(vec![int(1)])),
                 ),
                 create_let_type(
-                    ident_type("pi", create_type(EType::Float, true)),
+                    ident_type("pi", Type::array(Type::float())),
                     Some(array(vec![float(1.0)])),
                 ),
                 create_let_type(
-                    ident_type("name", create_type(EType::String, true)),
+                    ident_type("name", Type::array(Type::string())),
                     Some(array(vec![string_lit("test")])),
                 ),
                 create_let_type(
-                    ident_type("exists", create_type(EType::Bool, true)),
+                    ident_type("exists", Type::array(Type::bool())),
                     Some(array(vec![bool_lit(true)])),
                 ),
             ],
         );
+    }
 
+    #[test]
+    fn parse_type_fun() {
+        parse(
+            "
+            let x: Fun(a: string);
+            let x: Fun();
+            let x: Fun(): unit;
+            let x: Fun(): string;
+            let x: Fun(a: string): int;
+            let x: Fun(a: string,): int[];
+            let x: (Fun(b: int): int)[];
+            let x: Fun(b: int)[];
+        ",
+            vec![
+                create_let_type(
+                    ident_type(
+                        "x",
+                        Type::fun(vec![ident_type("a".into(), Type::string())], Type::unit()),
+                    ),
+                    None,
+                ),
+                create_let_type(ident_type("x", Type::fun(vec![], Type::unit())), None),
+                create_let_type(ident_type("x", Type::fun(vec![], Type::unit())), None),
+                create_let_type(ident_type("x", Type::fun(vec![], Type::string())), None),
+                create_let_type(
+                    ident_type(
+                        "x",
+                        Type::fun(vec![ident_type("a".into(), Type::string())], Type::int()),
+                    ),
+                    None,
+                ),
+                create_let_type(
+                    ident_type(
+                        "x",
+                        Type::fun(
+                            vec![ident_type("a".into(), Type::string())],
+                            Type::array(Type::int()),
+                        ),
+                    ),
+                    None,
+                ),
+                create_let_type(
+                    ident_type(
+                        "x",
+                        Type::array(Type::fun(
+                            vec![ident_type("b".into(), Type::int())],
+                            Type::int(),
+                        )),
+                    ),
+                    None,
+                ),
+                create_let_type(
+                    ident_type(
+                        "x",
+                        Type::array(Type::fun(
+                            vec![ident_type("b".into(), Type::int())],
+                            Type::unit(),
+                        )),
+                    ),
+                    None,
+                ),
+            ],
+        );
+    }
+
+    #[test]
+    fn parse_type_user_type() {
         parse(
             r#"
         let joe: Person = Person {};
         let family: Person[] = [Person{}];
+        let x: Fun(x: Person);
         "#,
             vec![
                 create_let_type(
-                    ident_type("joe", create_type(EType::User("Person".into()), false)),
+                    ident_type("joe", Type::identifier("Person")),
                     Some(create_data_struct_instance("Person".into(), vec![])),
                 ),
                 create_let_type(
-                    ident_type("family", create_type(EType::User("Person".into()), true)),
+                    ident_type("family", Type::array(Type::Identifier("Person".into()))),
                     Some(array(vec![create_data_struct_instance(
                         "Person".into(),
                         vec![],
                     )])),
+                ),
+                create_let_type(
+                    ident_type(
+                        "x",
+                        Type::fun(
+                            vec![ident_type("x".into(), Type::identifier("Person"))],
+                            Type::unit(),
+                        ),
+                    ),
+                    None,
                 ),
             ],
         );
@@ -1324,6 +1441,64 @@ mod test {
                 ),
             ],
         )
+    }
+
+    #[test]
+    fn parse_type_error_fun() {
+        parse_error(
+            "
+        let x: Fun;
+        let x: Fun(;
+        let x: Fun): int = 2;
+        let x: Fun(): = 2;
+        let x: Fun(a): int = 2;
+        let x: Fun(a: int, b): int = 2;
+        let x: Fun(a: unit): int = 2;
+        ",
+            vec![
+                ParserError::ExpectedToken(
+                    "Expected '(', found ';'".into(),
+                    Token::semi_colon(Span::fake().into()),
+                ),
+                ParserError::ExpectedToken(
+                    "Expected 'identifier', found ';'".into(),
+                    Token::semi_colon(Span::fake().into()),
+                ),
+                ParserError::ExpectedToken(
+                    "Expected '(', found ')'".into(),
+                    Token::right_paren(Span::fake().into()),
+                ),
+                ParserError::InvalidType(Token::assign(Span::fake().into())),
+                ParserError::TypeAnnotationNeeded(Token::identifier(
+                    "a".into(),
+                    Span::fake().into(),
+                )),
+                ParserError::TypeAnnotationNeeded(Token::identifier(
+                    "b".into(),
+                    Span::fake().into(),
+                )),
+                ParserError::InvalidUseOfUnitType(Token::unit(Span::fake().into())),
+            ],
+        );
+    }
+
+    #[test]
+    fn parse_function_error() {
+        parse_error(
+            "
+        fun(a): int {};
+        fun(a: 123) {};
+        fun(a: unit) {};
+        ",
+            vec![
+                ParserError::TypeAnnotationNeeded(Token::identifier(
+                    "a".into(),
+                    Span::fake().into(),
+                )),
+                ParserError::InvalidType(Token::int_const("123".into(), Span::fake().into())),
+                ParserError::InvalidUseOfUnitType(Token::unit(Span::fake().into())),
+            ],
+        );
     }
 
     #[test]
@@ -1524,6 +1699,7 @@ mod test {
                 Some(create_function(
                     Some("main".to_string()),
                     vec![],
+                    Type::unit(),
                     true,
                     create_block(vec![create_self("self")]),
                 )),
@@ -1536,7 +1712,7 @@ mod test {
         parse(
             "let num: int; let _num = 1;",
             vec![
-                create_let_type(ident_type("num", Type::new(EType::Int, false)), None),
+                create_let_type(ident_type("num", Type::int()), None),
                 create_let("_num", Some(int(1))),
             ],
         );
@@ -1754,7 +1930,7 @@ mod test {
         parse(
             "fun (){}();",
             vec![create_call(
-                create_function(None, vec![], true, create_block(vec![])),
+                create_function(None, vec![], Type::unit(), true, create_block(vec![])),
                 vec![],
             )],
         );
@@ -1764,11 +1940,11 @@ mod test {
     fn parse_return_expr() {
         parse(
             "
-                let main = fun {
+                let main = fun(): int {
                     return; 
                     return 1;
                 };
-                let main = fun() => 1;
+                let main = fun(): int => 1;
             ",
             vec![
                 create_let(
@@ -1776,6 +1952,7 @@ mod test {
                     Some(create_function(
                         Some("main".to_string()),
                         vec![],
+                        Type::int(),
                         true,
                         create_block(vec![create_return(None), create_return(Some(int(1)))]),
                     )),
@@ -1785,6 +1962,7 @@ mod test {
                     Some(create_function(
                         Some("main".to_string()),
                         vec![],
+                        Type::int(),
                         true,
                         create_block(vec![create_implicit_return(int(1))]),
                     )),
@@ -1799,30 +1977,28 @@ mod test {
             "
         fun {};
         fun () {};
-        fun (x, y) {};
-        fun (y, z) {
+        fun:string {};
+        fun (x: int, y: int) {};
+        fun (y: int, z: int) {
             let name = 2;
             123;
         };
         ",
             vec![
-                create_function(None, vec![], true, create_block(vec![])),
-                create_function(None, vec![], true, create_block(vec![])),
+                create_function(None, vec![], Type::unit(), true, create_block(vec![])),
+                create_function(None, vec![], Type::unit(), true, create_block(vec![])),
+                create_function(None, vec![], Type::string(), true, create_block(vec![])),
                 create_function(
                     None,
-                    vec![
-                        Identifier::new("x".to_string()),
-                        Identifier::new("y".to_string()),
-                    ],
+                    vec![ident_type("x", Type::int()), ident_type("y", Type::int())],
+                    Type::unit(),
                     true,
                     create_block(vec![]),
                 ),
                 create_function(
                     None,
-                    vec![
-                        Identifier::new("y".to_string()),
-                        Identifier::new("z".to_string()),
-                    ],
+                    vec![ident_type("y", Type::int()), ident_type("z", Type::int())],
+                    Type::unit(),
                     true,
                     create_block(vec![create_let("name", Some(int(2))), int(123)]),
                 ),
@@ -1921,23 +2097,12 @@ mod test {
         parse(
             "
             data Person {
-                first_name,
-            };
-        ",
-            vec![create_data_struct("Person", vec!["first_name"], vec![])],
-        );
-
-        parse(
-            "
-            data Person {
-                first_name,
-                last_name,
-                age
+                first_name: string,
             };
         ",
             vec![create_data_struct(
                 "Person",
-                vec!["first_name", "last_name", "age"],
+                vec![("first_name", Type::string())],
                 vec![],
             )],
         );
@@ -1945,14 +2110,37 @@ mod test {
         parse(
             "
             data Person {
-                first_name,
-                last_name,
-                age,
+                first_name: string,
+                last_name: string,
+                age: int
             };
         ",
             vec![create_data_struct(
                 "Person",
-                vec!["first_name", "last_name", "age"],
+                vec![
+                    ("first_name", Type::string()),
+                    ("last_name", Type::string()),
+                    ("age", Type::int()),
+                ],
+                vec![],
+            )],
+        );
+
+        parse(
+            "
+            data Person {
+                first_name: string,
+                last_name: string,
+                age: int,
+            };
+        ",
+            vec![create_data_struct(
+                "Person",
+                vec![
+                    ("first_name", Type::string()),
+                    ("last_name", Type::string()),
+                    ("age", Type::int()),
+                ],
                 vec![],
             )],
         );
@@ -1963,7 +2151,7 @@ mod test {
         parse(
             "
             data Person {
-                first_name,
+                first_name: string,
             } :: {
                 fun new {
                 }
@@ -1975,15 +2163,19 @@ mod test {
         ",
             vec![create_data_struct(
                 "Person",
-                vec!["first_name"],
+                vec![("first_name", Type::string())],
                 vec![
-                    create_function(Some("new".to_string()), vec![], true, create_block(vec![])),
+                    create_function(
+                        Some("new".to_string()),
+                        vec![],
+                        Type::unit(),
+                        true,
+                        create_block(vec![]),
+                    ),
                     create_function(
                         Some("name".to_string()),
-                        vec![Identifier::with_token_type(
-                            "self".to_string(),
-                            TokenType::SELF,
-                        )],
+                        vec![ident_self("Person")],
+                        Type::unit(),
                         false,
                         create_block(vec![]),
                     ),
@@ -1997,23 +2189,24 @@ mod test {
         parse(
             "
             data Person {
-                first_name,
+                first_name: string,
             } :: {
                 fun name(self) {
                     self.first_name;
                 }
-                fun set_name(self, name) {
+                fun set_name(self, name: string) {
                     self.first_name = name;
                 }
             };
         ",
             vec![create_data_struct(
                 "Person",
-                vec!["first_name"],
+                vec![("first_name", Type::string())],
                 vec![
                     create_function(
                         Some("name".to_string()),
-                        vec![ident_self()],
+                        vec![ident_self("Person")],
+                        Type::unit(),
                         false,
                         create_block(vec![create_get_property(
                             create_self("self"),
@@ -2023,7 +2216,8 @@ mod test {
                     ),
                     create_function(
                         Some("set_name".to_string()),
-                        vec![ident_self(), ident("name")],
+                        vec![ident_self("Person"), ident_type("name", Type::string())],
+                        Type::unit(),
                         false,
                         create_block(vec![create_set_property(
                             create_self("self"),
@@ -2051,11 +2245,19 @@ mod test {
 
         parse(
             r#"
-            data Person {first_name, last_name, age};
+            data Person { first_name: string, last_name: string, age: int };
             Person { first_name: "john", last_name: "doe", age: 23 };
         "#,
             vec![
-                create_data_struct("Person", vec!["first_name", "last_name", "age"], vec![]),
+                create_data_struct(
+                    "Person",
+                    vec![
+                        ("first_name", Type::string()),
+                        ("last_name", Type::string()),
+                        ("age", Type::int()),
+                    ],
+                    vec![],
+                ),
                 create_data_struct_instance(
                     "Person",
                     vec![
@@ -2085,8 +2287,8 @@ mod test {
         parse(
             r#"
             data Person {
-                id,
-                first_name,
+                id: int,
+                first_name: string,
             };
             let id = 123;
             let first_name = "John";
@@ -2100,7 +2302,11 @@ mod test {
             };
         "#,
             vec![
-                create_data_struct("Person", vec!["id", "first_name"], vec![]),
+                create_data_struct(
+                    "Person",
+                    vec![("id", Type::int()), ("first_name", Type::string())],
+                    vec![],
+                ),
                 create_let("id", Some(int(123))),
                 create_let("first_name", Some(string_lit("John"))),
                 create_data_struct_instance(
@@ -2126,15 +2332,23 @@ mod test {
         parse(
             "
             data Person {
-                first_name,
-                last_name,
-                age,
+                first_name: string,
+                last_name: string,
+                age: int,
             };
             let p = Person{};
             p.first_name;
         ",
             vec![
-                create_data_struct("Person", vec!["first_name", "last_name", "age"], vec![]),
+                create_data_struct(
+                    "Person",
+                    vec![
+                        ("first_name", Type::string()),
+                        ("last_name", Type::string()),
+                        ("age", Type::int()),
+                    ],
+                    vec![],
+                ),
                 create_let("p", Some(create_data_struct_instance("Person", vec![]))),
                 create_get_property(
                     create_let_ref("p"),
@@ -2150,15 +2364,23 @@ mod test {
         parse(
             r#"
             data Person {
-                first_name,
-                last_name,
-                age,
+                first_name: string,
+                last_name: string,
+                age: int,
             };
             let p = Person{};
             p.age = 1;
         "#,
             vec![
-                create_data_struct("Person", vec!["first_name", "last_name", "age"], vec![]),
+                create_data_struct(
+                    "Person",
+                    vec![
+                        ("first_name", Type::string()),
+                        ("last_name", Type::string()),
+                        ("age", Type::int()),
+                    ],
+                    vec![],
+                ),
                 create_let("p", Some(create_data_struct_instance("Person", vec![]))),
                 create_set_property(create_let_ref("p"), ident("age"), int(1)),
             ],
@@ -2166,9 +2388,9 @@ mod test {
         parse(
             r#"
             data Person {
-                first_name,
-                last_name,
-                age,
+                first_name: string,
+                last_name: string,
+                age: int,
             };
             let p = Person{};
             p.age += 1;
@@ -2177,7 +2399,15 @@ mod test {
             p.age /= 1;
         "#,
             vec![
-                create_data_struct("Person", vec!["first_name", "last_name", "age"], vec![]),
+                create_data_struct(
+                    "Person",
+                    vec![
+                        ("first_name", Type::string()),
+                        ("last_name", Type::string()),
+                        ("age", Type::int()),
+                    ],
+                    vec![],
+                ),
                 create_let("p", Some(create_data_struct_instance("Person", vec![]))),
                 create_set_property(
                     create_let_ref("p"),

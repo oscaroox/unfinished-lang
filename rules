@@ -54,5 +54,12 @@ primary ::=
                                 | IDENTIFIER
                                 | "(" expression ")" ;
 
+type ::=                        | int
+                                | float
+                                | string
+                                | bool
+                                | IDENTIFIER
+                                | type "[]" ;
+
 DATACLASSINSTANCE ::=       IDENTIFIER "{" ( dataClassInstanceFields  )? "}" ; 
 dataClassInstanceFields ::=     IDENTIFIER ( (",", dataClassInstanceField)*  | ":" expression ("," dataClassInstanceField)* ) ;

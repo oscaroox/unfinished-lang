@@ -2,7 +2,7 @@ use crate::{
     Assign, BinOp, BinaryOperation, Block, BreakExpr, Call, ContinueExpr, DataStruct,
     DataStructInstance, DataStructInstanceField, Function, GetProperty, Grouping, Identifier,
     IfConditional, ImplicitReturn, Index, LetExpr, LetRef, Literal, Logic, LogicOperation,
-    LoopExpr, ReturnExpr, SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation,
+    LoopExpr, ReturnExpr, SelfExpr, SetIndex, SetProperty, Type, UnaryOp, UnaryOperation,
 };
 use span_util::{Span, WithSpan};
 
@@ -199,6 +199,7 @@ impl Expression {
     pub fn create_function(
         name: Option<String>,
         params: Vec<Identifier>,
+        return_type: Type,
         is_static: bool,
         body: Expression,
         span: Span,
@@ -207,6 +208,7 @@ impl Expression {
             Function {
                 name,
                 params,
+                return_type,
                 body: Box::new(body),
                 is_static,
             },
