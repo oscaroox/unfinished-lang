@@ -623,10 +623,6 @@ mod test {
         Identifier::with_value_type(name.into(), Some(Type::int()))
     }
 
-    fn ident_bool(name: &str) -> Identifier {
-        Identifier::with_value_type(name.into(), Some(Type::bool()))
-    }
-
     fn data_struct(
         name: &str,
         fields: Vec<Identifier>,
@@ -642,7 +638,6 @@ mod test {
     }
 
     #[test]
-    // TODO test implicit returns
     fn eval_implicit_returns() {
         run(
             r#"

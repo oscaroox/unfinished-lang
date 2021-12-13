@@ -55,3 +55,28 @@ impl std::fmt::Display for Identifier {
         write!(f, "{}", self.value)
     }
 }
+
+#[cfg(test)]
+pub mod test {
+    use crate::{Identifier, Type};
+
+    pub fn ident(name: &str) -> Identifier {
+        Identifier::new(name.into())
+    }
+
+    pub fn ident_string(name: &str) -> Identifier {
+        Identifier::with_value_type(name.into(), Some(Type::string()))
+    }
+
+    pub fn ident_bool(name: &str) -> Identifier {
+        Identifier::with_value_type(name.into(), Some(Type::bool()))
+    }
+
+    pub fn ident_int(name: &str) -> Identifier {
+        Identifier::with_value_type(name.into(), Some(Type::int()))
+    }
+
+    pub fn ident_float(name: &str) -> Identifier {
+        Identifier::with_value_type(name.into(), Some(Type::float()))
+    }
+}

@@ -138,14 +138,6 @@ impl Parser {
             self.eat_semi()?;
         }
         Ok(expr)
-        // match self.eat(TokenType::SemiColon, "Expected ';' after expression") {
-        //     Ok(_) => Ok(expr),
-        //     Err(err) => match err {
-        //         // TODO find out why i intercept the error message here
-        //         // ParserError::ExpectedToken(msg, _) => Err(self.error(msg, self.prev_token.clone())),
-        //         _ => Err(err),
-        //     },
-        // }
     }
 
     fn expression(&mut self) -> ParserResult {
@@ -1054,6 +1046,7 @@ mod test {
     use crate::ParserError;
 
     use super::Parser;
+
     use ast::{
         BinaryOperation, DataStructInstanceField, Expression, Identifier, Literal, LogicOperation,
         Program, Type, UnaryOperation,
