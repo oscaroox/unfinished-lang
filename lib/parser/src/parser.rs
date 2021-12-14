@@ -592,10 +592,12 @@ impl Parser {
                 Expression::LetRef(let_ref) => match assignment_tok.0.token_type {
                     TokenType::Assign => {
                         return Ok(Expression::create_assign(
+                            // TODO pass full let ref expression to lhs of assign
+                            // TODO make Identifier an expression in ast
                             let_ref.0.name.clone(),
                             rhs,
                             full_span,
-                        ))
+                        ));
                     }
                     _ => {
                         return Ok(Expression::create_assign(

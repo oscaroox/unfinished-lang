@@ -182,6 +182,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "typechecker"
+version = "0.1.0"
+dependencies = [
+ "ast",
+ "parser",
+ "scanner",
+]
+
+[[package]]
 name = "unf"
 version = "0.1.0"
 dependencies = [

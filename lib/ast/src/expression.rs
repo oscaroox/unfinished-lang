@@ -66,6 +66,16 @@ impl Expression {
         }
     }
 
+    pub fn is_array_lit(&self) -> bool {
+        match self {
+            Expression::Literal(lit) => match lit.0 {
+                Literal::Array(_) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
     pub fn create_let(name: Identifier, value: Option<Expression>, span: Span) -> Expression {
         let value = if let Some(e) = value {
             Some(Box::new(e))
