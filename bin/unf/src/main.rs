@@ -10,6 +10,7 @@ use std::{
     process,
     rc::Rc,
 };
+use typechecker::typecheck;
 
 fn main() {
     let matches = App::new("Unfinished Language")
@@ -95,19 +96,21 @@ fn parse_contents(source: String) -> Result<Program, String> {
         return Err("Parser error".to_string());
     }
 
-    let mut analyzer = Analyzer::new();
+    // let mut analyzer = Analyzer::new();
 
-    let errors = analyzer.analyze(&exprs);
+    // let errors = analyzer.analyze(&exprs);
 
-    if errors.len() > 0 {
-        for mut err in errors {
-            match err.into_report().print(Source::from(source.to_string())) {
-                Ok(_) => {}
-                Err(err) => println!("{}", err),
-            }
-        }
-        return Err("Analyzer error".to_string());
-    }
+    // if errors.len() > 0 {
+    //     for mut err in errors {
+    //         match err.into_report().print(Source::from(source.to_string())) {
+    //             Ok(_) => {}
+    //             Err(err) => println!("{}", err),
+    //         }
+    //     }
+    //     return Err("Analyzer error".to_string());
+    // }
+
+    typecheck(&exprs, None);
 
     Ok(exprs)
 }

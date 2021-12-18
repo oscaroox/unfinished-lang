@@ -200,6 +200,7 @@ dependencies = [
  "interpreter",
  "parser",
  "scanner",
+ "typechecker",
 ]
 
 [[package]]

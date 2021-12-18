@@ -12,4 +12,5 @@ ast = { path = "../../lib/ast" }
 scanner = { path = "../../lib/scanner" }
 parser = { path = "../../lib/parser" }
 interpreter = { path = "../../lib/interpreter" }
+typechecker = { path = "../../lib/typechecker" }
 ariadne = "0.1.3"
