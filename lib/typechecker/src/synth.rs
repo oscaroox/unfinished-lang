@@ -625,6 +625,20 @@ mod test {
     }
 
     #[test]
+    fn test_function_callback_synth() {
+        // TODO dont throw annnotation needed error in parser
+        parse(
+            "
+            let main = fun(cb: Fun(id: int)) {
+                cb(1);
+            };
+
+            main(fun(id) => id == 1);
+        ",
+        );
+    }
+
+    #[test]
     fn test_index_synth() {
         parse(
             "
