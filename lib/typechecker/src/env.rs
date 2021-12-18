@@ -1,8 +1,7 @@
+use crate::Type;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-
-use crate::Type;
 
 #[derive(Debug)]
 pub struct Env {
@@ -25,12 +24,17 @@ impl Env {
         }
     }
 
+    fn get_store(&mut self) -> &mut HashMap<String, Type> {
+        &mut self.store
+    }
+
     pub fn set(&mut self, name: &str, value: Type) {
-        self.store.insert(name.into(), value);
+        let store = self.get_store();
+        store.insert(name.into(), value);
     }
 
     pub fn get(&mut self, name: &str) -> Option<Type> {
-        match self.store.get(name) {
+        match self.get_store().get(name) {
             Some(ttype) => Some(ttype.clone()),
             None => match &self.parent {
                 Some(env) => env.borrow_mut().get(name),
