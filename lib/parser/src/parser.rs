@@ -172,13 +172,17 @@ impl Parser {
                 }
 
                 let ident = self.eat(TokenType::Identifier, "Expected 'identifier'")?;
-                if self.eat_optional(TokenType::Colon).is_none() {
-                    return Err(ParserError::TypeAnnotationNeeded(ident));
-                }
 
-                let ttype = self.parse_type(false)?;
+                let ident = if self.eat_optional(TokenType::Colon).is_none() {
+                    // return Err(ParserError::TypeAnnotationNeeded(ident));
+                    Identifier::new(ident.0.value)
+                } else {
+                    let ttype = self.parse_type(false)?;
+                    Identifier::with_value_type(ident.0.value, Some(ttype))
+                };
+                // let ttype = self.parse_type(false)?;
 
-                params.push(Identifier::with_value_type(ident.0.value, Some(ttype)));
+                params.push(ident);
 
                 if !self.matches(vec![TokenType::Comma])
                     || self.curr_token.0.token_type == token_end
@@ -1446,8 +1450,6 @@ mod test {
         let x: Fun(;
         let x: Fun): int = 2;
         let x: Fun(): = 2;
-        let x: Fun(a): int = 2;
-        let x: Fun(a: int, b): int = 2;
         let x: Fun(a: unit): int = 2;
         ",
             vec![
@@ -1464,14 +1466,6 @@ mod test {
                     Token::right_paren(Span::fake().into()),
                 ),
                 ParserError::InvalidType(Token::assign(Span::fake().into())),
-                ParserError::TypeAnnotationNeeded(Token::identifier(
-                    "a".into(),
-                    Span::fake().into(),
-                )),
-                ParserError::TypeAnnotationNeeded(Token::identifier(
-                    "b".into(),
-                    Span::fake().into(),
-                )),
                 ParserError::InvalidUseOfUnitType(Token::unit(Span::fake().into())),
             ],
         );
@@ -1486,10 +1480,6 @@ mod test {
         fun(a: unit) {};
         ",
             vec![
-                ParserError::TypeAnnotationNeeded(Token::identifier(
-                    "a".into(),
-                    Span::fake().into(),
-                )),
                 ParserError::InvalidType(Token::int_const("123".into(), Span::fake().into())),
                 ParserError::InvalidUseOfUnitType(Token::unit(Span::fake().into())),
             ],
