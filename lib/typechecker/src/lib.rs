@@ -1,4 +1,3 @@
-mod Env;
 mod env;
 mod synth;
 mod types;
