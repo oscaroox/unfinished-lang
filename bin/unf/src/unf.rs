@@ -49,8 +49,8 @@ impl Unf {
         let env = Rc::new(RefCell::new(Environment::new()));
         println!("Welcome to the unfinished language repl.");
         loop {
-            let readline = rl.readline(">");
             let mut interpreter = Interpreter::with_env(env.clone());
+            let readline = rl.readline(">");
             match readline {
                 Ok(line) => match self.run_contents(line) {
                     Ok(exprs) => match interpreter.run(exprs) {
