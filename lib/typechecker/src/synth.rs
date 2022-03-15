@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
+use crate::env::Env;
 use crate::types::{DataStructField, DataStructMethod, Singleton, Type};
-use crate::Env::Env;
 use ast::{Expression, Function};
 
 pub fn check(expr: &Expression, ttype: Type, env: &Rc<RefCell<Env>>) {
@@ -9,11 +9,60 @@ pub fn check(expr: &Expression, ttype: Type, env: &Rc<RefCell<Env>>) {
         return check_array(&expr, ttype, env);
     }
 
+    if expr.is_function() && ttype.is_function() {
+        return check_function(expr, ttype, env);
+    }
+
     let synth_type = synth(&expr, env);
 
     if !synth_type.is_subtype(ttype.clone()) {
         panic!("Expected {}, got {}", ttype, synth_type)
     }
+}
+
+pub fn check_function(expr: &Expression, ttype: Type, env: &Rc<RefCell<Env>>) {
+    let fun = match &expr {
+        Expression::Function(e) => e,
+        _ => unreachable!(),
+    };
+
+    let fun_type = match &ttype {
+        Type::Function(p, r) => (p, r),
+        _ => unreachable!(),
+    };
+
+    let params = &fun.0.params;
+
+    if params.len() != fun_type.0.len() {
+        panic!("Exepcted {} args, got {}", params.len(), fun_type.0.len())
+    }
+
+    let env = Rc::new(RefCell::new(Env::with_parent(Rc::clone(&env))));
+
+    let type_params: Vec<Type> = params
+        .into_iter()
+        .zip(fun_type.0.into_iter())
+        .map(|e| {
+            let ident = e.0;
+            let ttype = e.1;
+
+            env.borrow_mut().set(&ident.value, ttype.clone());
+
+            match &ident.value_type {
+                Some(v) => Type::from_ast_type(v.clone(), &env),
+                None => ttype.clone(),
+            }
+        })
+        .collect();
+
+    let ret = synth(&fun.0.body, &env);
+    let synth_type = Type::Function(type_params, Box::new(ret));
+
+    if !synth_type.is_subtype(ttype.clone()) {
+        panic!("Expected {}, got {}", ttype, synth_type)
+    }
+
+    // params.into_iter().enumerate(|e| {});
 }
 
 pub fn check_array(expr: &Expression, ttype: Type, env: &Rc<RefCell<Env>>) {
@@ -32,9 +81,9 @@ pub fn synth_function_signature(expr: &Function, env: &Rc<RefCell<Env>>) -> Type
     let param_types: Vec<Type> = expr
         .params
         .iter()
-        .map(|e| {
-            let ttype = Type::from_ast_type(e.value_type.as_ref().unwrap().clone(), &env);
-            ttype
+        .map(|e| match &e.value_type {
+            Some(t) => Type::from_ast_type(t.clone(), &env),
+            None => panic!("Annotation type needed"),
         })
         .collect();
 
@@ -194,7 +243,7 @@ pub fn synth(expr: &Expression, env: &Rc<RefCell<Env>>) -> Type {
                     // TODO handle self param in methods
                     if params.len() != expr.arguments.len() {
                         panic!(
-                            "Exepcted {} args, got {}",
+                            "Exepected {} args, got {}",
                             params.len(),
                             expr.arguments.len()
                         )
@@ -218,8 +267,11 @@ pub fn synth(expr: &Expression, env: &Rc<RefCell<Env>>) -> Type {
             let mut methods = vec![];
 
             for field in &expr.fields {
-                let v = field.value_type.as_ref().unwrap().clone();
-                let ttype = Type::from_ast_type(v, &env);
+                let t = match &field.value_type {
+                    Some(t) => t.clone(),
+                    None => panic!("Type Annotation needed"),
+                };
+                let ttype = Type::from_ast_type(t, &env);
                 fields.push(DataStructField {
                     name: field.value.to_string(),
                     ttype,
@@ -626,14 +678,16 @@ mod test {
 
     #[test]
     fn test_function_callback_synth() {
+        // let n: fn(x: usize) -> usize = |x: f64| 2;
+
         // TODO dont throw annnotation needed error in parser
         parse(
             "
-            let main = fun(cb: Fun(id: int)) {
+            let main: Fun(cb: Fun(id: int)) = fun(cb) {
                 cb(1);
             };
 
-            main(fun(id) => id == 1);
+            main(fun(id) => { id == 1; });
         ",
         );
     }
