@@ -76,6 +76,13 @@ impl Expression {
         }
     }
 
+    pub fn is_function(&self) -> bool {
+        match self {
+            Expression::Function(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn create_let(name: Identifier, value: Option<Expression>, span: Span) -> Expression {
         let value = if let Some(e) = value {
             Some(Box::new(e))

@@ -668,6 +668,7 @@ impl Parser {
                 _ => return Err(ParserError::InvalidAssignmentTarget(curr_token)),
             }
         }
+
         Ok(expr)
     }
 
