@@ -592,6 +592,7 @@ mod test {
     use ast::{Identifier, Type};
     use parser::Parser;
     use scanner::Scanner;
+    use span_util::Span;
 
     pub fn run(src: &str, expected: Value) {
         let scanner = Scanner::new(src.to_string());
@@ -612,15 +613,15 @@ mod test {
     }
 
     fn ident(name: &str) -> Identifier {
-        Identifier::new(name.to_string())
+        Identifier::new(name.to_string(), Span::fake())
     }
 
     fn ident_string(name: &str) -> Identifier {
-        Identifier::with_value_type(name.into(), Some(Type::string()))
+        Identifier::with_value_type(name.into(), Some(Type::string()), Span::fake())
     }
 
     fn ident_int(name: &str) -> Identifier {
-        Identifier::with_value_type(name.into(), Some(Type::int()))
+        Identifier::with_value_type(name.into(), Some(Type::int()), Span::fake())
     }
 
     fn data_struct(
@@ -630,7 +631,7 @@ mod test {
         instance_methods: HashMap<String, FunctionValue>,
     ) -> DataStruct {
         DataStruct {
-            name: Identifier::new(name.to_string()),
+            name: Identifier::new(name.to_string(), Span::fake()),
             fields,
             static_methods,
             instance_methods,

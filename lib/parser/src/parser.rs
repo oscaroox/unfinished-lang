@@ -175,10 +175,10 @@ impl Parser {
 
                 let ident = if self.eat_optional(TokenType::Colon).is_none() {
                     // return Err(ParserError::TypeAnnotationNeeded(ident));
-                    Identifier::new(ident.0.value)
+                    Identifier::new(ident.0.value, ident.1)
                 } else {
                     let ttype = self.parse_type(false)?;
-                    Identifier::with_value_type(ident.0.value, Some(ttype))
+                    Identifier::with_value_type(ident.0.value, Some(ttype), ident.1)
                 };
                 // let ttype = self.parse_type(false)?;
 
@@ -305,7 +305,7 @@ impl Parser {
         let span: Span = start_span.extend(self.curr_token.1.clone());
 
         Ok(Expression::create_let(
-            Identifier::with_value_type(identifier.0.value, itype),
+            Identifier::with_value_type(identifier.0.value, itype, identifier.1),
             init,
             span,
         ))
@@ -372,7 +372,7 @@ impl Parser {
                 if self.matches(vec![TokenType::Comma])
                     || self.curr_token.0.token_type == TokenType::RightBrace
                 {
-                    let ident = Identifier::new(id.0.value.to_string());
+                    let ident = Identifier::new(id.0.value.to_string(), id.1);
                     fields.push(DataStructInstanceField::new(
                         ident.clone(),
                         Expression::create_let_ref(ident, id_span),
@@ -385,8 +385,10 @@ impl Parser {
 
                 self.eat(TokenType::Colon, "Expected ':'")?;
                 let expr = self.expression()?;
-                let field =
-                    DataStructInstanceField::new(Identifier::new(id.0.value.to_string()), expr);
+                let field = DataStructInstanceField::new(
+                    Identifier::new(id.0.value.to_string(), id.1),
+                    expr,
+                );
                 fields.push(field);
 
                 if !self.matches(vec![TokenType::Comma])
@@ -399,7 +401,7 @@ impl Parser {
 
         self.eat(TokenType::RightBrace, "Expected '}'")?;
         Ok(Expression::create_data_struct_instance(
-            Identifier::new(ident.0.value.to_string()),
+            Identifier::new(ident.0.value.to_string(), ident.1),
             fields,
             identifier_span,
         ))
@@ -429,7 +431,7 @@ impl Parser {
         }
 
         Ok(Expression::create_data_struct(
-            Identifier::new(ident.0.value.to_string()),
+            Identifier::new(ident.0.value.to_string(), ident.1),
             fields,
             methods,
             ident_span,
@@ -473,6 +475,7 @@ impl Parser {
                         token.0.value,
                         token.0.token_type,
                         Type::Identifier(data_struct_indentifier),
+                        token.1,
                     ));
                 }
                 (FunctionKind::Function, true) => {
@@ -822,7 +825,7 @@ impl Parser {
                 let is_callable = self.check(TokenType::LeftParen);
                 expr = Expression::create_get_property(
                     expr,
-                    Identifier::new(name.0.value.to_string()),
+                    Identifier::new(name.0.value.to_string(), ident_span.clone()),
                     is_callable,
                     ident_span,
                 )
@@ -884,13 +887,13 @@ impl Parser {
             //  e.g if value {}
             //        ^^^^^^^^ after the If the parser will try to parse the expression after if as a data struct
             //  possible solution is the one below checking if the the previous token is one of the keywords: If and In
-            //  there should be a better solution: what if we implement pattern matching / destructering
+            //  there should be a better solution: what if we implement pattern matching / destructuring
             //  let Person { name } = person; // will be parsed as data struct instantiation
             //  match person {
             //      Person { name } => name,
             //  }
             //  In the match expression the parser would try to parse the first match arm as
-            //  a data struct instantation
+            //  a data struct instantiation
             //
             //  Possible solution is to use the :: token for instantiation
             //  e.g: Person :: { id: 1 };
@@ -903,7 +906,7 @@ impl Parser {
 
         if self.matches(vec![TokenType::Identifier]) {
             return Ok(Expression::create_let_ref(
-                Identifier::new(token.0.value.to_string()),
+                Identifier::new(token.0.value.to_string(), token.1),
                 span,
             ));
         }
@@ -1129,11 +1132,11 @@ mod test {
     }
 
     fn ident(val: &str) -> Identifier {
-        Identifier::new(val.to_string())
+        Identifier::new(val.to_string(), Span::fake())
     }
 
     fn ident_type(val: &str, value_type: Type) -> Identifier {
-        Identifier::with_value_type(val.into(), Some(value_type))
+        Identifier::with_value_type(val.into(), Some(value_type), Span::fake())
     }
 
     fn ident_self(r#type: &str) -> Identifier {
@@ -1141,6 +1144,7 @@ mod test {
             value: "self".to_string(),
             token_type: Some(TokenType::SELF),
             value_type: Some(Type::Identifier(r#type.into())),
+            span: Span::fake(),
         }
     }
 
@@ -1149,7 +1153,7 @@ mod test {
     }
 
     fn create_let_ref(val: &str) -> Expression {
-        Expression::create_let_ref(Identifier::new(val.to_string()), Span::fake())
+        Expression::create_let_ref(Identifier::new(val.to_string(), Span::fake()), Span::fake())
     }
 
     fn create_block(exprs: Vec<Expression>) -> Expression {
@@ -1170,7 +1174,7 @@ mod test {
         methods: Vec<Expression>,
     ) -> Expression {
         Expression::create_data_struct(
-            Identifier::new(name.to_string()),
+            Identifier::new(name.to_string(), Span::fake()),
             fields
                 .iter()
                 .map(|v| ident_type(v.0, v.1.clone()))
@@ -1182,14 +1186,14 @@ mod test {
 
     fn create_data_struct_instance(name: &str, fields: Vec<DataStructInstanceField>) -> Expression {
         Expression::create_data_struct_instance(
-            Identifier::new(name.to_string()),
+            Identifier::new(name.to_string(), Span::fake()),
             fields,
             Span::fake(),
         )
     }
 
     fn data_struct_instance_field(name: &str, value: Expression) -> DataStructInstanceField {
-        DataStructInstanceField::new(Identifier::new(name.to_string()), value)
+        DataStructInstanceField::new(Identifier::new(name.to_string(), Span::fake()), value)
     }
 
     fn create_assign(name: Identifier, rhs: Expression) -> Expression {
@@ -2196,7 +2200,7 @@ mod test {
                         false,
                         create_block(vec![create_get_property(
                             create_self("self"),
-                            Identifier::new("first_name".to_string()),
+                            ident("first_name"),
                             false,
                         )]),
                     ),
@@ -2336,11 +2340,7 @@ mod test {
                     vec![],
                 ),
                 create_let("p", Some(create_data_struct_instance("Person", vec![]))),
-                create_get_property(
-                    create_let_ref("p"),
-                    Identifier::new("first_name".to_string()),
-                    false,
-                ),
+                create_get_property(create_let_ref("p"), ident("first_name"), false),
             ],
         );
     }
