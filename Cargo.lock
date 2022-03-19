@@ -512,9 +512,12 @@ dependencies = [
 name = "typechecker"
 version = "0.1.0"
 dependencies = [
+ "ariadne",
  "ast",
  "parser",
  "scanner",
+ "span_util",
+ "thiserror",
 ]
 
 [[package]]

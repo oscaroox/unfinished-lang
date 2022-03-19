@@ -10,3 +10,7 @@ edition = "2018"
 ast = { path = "../ast" }
 parser = { path = "../parser" }
 scanner = { path = "../scanner" }
+span_util = { path = "../span_util" }
+
+thiserror = "1.0"
+ariadne = "0.1.5"

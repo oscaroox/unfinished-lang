@@ -8,6 +8,7 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use scanner::Scanner;
 use std::{cell::RefCell, process, rc::Rc};
+use typechecker::TypeChecker;
 
 pub struct Unf;
 
@@ -75,6 +76,7 @@ impl Unf {
 
     pub fn run_contents(&mut self, source: String) -> Result<Program, String> {
         let scanner = Scanner::new(source.to_string());
+        let mut type_checker = TypeChecker::new();
         let mut parser = Parser::new(scanner);
 
         let (exprs, errors) = parser.parse();
@@ -103,7 +105,17 @@ impl Unf {
         //     return Err("Analyzer error".to_string());
         // }
 
-        typechecker::typecheck(&exprs, None);
+        let (_, type_errors) = type_checker.type_check(&exprs, None);
+
+        if !type_errors.is_empty() {
+            for mut err in type_errors.clone() {
+                match err.into_report().print(Source::from(source.to_string())) {
+                    Ok(_) => {}
+                    Err(err) => println!("{}", err),
+                }
+            }
+            return Err("Parser error".to_string());
+        }
 
         Ok(exprs)
     }

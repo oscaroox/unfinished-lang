@@ -12,6 +12,18 @@ pub enum BinaryOperation {
     Divide,
 }
 
+impl std::fmt::Display for BinaryOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BinaryOperation::Add => write!(f, "+"),
+            BinaryOperation::ConcatInterpolation => write!(f, ""),
+            BinaryOperation::Substract => write!(f, "-"),
+            BinaryOperation::Multiply => write!(f, "*"),
+            BinaryOperation::Divide => write!(f, "/"),
+        }
+    }
+}
+
 impl BinaryOperation {
     pub fn from_token(token: Token) -> BinaryOperation {
         match token.token_type {
