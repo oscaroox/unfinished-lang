@@ -22,7 +22,7 @@ pub enum ParserError {
     #[error("Unterminated function call")]
     UnterminatedFunctionCall(TokenWithSpan),
 
-    #[error("Invalid assignemnt target")]
+    #[error("Invalid assignment target")]
     InvalidAssignmentTarget(TokenWithSpan),
 
     #[error("Invalid unary operation")]
