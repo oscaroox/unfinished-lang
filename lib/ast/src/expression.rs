@@ -21,7 +21,7 @@ pub enum Expression {
     Grouping(WithSpan<Grouping>),
     Logic(WithSpan<Logic>),
     Call(Call),
-    Function(WithSpan<Function>),
+    Function(Function),
     DataStruct(DataStruct),
     DataStructInstance(WithSpan<DataStructInstance>),
     Block(WithSpan<Block>),
@@ -215,16 +215,14 @@ impl Expression {
         body: Expression,
         span: Span,
     ) -> Expression {
-        Expression::Function(WithSpan(
-            Function {
-                name,
-                params,
-                return_type,
-                body: Box::new(body),
-                is_static,
-            },
+        Expression::Function(Function {
+            name,
+            params,
+            return_type,
+            body: Box::new(body),
+            is_static,
             span,
-        ))
+        })
     }
 
     pub fn create_if(
@@ -356,7 +354,7 @@ impl Expression {
             Expression::Grouping(s) => s.1.clone(),
             Expression::Logic(s) => s.1.clone(),
             Expression::Call(s) => s.span.clone(),
-            Expression::Function(s) => s.1.clone(),
+            Expression::Function(s) => s.span.clone(),
             Expression::DataStruct(s) => s.span.clone(),
             Expression::DataStructInstance(s) => s.1.clone(),
             Expression::Block(s) => s.1.clone(),

@@ -273,11 +273,11 @@ impl Parser {
                 Ok(expr) => match expr {
                     Expression::Function(fun) => Expression::create_function(
                         Some(identifier.value.to_string()),
-                        fun.0.params,
-                        fun.0.return_type,
-                        fun.0.is_static,
-                        *fun.0.body,
-                        fun.1,
+                        fun.params,
+                        fun.return_type,
+                        fun.is_static,
+                        *fun.body,
+                        fun.span,
                     ),
                     _ => expr,
                 },

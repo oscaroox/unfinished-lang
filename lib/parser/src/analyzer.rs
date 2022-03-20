@@ -105,7 +105,7 @@ impl Analyzer {
             Expression::Call(_) => todo!(),
             Expression::Function(expr) => {
                 self.function_scopes.push(FunctionScope::Function);
-                self.expression(&expr.0.body)?;
+                self.expression(&expr.body)?;
                 self.function_scopes.pop();
             }
             Expression::DataStruct(expr) => {

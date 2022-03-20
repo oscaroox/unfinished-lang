@@ -143,7 +143,6 @@ impl TypeChecker {
                 }
             }
             Expression::Function(expr) => {
-                let expr = &expr.0;
                 let fn_type = self.synth_function_signature(expr, &env)?;
                 let env = Rc::new(RefCell::new(Env::with_parent(Rc::clone(&env))));
 
@@ -243,13 +242,13 @@ impl TypeChecker {
                 for method in &expr.methods {
                     match method {
                         Expression::Function(expr) => {
-                            let name = expr.0.name.as_ref().unwrap().to_string();
+                            let name = expr.name.as_ref().unwrap().to_string();
 
-                            let ttype = self.synth_function_signature(&expr.0, env)?;
+                            let ttype = self.synth_function_signature(&expr, env)?;
                             methods.push(DataStructMethod {
                                 name,
                                 ttype,
-                                is_static: expr.0.is_static,
+                                is_static: expr.is_static,
                             });
                         }
                         _ => unreachable!(),
@@ -268,12 +267,12 @@ impl TypeChecker {
                 for method in &expr.methods {
                     match method {
                         Expression::Function(expr) => {
-                            let name = expr.0.name.as_ref().unwrap().to_string();
-                            let ttype = self.synth_function_signature(&expr.0, env)?;
+                            let name = expr.name.as_ref().unwrap().to_string();
+                            let ttype = self.synth_function_signature(&expr, env)?;
                             methods.push(DataStructMethod {
                                 name,
                                 ttype,
-                                is_static: expr.0.is_static,
+                                is_static: expr.is_static,
                             });
                         }
                         _ => unreachable!(),
@@ -676,7 +675,7 @@ impl TypeChecker {
             _ => unreachable!(),
         };
 
-        let params = &fun.0.params;
+        let params = &fun.params;
 
         if params.len() != fun_type.0.len() {
             return Err(TypeError::ExpectedArguments(
@@ -704,7 +703,7 @@ impl TypeChecker {
             })
             .collect();
 
-        let ret = self.synth(&fun.0.body, &env)?;
+        let ret = self.synth(&fun.body, &env)?;
         Ok(Type::Function(type_params, Box::new(ret)))
     }
 

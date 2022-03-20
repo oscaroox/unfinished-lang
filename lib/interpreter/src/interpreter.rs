@@ -116,7 +116,7 @@ impl Interpreter {
             Expression::Grouping(expr) => self.expression(&expr.0.expr),
             Expression::Logic(expr) => self.eval_logic_expression(&expr.0),
             Expression::Call(expr) => self.eval_call(&expr),
-            Expression::Function(expr) => self.eval_function(&expr.0),
+            Expression::Function(expr) => self.eval_function(&expr),
             Expression::Block(expr) => self.eval_block(&expr.0),
             Expression::If(expr) => self.eval_if_conditional(&expr.0),
             Expression::Index(expr) => self.eval_index(&expr.0),
@@ -294,12 +294,12 @@ impl Interpreter {
             match method {
                 Expression::Function(fun) => match self.expression(method)? {
                     Value::Function(value_fun) => {
-                        if fun.0.is_static {
+                        if fun.is_static {
                             static_methods
-                                .insert(fun.0.name.as_ref().unwrap().to_string(), value_fun);
+                                .insert(fun.name.as_ref().unwrap().to_string(), value_fun);
                         } else {
                             instance_methods
-                                .insert(fun.0.name.as_ref().unwrap().to_string(), value_fun);
+                                .insert(fun.name.as_ref().unwrap().to_string(), value_fun);
                         }
                     }
                     _ => unreachable!(),
