@@ -438,7 +438,8 @@ impl Parser {
     }
 
     fn return_expression(&mut self) -> ParserResult {
-        let mut span: Span = self.prev_token.span.clone();
+        let return_token = self.prev_token.clone();
+        let mut span: Span = return_token.span.clone();
         let mut value = None;
 
         if !self.curr_token.is_semi_colon() {
@@ -448,7 +449,7 @@ impl Parser {
         }
 
         let span = span.extend(self.curr_token.span.clone());
-        Ok(Expression::create_return(value, span))
+        Ok(Expression::create_return(value, span, return_token.span))
     }
 
     fn fun_expression(&mut self, kind: FunctionKind) -> ParserResult {
@@ -1158,7 +1159,7 @@ mod test {
     }
 
     fn create_return(val: Option<Expression>) -> Expression {
-        Expression::create_return(val, Span::fake())
+        Expression::create_return(val, Span::fake(), Span::fake())
     }
 
     fn create_implicit_return(val: Expression) -> Expression {

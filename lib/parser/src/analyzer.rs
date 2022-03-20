@@ -126,10 +126,10 @@ impl Analyzer {
             Expression::Return(expr) => {
                 if !self.is_in_function() {
                     if !self.is_in_method() {
-                        self.error(AnalyzerError::NoTopLevelReturn(expr.1.clone()));
+                        self.error(AnalyzerError::NoTopLevelReturn(expr.span.clone()));
                     }
                 }
-                if let Some(e) = &*expr.0.value {
+                if let Some(e) = &*expr.value {
                     self.expression(e)?
                 }
             }

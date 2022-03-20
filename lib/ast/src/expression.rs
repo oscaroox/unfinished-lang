@@ -27,7 +27,7 @@ pub enum Expression {
     Block(WithSpan<Block>),
     If(IfConditional),
     ImplicitReturn(WithSpan<ImplicitReturn>),
-    Return(WithSpan<ReturnExpr>),
+    Return(ReturnExpr),
     SelfExpr(WithSpan<SelfExpr>),
     LoopExpr(WithSpan<LoopExpr>),
     BreakExpr(BreakExpr),
@@ -256,13 +256,16 @@ impl Expression {
         Expression::Block(WithSpan(Block { exprs }, span))
     }
 
-    pub fn create_return(value: Option<Expression>, span: Span) -> Expression {
-        Expression::Return(WithSpan(
-            ReturnExpr {
-                value: Box::new(value),
-            },
-            span.into(),
-        ))
+    pub fn create_return(
+        value: Option<Expression>,
+        span: Span,
+        return_token_span: Span,
+    ) -> Expression {
+        Expression::Return(ReturnExpr {
+            value: Box::new(value),
+            span,
+            return_token: return_token_span,
+        })
     }
 
     pub fn create_implicit_return(value: Expression, span: Span) -> Expression {
@@ -350,7 +353,7 @@ impl Expression {
             Expression::Block(s) => s.1.clone(),
             Expression::If(s) => s.span.clone(),
             Expression::ImplicitReturn(s) => s.1.clone(),
-            Expression::Return(s) => s.1.clone(),
+            Expression::Return(s) => s.span.clone(),
             Expression::SelfExpr(s) => s.1.clone(),
             Expression::LoopExpr(s) => s.1.clone(),
             Expression::BreakExpr(s) => s.span.clone(),

@@ -121,7 +121,7 @@ impl Interpreter {
             Expression::If(expr) => self.eval_if_conditional(&expr),
             Expression::GetIndex(expr) => self.eval_index(&expr),
             Expression::SetIndex(expr) => self.eval_set_index(&expr),
-            Expression::Return(expr) => self.eval_return(&expr.0),
+            Expression::Return(expr) => self.eval_return(&expr),
             Expression::ImplicitReturn(expr) => self.eval_implicit_return(&expr.0),
             Expression::DataStruct(expr) => self.eval_data_struct(&expr),
             Expression::DataStructInstance(expr) => self.eval_data_struct_instance(&expr.0),

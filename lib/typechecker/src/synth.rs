@@ -135,13 +135,10 @@ impl TypeChecker {
                 let expr = &expr.0;
                 self.synth(&expr.value, &env)
             }
-            Expression::Return(expr) => {
-                let expr = &expr.0;
-                match &*expr.value {
-                    Some(e) => self.synth(e, env),
-                    None => Ok(Type::Unit),
-                }
-            }
+            Expression::Return(expr) => match &*expr.value {
+                Some(e) => self.synth(e, env),
+                None => Ok(Type::Unit),
+            },
             Expression::Function(expr) => {
                 let fn_type = self.synth_function_signature(expr, &env)?;
                 let env = Rc::new(RefCell::new(Env::with_parent(Rc::clone(&env))));
