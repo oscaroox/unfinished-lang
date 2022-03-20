@@ -112,7 +112,7 @@ impl Interpreter {
             Expression::Literal(expr) => self.eval_literal(&expr.0),
             Expression::Assign(expr) => self.eval_assignment(&expr),
             Expression::LetRef(expr) => self.eval_let_reference(&expr.0),
-            Expression::UnaryOp(expr) => self.eval_unaryop(&expr.0),
+            Expression::UnaryOp(expr) => self.eval_unaryop(&expr),
             Expression::Grouping(expr) => self.expression(&expr.0.expr),
             Expression::Logic(expr) => self.eval_logic_expression(&expr.0),
             Expression::Call(expr) => self.eval_call(&expr),
@@ -540,11 +540,11 @@ impl Interpreter {
         let right = self.expression(&unaryop.rhs)?;
 
         let res = match (left, right) {
-            (UnaryOperation::Minus, Value::Int(n1)) => Value::Int(-n1),
-            (UnaryOperation::Plus, Value::Int(n1)) => Value::Int(n1),
-            (UnaryOperation::Minus, Value::Float(n1)) => Value::Float(-n1),
-            (UnaryOperation::Plus, Value::Float(n1)) => Value::Float(n1),
-            (UnaryOperation::Not, Value::Bool(b1)) => Value::Bool(!b1),
+            (UnaryOperation::Minus(_), Value::Int(n1)) => Value::Int(-n1),
+            (UnaryOperation::Plus(_), Value::Int(n1)) => Value::Int(n1),
+            (UnaryOperation::Minus(_), Value::Float(n1)) => Value::Float(-n1),
+            (UnaryOperation::Plus(_), Value::Float(n1)) => Value::Float(n1),
+            (UnaryOperation::Not(_), Value::Bool(b1)) => Value::Bool(!b1),
             _ => panic!("invalid unary operation"),
         };
 

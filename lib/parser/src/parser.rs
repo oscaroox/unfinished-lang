@@ -772,12 +772,8 @@ impl Parser {
             let tok = self.prev_token.clone();
             let rhs = self.unary()?;
             let span: Span = tok.span.extend(rhs.get_span());
-            let op = match tok.token_type {
-                TokenType::Plus => UnaryOperation::Plus,
-                TokenType::Minus => UnaryOperation::Minus,
-                TokenType::Bang => UnaryOperation::Not,
-                _ => return Err(ParserError::InvalidUnaryOperation(tok)),
-            };
+            let op = UnaryOperation::from_token(tok);
+
             return Ok(Expression::create_unaryop(op, rhs, span));
         }
         self.call()
@@ -1842,13 +1838,13 @@ mod test {
         parse(
             "-1; 1 + -1; !1;",
             vec![
-                create_unaryop(UnaryOperation::Minus, int(1)),
+                create_unaryop(UnaryOperation::Minus(Span::fake()), int(1)),
                 create_binop(
                     int(1),
                     BinaryOperation::Add(Span::fake()),
-                    create_unaryop(UnaryOperation::Minus, int(1)),
+                    create_unaryop(UnaryOperation::Minus(Span::fake()), int(1)),
                 ),
-                create_unaryop(UnaryOperation::Not, int(1)),
+                create_unaryop(UnaryOperation::Not(Span::fake()), int(1)),
             ],
         );
     }

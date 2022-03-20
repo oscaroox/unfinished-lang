@@ -17,7 +17,7 @@ pub enum Expression {
     SetProperty(SetProperty),
     Let(WithSpan<LetExpr>),
     LetRef(WithSpan<LetRef>),
-    UnaryOp(WithSpan<UnaryOp>),
+    UnaryOp(UnaryOp),
     Grouping(WithSpan<Grouping>),
     Logic(WithSpan<Logic>),
     Call(Call),
@@ -123,13 +123,11 @@ impl Expression {
     }
 
     pub fn create_unaryop(op: UnaryOperation, rhs: Expression, span: Span) -> Expression {
-        Expression::UnaryOp(WithSpan(
-            UnaryOp {
-                op,
-                rhs: Box::new(rhs),
-            },
+        Expression::UnaryOp(UnaryOp {
+            op,
+            rhs: Box::new(rhs),
             span,
-        ))
+        })
     }
 
     pub fn create_grouping(expr: Expression, span: Span) -> Expression {
@@ -342,7 +340,7 @@ impl Expression {
             Expression::SetProperty(s) => s.span.clone(),
             Expression::Let(s) => s.1.clone(),
             Expression::LetRef(s) => s.1.clone(),
-            Expression::UnaryOp(s) => s.1.clone(),
+            Expression::UnaryOp(s) => s.span.clone(),
             Expression::Grouping(s) => s.1.clone(),
             Expression::Logic(s) => s.1.clone(),
             Expression::Call(s) => s.span.clone(),

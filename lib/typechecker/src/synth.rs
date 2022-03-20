@@ -433,25 +433,24 @@ impl TypeChecker {
                 }
             }
             Expression::UnaryOp(expr) => {
-                let unary = &expr.0;
-                let rhs = self.synth(&unary.rhs, env)?;
+                let rhs = self.synth(&expr.rhs, env)?;
 
-                match &unary.op {
-                    ast::UnaryOperation::Minus | ast::UnaryOperation::Plus => match rhs {
+                match &expr.op {
+                    ast::UnaryOperation::Minus(_) | ast::UnaryOperation::Plus(_) => match rhs {
                         Type::Singleton(Singleton::Int) => Ok(Type::int()),
                         Type::Singleton(Singleton::Float) => Ok(Type::float()),
                         _ => Err(TypeError::InvalidUnaryOperation(
-                            unary.op.to_string(),
+                            expr.op.to_string(),
                             rhs,
-                            expr.1.clone(),
+                            expr.span.clone(),
                         )),
                     },
-                    ast::UnaryOperation::Not => match rhs {
+                    ast::UnaryOperation::Not(_) => match rhs {
                         Type::Singleton(Singleton::Bool) => Ok(Type::bool()),
                         _ => Err(TypeError::InvalidUnaryOperation(
-                            unary.op.to_string(),
+                            expr.op.to_string(),
                             rhs,
-                            expr.1.clone(),
+                            expr.span.clone(),
                         )),
                     },
                 }
