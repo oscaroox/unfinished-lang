@@ -75,9 +75,9 @@ impl std::fmt::Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TokenType::Identifier => write!(f, "IDENTIFIER"),
-            TokenType::IntConst => write!(f, "INTCONST"),
-            TokenType::FloatConst => write!(f, "FLOATCONST"),
-            TokenType::StringConst => write!(f, "STRINGCONST"),
+            TokenType::IntConst => write!(f, "INT_CONST"),
+            TokenType::FloatConst => write!(f, "FLOAT_CONST"),
+            TokenType::StringConst => write!(f, "STRING_CONST"),
 
             TokenType::Int => write!(f, "int"),
             TokenType::Float => write!(f, "float"),
@@ -136,7 +136,7 @@ impl std::fmt::Display for TokenType {
             TokenType::DollarSign => write!(f, "$"),
             TokenType::Illegal => write!(f, "ILLEGAL"),
             TokenType::EOF => write!(f, "EOF"),
-            TokenType::BadToken => write!(f, "BADTOKEN"),
+            TokenType::BadToken => write!(f, "BAD_TOKEN"),
         }
     }
 }

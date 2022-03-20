@@ -28,7 +28,7 @@ impl Eq for Span {}
 impl PartialEq for Span {
     fn eq(&self, _: &Self) -> bool {
         // Ignore the span when comparing expressions
-        // this is only usefull for tests
+        // this is only useful for tests
         true
     }
 }
