@@ -1,6 +1,6 @@
 use crate::ParserError;
 use ast::{
-    BinaryOperation, DataStructInstanceField, Expression, Identifier, Literal, LogicOperation,
+    BinaryOperation, DataStructInstanceField, Expression, Identifier, LiteralValue, LogicOperation,
     Program, Type, UnaryOperation,
 };
 use scanner::{Scanner, ScannerMode, Token, TokenType};
@@ -255,7 +255,7 @@ impl Parser {
     }
 
     fn let_expression(&mut self) -> ParserResult {
-        let start_span: Span = self.prev_token.span.clone();
+        let let_token = self.prev_token.clone();
         let ident = self.curr_token.clone();
         let identifier = self.eat(TokenType::Identifier, "Expected identifier")?;
 
@@ -301,12 +301,13 @@ impl Parser {
             return Err(ParserError::TypeAnnotationNeeded(ident));
         }
 
-        let span: Span = start_span.extend(self.curr_token.span.clone());
+        let span: Span = let_token.span.extend(self.curr_token.span.clone());
 
         Ok(Expression::create_let(
             Identifier::with_value_type(identifier.value, itype, identifier.span),
             init,
             span,
+            let_token.span,
         ))
     }
 
@@ -319,12 +320,12 @@ impl Parser {
     }
 
     fn loop_expression(&mut self) -> ParserResult {
-        let if_span = self.prev_token.span.clone();
+        let loop_token = self.prev_token.clone();
         let token = self.curr_token.clone();
         let condition = if !self.check(TokenType::LeftBrace) {
             self.expression()?
         } else {
-            Expression::create_literal(Literal::Bool(true), if_span)
+            Expression::create_literal(LiteralValue::Bool(true), loop_token.span.clone())
         };
 
         let iterator = if self.matches(vec![TokenType::In]) {
@@ -340,10 +341,16 @@ impl Parser {
         if let Some(iter) = iterator {
             return match &condition {
                 Expression::LetRef(let_ref) => Ok(Expression::create_loop(
-                    Expression::create_let(let_ref.0.name.clone(), None, let_ref.1.clone()),
+                    Expression::create_let(
+                        let_ref.name.clone(),
+                        None,
+                        let_ref.span.clone(),
+                        let_ref.span.clone(),
+                    ),
                     body,
                     Some(iter.clone()),
-                    let_ref.1.extend(iter.get_span()),
+                    loop_token.span.extend(iter.get_span()),
+                    loop_token.span.clone(),
                 )),
                 _ => Err(ParserError::ExpectedToken(
                     "Expected variable".to_string(),
@@ -352,8 +359,14 @@ impl Parser {
             };
         }
 
-        let span = condition.get_span();
-        Ok(Expression::create_loop(condition, body, None, span))
+        let span = loop_token.span.extend(condition.get_span());
+        Ok(Expression::create_loop(
+            condition,
+            body,
+            None,
+            span,
+            loop_token.span,
+        ))
     }
 
     fn data_struct_instantiate(&mut self) -> ParserResult {
@@ -608,19 +621,16 @@ impl Parser {
                         return Ok(Expression::create_assign(
                             // TODO pass full let ref expression to lhs of assign
                             // TODO make Identifier an expression in ast
-                            let_ref.0.name.clone(),
+                            let_ref.name.clone(),
                             rhs,
                             full_span,
                         ));
                     }
                     _ => {
                         return Ok(Expression::create_assign(
-                            let_ref.0.name.clone(),
+                            let_ref.name.clone(),
                             Expression::create_binop(
-                                Expression::create_let_ref(
-                                    let_ref.0.name.clone(),
-                                    rhs_span.clone(),
-                                ),
+                                Expression::create_let_ref(let_ref.name.clone(), rhs_span.clone()),
                                 BinaryOperation::from_token(assignment_tok.clone()),
                                 rhs,
                                 rhs_span,
@@ -685,9 +695,10 @@ impl Parser {
     fn or(&mut self) -> ParserResult {
         let mut expr = self.and()?;
         while self.matches(vec![TokenType::Or]) {
+            let op = self.prev_token.clone();
             let rhs = self.and()?;
             let span = expr.get_span().extend(rhs.get_span());
-            expr = Expression::create_logic(expr, LogicOperation::Or, rhs, span);
+            expr = Expression::create_logic(expr, LogicOperation::from_token(op), rhs, span);
         }
 
         Ok(expr)
@@ -696,9 +707,10 @@ impl Parser {
     fn and(&mut self) -> ParserResult {
         let mut expr = self.equality()?;
         while self.matches(vec![TokenType::And]) {
+            let op = self.prev_token.clone();
             let rhs = self.equality()?;
             let span = expr.get_span().extend(rhs.get_span());
-            expr = Expression::create_logic(expr, LogicOperation::And, rhs, span);
+            expr = Expression::create_logic(expr, LogicOperation::from_token(op), rhs, span);
         }
 
         Ok(expr)
@@ -707,14 +719,11 @@ impl Parser {
     fn equality(&mut self) -> ParserResult {
         let mut expr = self.comparison()?;
         while self.matches(vec![TokenType::EqualEqual, TokenType::NotEqual]) {
-            let tok = self.prev_token.clone();
+            let op = self.prev_token.clone();
             let rhs = self.comparison()?;
             let span = expr.get_span().extend(rhs.get_span());
-            let op = match tok.token_type {
-                TokenType::EqualEqual => LogicOperation::Equal,
-                _ => LogicOperation::NotEqual,
-            };
-            expr = Expression::create_logic(expr, op, rhs, span);
+
+            expr = Expression::create_logic(expr, LogicOperation::from_token(op), rhs, span);
         }
         Ok(expr)
     }
@@ -727,16 +736,11 @@ impl Parser {
             TokenType::GreaterThan,
             TokenType::GreaterThanEqual,
         ]) {
-            let tok = self.prev_token.clone();
+            let op = self.prev_token.clone();
             let rhs = self.term()?;
             let span = expr.get_span().extend(rhs.get_span());
-            let op = match tok.token_type {
-                TokenType::LessThan => LogicOperation::LessThan,
-                TokenType::LessThanEqual => LogicOperation::LessThanEqual,
-                TokenType::GreaterThan => LogicOperation::GreaterThan,
-                _ => LogicOperation::GreaterThanEqual,
-            };
-            expr = Expression::create_logic(expr, op, rhs, span);
+
+            expr = Expression::create_logic(expr, LogicOperation::from_token(op), rhs, span);
         }
         Ok(expr)
     }
@@ -843,7 +847,7 @@ impl Parser {
                 Ok(v) => v,
                 Err(msg) => panic!("not a integer {}", msg),
             };
-            return Ok(Expression::create_literal(Literal::Int(val), span));
+            return Ok(Expression::create_literal(LiteralValue::Int(val), span));
         }
 
         if self.matches(vec![TokenType::True, TokenType::False]) {
@@ -852,7 +856,7 @@ impl Parser {
                 _ => false,
             };
 
-            return Ok(Expression::create_literal(Literal::Bool(bool), span));
+            return Ok(Expression::create_literal(LiteralValue::Bool(bool), span));
         }
 
         if self.matches(vec![TokenType::FloatConst]) {
@@ -860,11 +864,11 @@ impl Parser {
                 Ok(v) => v,
                 Err(msg) => panic!("not a float {}", msg),
             };
-            return Ok(Expression::create_literal(Literal::Float(val), span));
+            return Ok(Expression::create_literal(LiteralValue::Float(val), span));
         }
 
         if self.matches(vec![TokenType::Null]) {
-            return Ok(Expression::create_literal(Literal::Null, span));
+            return Ok(Expression::create_literal(LiteralValue::Null, span));
         }
 
         if self.check(TokenType::DoubleQuote) {
@@ -873,7 +877,7 @@ impl Parser {
 
         if self.matches(vec![TokenType::StringConst]) {
             return Ok(Expression::create_literal(
-                Literal::String(token.value),
+                LiteralValue::String(token.value),
                 span,
             ));
         }
@@ -934,7 +938,7 @@ impl Parser {
 
             self.eat(TokenType::RightBracket, "Expcted ']'")?;
             let span: Span = (token.span.start..self.curr_token.span.start).into();
-            return Ok(Expression::create_literal(Literal::Array(exprs), span));
+            return Ok(Expression::create_literal(LiteralValue::Array(exprs), span));
         }
 
         if self.matches(vec![TokenType::LeftParen]) {
@@ -949,7 +953,7 @@ impl Parser {
 
     fn parse_string(&mut self) -> ParserResult {
         self.scanner.set_mode(ScannerMode::String);
-        let quote = self.curr_token.clone();
+        let quote_start = self.curr_token.clone();
         let mut out = vec![];
 
         loop {
@@ -988,7 +992,7 @@ impl Parser {
             match self.curr_token.token_type {
                 TokenType::StringConst => {
                     out.push(Expression::create_literal(
-                        Literal::String(self.curr_token.value.to_string()),
+                        LiteralValue::String(self.curr_token.value.to_string()),
                         (0..0).into(),
                     ));
                 }
@@ -997,30 +1001,38 @@ impl Parser {
                 }
                 _ => {
                     self.scanner.set_mode(ScannerMode::Default);
-                    return Err(ParserError::UnterminatedString(quote));
+                    return Err(ParserError::UnterminatedString(quote_start));
                 }
             }
         }
         self.scanner.set_mode(ScannerMode::Default);
         self.advance(); // advance over '"'
-
+        let quote_end = self.prev_token.clone();
         let out_len = out.len();
-        let span: Span = (quote.span.start..self.prev_token.span.end).into();
+        let span: Span = quote_start.span.extend(quote_end.span);
         if out_len == 0 {
             // return a empty string if there is no output
             return Ok(Expression::create_literal(
-                Literal::String("".to_string()),
+                LiteralValue::String("".to_string()),
                 span,
             ));
         } else if out_len == 1 && out[0].is_string_lit() {
             // return the only elem in output as string lit
             // no reason to create a binop expression
-            return Ok(out[0].clone());
+            match &out[0] {
+                Expression::Literal(lit) => match lit.value {
+                    LiteralValue::String(_) => {
+                        return Ok(Expression::create_literal(lit.value.clone(), span))
+                    }
+                    _ => unreachable!(),
+                },
+                _ => unreachable!(),
+            }
         } else if out_len == 1 {
             // should be an expression other than string literal
             // append to empty string so it gets formatted as string
             return Ok(Expression::create_binop(
-                Expression::create_literal(Literal::String("".to_string()), Span::fake()),
+                Expression::create_literal(LiteralValue::String("".to_string()), Span::fake()),
                 BinaryOperation::ConcatInterpolation,
                 out[0].clone(),
                 span,
@@ -1056,8 +1068,8 @@ mod test {
     use super::Parser;
 
     use ast::{
-        BinaryOperation, DataStructInstanceField, Expression, Identifier, Literal, LogicOperation,
-        Program, Type, UnaryOperation,
+        BinaryOperation, DataStructInstanceField, Expression, Identifier, LiteralValue,
+        LogicOperation, Program, Type, UnaryOperation,
     };
     use scanner::{Scanner, Token, TokenType};
     use span_util::Span;
@@ -1087,7 +1099,7 @@ mod test {
         if errors.len() != expected_errors.len() {
             println!("{:#?}", errors);
             panic!(
-                "parser emmitted {} errors, expected errors has {} errors",
+                "parser emitted {} errors, expected errors has {} errors",
                 errors.len(),
                 expected_errors.len()
             );
@@ -1098,35 +1110,35 @@ mod test {
     }
 
     fn create_let(id: &str, value: Option<Expression>) -> Expression {
-        Expression::create_let(ident(id), value, Span::fake())
+        Expression::create_let(ident(id), value, Span::fake(), Span::fake())
     }
 
     fn create_let_type(id: Identifier, value: Option<Expression>) -> Expression {
-        Expression::create_let(id, value, Span::fake())
+        Expression::create_let(id, value, Span::fake(), Span::fake())
     }
 
     fn int(val: i64) -> Expression {
-        Expression::create_literal(Literal::Int(val), Span::fake())
+        Expression::create_literal(LiteralValue::Int(val), Span::fake())
     }
 
     fn float(val: f64) -> Expression {
-        Expression::create_literal(Literal::Float(val), Span::fake())
+        Expression::create_literal(LiteralValue::Float(val), Span::fake())
     }
 
     fn array(val: Vec<Expression>) -> Expression {
-        Expression::create_literal(Literal::Array(val), Span::fake())
+        Expression::create_literal(LiteralValue::Array(val), Span::fake())
     }
 
     fn null() -> Expression {
-        Expression::create_literal(Literal::Null, Span::fake())
+        Expression::create_literal(LiteralValue::Null, Span::fake())
     }
 
     fn bool_lit(val: bool) -> Expression {
-        Expression::create_literal(Literal::Bool(val), Span::fake())
+        Expression::create_literal(LiteralValue::Bool(val), Span::fake())
     }
 
     fn string_lit(val: &str) -> Expression {
-        Expression::create_literal(Literal::String(val.into()), Span::fake())
+        Expression::create_literal(LiteralValue::String(val.into()), Span::fake())
     }
 
     fn ident(val: &str) -> Identifier {
@@ -1235,7 +1247,7 @@ mod test {
         body: Expression,
         iterator: Option<Expression>,
     ) -> Expression {
-        Expression::create_loop(condition, body, iterator, Span::fake())
+        Expression::create_loop(condition, body, iterator, Span::fake(), Span::fake())
     }
 
     fn create_if(
@@ -1772,8 +1784,8 @@ mod test {
         parse(
             "1 && 2; 2 || 1;",
             vec![
-                create_logic(int(1), LogicOperation::And, int(2)),
-                create_logic(int(2), LogicOperation::Or, int(1)),
+                create_logic(int(1), LogicOperation::And(Span::fake()), int(2)),
+                create_logic(int(2), LogicOperation::Or(Span::fake()), int(1)),
             ],
         );
     }
@@ -1783,8 +1795,8 @@ mod test {
         parse(
             "1 == 2; 2 != 1;",
             vec![
-                create_logic(int(1), LogicOperation::Equal, int(2)),
-                create_logic(int(2), LogicOperation::NotEqual, int(1)),
+                create_logic(int(1), LogicOperation::Equal(Span::fake()), int(2)),
+                create_logic(int(2), LogicOperation::NotEqual(Span::fake()), int(1)),
             ],
         );
     }
@@ -1794,10 +1806,14 @@ mod test {
         parse(
             "1 < 2; 2 <= 1;3 > 1; 3 >= 1;",
             vec![
-                create_logic(int(1), LogicOperation::LessThan, int(2)),
-                create_logic(int(2), LogicOperation::LessThanEqual, int(1)),
-                create_logic(int(3), LogicOperation::GreaterThan, int(1)),
-                create_logic(int(3), LogicOperation::GreaterThanEqual, int(1)),
+                create_logic(int(1), LogicOperation::LessThan(Span::fake()), int(2)),
+                create_logic(int(2), LogicOperation::LessThanEqual(Span::fake()), int(1)),
+                create_logic(int(3), LogicOperation::GreaterThan(Span::fake()), int(1)),
+                create_logic(
+                    int(3),
+                    LogicOperation::GreaterThanEqual(Span::fake()),
+                    int(1),
+                ),
             ],
         );
     }
@@ -2469,7 +2485,7 @@ mod test {
                 create_loop(bool_lit(true), create_block(vec![]), None),
                 create_loop(bool_lit(true), create_block(vec![]), None),
                 create_loop(
-                    create_logic(int(1), LogicOperation::LessThan, int(2)),
+                    create_logic(int(1), LogicOperation::LessThan(Span::fake()), int(2)),
                     create_block(vec![]),
                     None,
                 ),

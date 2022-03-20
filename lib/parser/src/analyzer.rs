@@ -80,13 +80,13 @@ impl Analyzer {
     fn expression(&mut self, expression: &Expression) -> AnalyzerResult {
         match expression {
             Expression::BinOp(_) => todo!(),
-            Expression::Literal(lit) => match lit.0 {
-                ast::Literal::Int(_)
-                | ast::Literal::Float(_)
-                | ast::Literal::Bool(_)
-                | ast::Literal::String(_)
-                | ast::Literal::Array(_)
-                | ast::Literal::Null => {}
+            Expression::Literal(lit) => match lit.value {
+                ast::LiteralValue::Int(_)
+                | ast::LiteralValue::Float(_)
+                | ast::LiteralValue::Bool(_)
+                | ast::LiteralValue::String(_)
+                | ast::LiteralValue::Array(_)
+                | ast::LiteralValue::Null => {}
             },
             Expression::Assign(_) => todo!(),
             Expression::GetIndex(_) => todo!(),
@@ -94,7 +94,7 @@ impl Analyzer {
             Expression::GetProperty(_) => todo!(),
             Expression::SetProperty(_) => todo!(),
             Expression::Let(expr) => {
-                if let Some(e) = &expr.0.value {
+                if let Some(e) = &expr.value {
                     self.expression(e)?;
                 }
             }
@@ -117,7 +117,7 @@ impl Analyzer {
             }
             Expression::DataStructInstance(_) => todo!(),
             Expression::Block(expr) => {
-                for e in &expr.0.exprs {
+                for e in &expr.exprs {
                     self.expression(e)?
                 }
             }
@@ -140,8 +140,8 @@ impl Analyzer {
             }
             Expression::LoopExpr(expr) => {
                 self.loop_scopes.push(LoopScope::Loop);
-                self.expression(&expr.0.condition)?;
-                self.expression(&expr.0.body)?;
+                self.expression(&expr.condition)?;
+                self.expression(&expr.body)?;
                 self.loop_scopes.pop();
             }
             Expression::BreakExpr(_) => {

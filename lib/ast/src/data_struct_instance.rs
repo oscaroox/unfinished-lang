@@ -1,3 +1,5 @@
+use span_util::Span;
+
 use crate::{Expression, Identifier};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -16,4 +18,5 @@ impl DataStructInstanceField {
 pub struct DataStructInstance {
     pub name: Identifier,
     pub fields: Vec<DataStructInstanceField>,
+    pub span: Span,
 }

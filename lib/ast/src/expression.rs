@@ -1,35 +1,36 @@
 use crate::{
     Assign, BinOp, BinaryOperation, Block, BreakExpr, Call, ContinueExpr, DataStruct,
     DataStructInstance, DataStructInstanceField, Function, GetIndex, GetProperty, Grouping,
-    Identifier, IfConditional, ImplicitReturn, LetExpr, LetRef, Literal, Logic, LogicOperation,
-    LoopExpr, ReturnExpr, SelfExpr, SetIndex, SetProperty, Type, UnaryOp, UnaryOperation,
+    Identifier, IfConditional, ImplicitReturn, LetExpr, LetRef, Literal, LiteralValue, Logic,
+    LogicOperation, LoopExpr, ReturnExpr, SelfExpr, SetIndex, SetProperty, Type, UnaryOp,
+    UnaryOperation,
 };
 use span_util::{Span, WithSpan};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     BinOp(BinOp),
-    Literal(WithSpan<Literal>),
+    Literal(Literal),
     Assign(Assign),
     GetIndex(GetIndex),
     SetIndex(SetIndex),
     GetProperty(GetProperty),
     SetProperty(SetProperty),
-    Let(WithSpan<LetExpr>),
-    LetRef(WithSpan<LetRef>),
+    Let(LetExpr),
+    LetRef(LetRef),
     UnaryOp(UnaryOp),
-    Grouping(WithSpan<Grouping>),
-    Logic(WithSpan<Logic>),
+    Grouping(Grouping),
+    Logic(Logic),
     Call(Call),
     Function(Function),
     DataStruct(DataStruct),
-    DataStructInstance(WithSpan<DataStructInstance>),
-    Block(WithSpan<Block>),
+    DataStructInstance(DataStructInstance),
+    Block(Block),
     If(IfConditional),
-    ImplicitReturn(WithSpan<ImplicitReturn>),
+    ImplicitReturn(ImplicitReturn),
     Return(ReturnExpr),
-    SelfExpr(WithSpan<SelfExpr>),
-    LoopExpr(WithSpan<LoopExpr>),
+    SelfExpr(SelfExpr),
+    LoopExpr(LoopExpr),
     BreakExpr(BreakExpr),
     ContinueExpr(ContinueExpr),
 }
@@ -42,7 +43,7 @@ impl Expression {
         }
     }
 
-    pub fn to_let(&self) -> WithSpan<LetExpr> {
+    pub fn to_let(&self) -> LetExpr {
         match &self {
             Expression::Let(e) => e.clone(),
             _ => panic!("Cannot cast to assign"),
@@ -51,15 +52,15 @@ impl Expression {
 
     pub fn to_let_ref(&self) -> LetRef {
         match &self {
-            Expression::LetRef(e) => e.0.clone(),
+            Expression::LetRef(e) => e.clone(),
             _ => panic!("Cannot cast to assign"),
         }
     }
 
     pub fn is_string_lit(&self) -> bool {
         match self {
-            Expression::Literal(lit) => match lit.0 {
-                Literal::String(_) => true,
+            Expression::Literal(lit) => match lit.value {
+                LiteralValue::String(_) => true,
                 _ => false,
             },
             _ => false,
@@ -68,8 +69,8 @@ impl Expression {
 
     pub fn is_array_lit(&self) -> bool {
         match self {
-            Expression::Literal(lit) => match lit.0 {
-                Literal::Array(_) => true,
+            Expression::Literal(lit) => match lit.value {
+                LiteralValue::Array(_) => true,
                 _ => false,
             },
             _ => false,
@@ -83,13 +84,23 @@ impl Expression {
         }
     }
 
-    pub fn create_let(name: Identifier, value: Option<Expression>, span: Span) -> Expression {
+    pub fn create_let(
+        name: Identifier,
+        value: Option<Expression>,
+        span: Span,
+        let_token_span: Span,
+    ) -> Expression {
         let value = if let Some(e) = value {
             Some(Box::new(e))
         } else {
             None
         };
-        Expression::Let(WithSpan(LetExpr { name, value }, span))
+        Expression::Let(LetExpr {
+            name,
+            value,
+            span,
+            let_token: let_token_span,
+        })
     }
 
     pub fn create_binop(
@@ -106,8 +117,8 @@ impl Expression {
         })
     }
 
-    pub fn create_literal(lit: Literal, span: Span) -> Expression {
-        Expression::Literal(WithSpan(lit, span))
+    pub fn create_literal(value: LiteralValue, span: Span) -> Expression {
+        Expression::Literal(Literal { value, span })
     }
 
     pub fn create_assign(name: Identifier, rhs: Expression, span: Span) -> Expression {
@@ -119,7 +130,7 @@ impl Expression {
     }
 
     pub fn create_let_ref(ident: Identifier, span: Span) -> Expression {
-        Expression::LetRef(WithSpan(LetRef { name: ident }, span))
+        Expression::LetRef(LetRef { name: ident, span })
     }
 
     pub fn create_unaryop(op: UnaryOperation, rhs: Expression, span: Span) -> Expression {
@@ -131,12 +142,10 @@ impl Expression {
     }
 
     pub fn create_grouping(expr: Expression, span: Span) -> Expression {
-        Expression::Grouping(WithSpan(
-            Grouping {
-                expr: Box::new(expr),
-            },
+        Expression::Grouping(Grouping {
+            expr: Box::new(expr),
             span,
-        ))
+        })
     }
 
     pub fn create_call(callee: Expression, args: Vec<Expression>, span: Span) -> Expression {
@@ -242,18 +251,16 @@ impl Expression {
         rhs: Expression,
         span: Span,
     ) -> Expression {
-        Expression::Logic(WithSpan(
-            Logic {
-                lhs: Box::new(lhs),
-                op,
-                rhs: Box::new(rhs),
-            },
+        Expression::Logic(Logic {
+            lhs: Box::new(lhs),
+            op,
+            rhs: Box::new(rhs),
             span,
-        ))
+        })
     }
 
     pub fn create_block(exprs: Vec<Expression>, span: Span) -> Expression {
-        Expression::Block(WithSpan(Block { exprs }, span))
+        Expression::Block(Block { exprs, span })
     }
 
     pub fn create_return(
@@ -269,12 +276,10 @@ impl Expression {
     }
 
     pub fn create_implicit_return(value: Expression, span: Span) -> Expression {
-        Expression::ImplicitReturn(WithSpan(
-            ImplicitReturn {
-                value: Box::new(value),
-            },
+        Expression::ImplicitReturn(ImplicitReturn {
+            value: Box::new(value),
             span,
-        ))
+        })
     }
 
     pub fn create_data_struct(
@@ -296,11 +301,11 @@ impl Expression {
         fields: Vec<DataStructInstanceField>,
         span: Span,
     ) -> Expression {
-        Expression::DataStructInstance(WithSpan(DataStructInstance { name, fields }, span))
+        Expression::DataStructInstance(DataStructInstance { name, fields, span })
     }
 
     pub fn create_self(name: String, span: Span) -> Expression {
-        Expression::SelfExpr(WithSpan(SelfExpr { name }, span))
+        Expression::SelfExpr(SelfExpr { name, span })
     }
 
     pub fn create_loop(
@@ -308,20 +313,20 @@ impl Expression {
         body: Expression,
         iterator: Option<Expression>,
         span: Span,
+        loop_token_span: Span,
     ) -> Expression {
         let iterator = if let Some(e) = iterator {
             Some(Box::new(e))
         } else {
             None
         };
-        Expression::LoopExpr(WithSpan(
-            LoopExpr {
-                body: Box::new(body),
-                condition: Box::new(condition),
-                iterator,
-            },
+        Expression::LoopExpr(LoopExpr {
+            body: Box::new(body),
+            condition: Box::new(condition),
+            iterator,
             span,
-        ))
+            loop_token: loop_token_span,
+        })
     }
 
     pub fn create_break(span: Span) -> Expression {
@@ -335,27 +340,27 @@ impl Expression {
     pub fn get_span(&self) -> Span {
         match &self {
             Expression::BinOp(s) => s.span.clone(),
-            Expression::Literal(s) => s.1.clone(),
+            Expression::Literal(s) => s.span.clone(),
             Expression::Assign(s) => s.span.clone(),
             Expression::GetIndex(s) => s.span.clone(),
             Expression::SetIndex(s) => s.span.clone(),
             Expression::GetProperty(s) => s.span.clone(),
             Expression::SetProperty(s) => s.span.clone(),
-            Expression::Let(s) => s.1.clone(),
-            Expression::LetRef(s) => s.1.clone(),
+            Expression::Let(s) => s.span.clone(),
+            Expression::LetRef(s) => s.span.clone(),
             Expression::UnaryOp(s) => s.span.clone(),
-            Expression::Grouping(s) => s.1.clone(),
-            Expression::Logic(s) => s.1.clone(),
+            Expression::Grouping(s) => s.span.clone(),
+            Expression::Logic(s) => s.span.clone(),
             Expression::Call(s) => s.span.clone(),
             Expression::Function(s) => s.span.clone(),
             Expression::DataStruct(s) => s.span.clone(),
-            Expression::DataStructInstance(s) => s.1.clone(),
-            Expression::Block(s) => s.1.clone(),
+            Expression::DataStructInstance(s) => s.span.clone(),
+            Expression::Block(s) => s.span.clone(),
             Expression::If(s) => s.span.clone(),
-            Expression::ImplicitReturn(s) => s.1.clone(),
+            Expression::ImplicitReturn(s) => s.span.clone(),
             Expression::Return(s) => s.span.clone(),
-            Expression::SelfExpr(s) => s.1.clone(),
-            Expression::LoopExpr(s) => s.1.clone(),
+            Expression::SelfExpr(s) => s.span.clone(),
+            Expression::LoopExpr(s) => s.span.clone(),
             Expression::BreakExpr(s) => s.span.clone(),
             Expression::ContinueExpr(s) => s.span.clone(),
         }

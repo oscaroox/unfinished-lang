@@ -3,8 +3,9 @@ use std::{cell::RefCell, collections::HashMap, convert::TryInto, fmt::Debug, rc:
 use crate::{builtin::get_builtins, environment::Environment, Value};
 use ast::{
     Assign, BinOp, BinaryOperation, Block, Call, DataStruct, Expression, Function, GetIndex,
-    GetProperty, IfConditional, ImplicitReturn, LetExpr, Literal, Logic, LogicOperation, LoopExpr,
-    Program, ReturnExpr, SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation,
+    GetProperty, IfConditional, ImplicitReturn, LetExpr, Literal, LiteralValue, Logic,
+    LogicOperation, LoopExpr, Program, ReturnExpr, SelfExpr, SetIndex, SetProperty, UnaryOp,
+    UnaryOperation,
 };
 
 #[derive(Debug)]
@@ -83,7 +84,7 @@ impl Interpreter {
         };
 
         let res = Value::Unit;
-        for expr in &block.0.exprs {
+        for expr in &block.exprs {
             match self.expression(expr)? {
                 Value::ReturnVal(v) | Value::ImplicitReturnVal(v) => return Ok(*v),
                 _ => {}
@@ -107,28 +108,28 @@ impl Interpreter {
 
     fn expression(&mut self, expression: &Expression) -> InterpreterResult {
         match expression {
-            Expression::Let(expr) => self.eval_let_expression(&expr.0),
+            Expression::Let(expr) => self.eval_let_expression(&expr),
             Expression::BinOp(expr) => self.eval_binop(&expr),
-            Expression::Literal(expr) => self.eval_literal(&expr.0),
+            Expression::Literal(expr) => self.eval_literal(&expr),
             Expression::Assign(expr) => self.eval_assignment(&expr),
-            Expression::LetRef(expr) => self.eval_let_reference(&expr.0),
+            Expression::LetRef(expr) => self.eval_let_reference(&expr),
             Expression::UnaryOp(expr) => self.eval_unaryop(&expr),
-            Expression::Grouping(expr) => self.expression(&expr.0.expr),
-            Expression::Logic(expr) => self.eval_logic_expression(&expr.0),
+            Expression::Grouping(expr) => self.expression(&expr.expr),
+            Expression::Logic(expr) => self.eval_logic_expression(&expr),
             Expression::Call(expr) => self.eval_call(&expr),
             Expression::Function(expr) => self.eval_function(&expr),
-            Expression::Block(expr) => self.eval_block(&expr.0),
+            Expression::Block(expr) => self.eval_block(&expr),
             Expression::If(expr) => self.eval_if_conditional(&expr),
             Expression::GetIndex(expr) => self.eval_index(&expr),
             Expression::SetIndex(expr) => self.eval_set_index(&expr),
             Expression::Return(expr) => self.eval_return(&expr),
-            Expression::ImplicitReturn(expr) => self.eval_implicit_return(&expr.0),
+            Expression::ImplicitReturn(expr) => self.eval_implicit_return(&expr),
             Expression::DataStruct(expr) => self.eval_data_struct(&expr),
-            Expression::DataStructInstance(expr) => self.eval_data_struct_instance(&expr.0),
+            Expression::DataStructInstance(expr) => self.eval_data_struct_instance(&expr),
             Expression::GetProperty(expr) => self.eval_get_property(&expr),
             Expression::SetProperty(expr) => self.eval_set_property(&expr),
-            Expression::SelfExpr(expr) => self.eval_self_expr(&expr.0),
-            Expression::LoopExpr(expr) => self.eval_loop_expr(&expr.0),
+            Expression::SelfExpr(expr) => self.eval_self_expr(&expr),
+            Expression::LoopExpr(expr) => self.eval_loop_expr(&expr),
             Expression::BreakExpr(_) => Ok(Value::Break),
             Expression::ContinueExpr(_) => Ok(Value::Continue),
         }
@@ -153,7 +154,7 @@ impl Interpreter {
 
             // condition is a let expr
             self.expression(&loop_expr.condition)?;
-            let let_expr = loop_expr.condition.to_let().0;
+            let let_expr = loop_expr.condition.to_let();
 
             let values = match iter {
                 Value::Array(arr) => arr.borrow().values.clone(),
@@ -433,46 +434,54 @@ impl Interpreter {
         let right = self.expression(&logic.rhs)?;
         let res = match (&left, &logic.op, &right) {
             // integer
-            (Value::Int(n1), LogicOperation::Equal, Value::Int(n2)) => Value::Bool(n1 == n2),
-            (Value::Int(n1), LogicOperation::NotEqual, Value::Int(n2)) => Value::Bool(n1 != n2),
-            (Value::Int(n1), LogicOperation::LessThan, Value::Int(n2)) => Value::Bool(n1 < n2),
-            (Value::Int(n1), LogicOperation::LessThanEqual, Value::Int(n2)) => {
+            (Value::Int(n1), LogicOperation::Equal(_), Value::Int(n2)) => Value::Bool(n1 == n2),
+            (Value::Int(n1), LogicOperation::NotEqual(_), Value::Int(n2)) => Value::Bool(n1 != n2),
+            (Value::Int(n1), LogicOperation::LessThan(_), Value::Int(n2)) => Value::Bool(n1 < n2),
+            (Value::Int(n1), LogicOperation::LessThanEqual(_), Value::Int(n2)) => {
                 Value::Bool(n1 <= n2)
             }
-            (Value::Int(n1), LogicOperation::GreaterThan, Value::Int(n2)) => Value::Bool(n1 > n2),
-            (Value::Int(n1), LogicOperation::GreaterThanEqual, Value::Int(n2)) => {
+            (Value::Int(n1), LogicOperation::GreaterThan(_), Value::Int(n2)) => {
+                Value::Bool(n1 > n2)
+            }
+            (Value::Int(n1), LogicOperation::GreaterThanEqual(_), Value::Int(n2)) => {
                 Value::Bool(n1 >= n2)
             }
 
             // float
-            (Value::Float(n1), LogicOperation::Equal, Value::Float(n2)) => Value::Bool(n1 == n2),
-            (Value::Float(n1), LogicOperation::NotEqual, Value::Float(n2)) => Value::Bool(n1 != n2),
-            (Value::Float(n1), LogicOperation::LessThan, Value::Float(n2)) => Value::Bool(n1 < n2),
-            (Value::Float(n1), LogicOperation::LessThanEqual, Value::Float(n2)) => {
+            (Value::Float(n1), LogicOperation::Equal(_), Value::Float(n2)) => Value::Bool(n1 == n2),
+            (Value::Float(n1), LogicOperation::NotEqual(_), Value::Float(n2)) => {
+                Value::Bool(n1 != n2)
+            }
+            (Value::Float(n1), LogicOperation::LessThan(_), Value::Float(n2)) => {
+                Value::Bool(n1 < n2)
+            }
+            (Value::Float(n1), LogicOperation::LessThanEqual(_), Value::Float(n2)) => {
                 Value::Bool(n1 <= n2)
             }
-            (Value::Float(n1), LogicOperation::GreaterThan, Value::Float(n2)) => {
+            (Value::Float(n1), LogicOperation::GreaterThan(_), Value::Float(n2)) => {
                 Value::Bool(n1 > n2)
             }
-            (Value::Float(n1), LogicOperation::GreaterThanEqual, Value::Float(n2)) => {
+            (Value::Float(n1), LogicOperation::GreaterThanEqual(_), Value::Float(n2)) => {
                 Value::Bool(n1 >= n2)
             }
 
             // bool
-            (Value::Bool(b1), LogicOperation::And, Value::Bool(b2)) => Value::Bool(*b1 && *b2),
-            (Value::Bool(b1), LogicOperation::Or, Value::Bool(b2)) => Value::Bool(*b1 || *b2),
+            (Value::Bool(b1), LogicOperation::And(_), Value::Bool(b2)) => Value::Bool(*b1 && *b2),
+            (Value::Bool(b1), LogicOperation::Or(_), Value::Bool(b2)) => Value::Bool(*b1 || *b2),
 
             // string
-            (Value::String(s1), LogicOperation::Equal, Value::String(s2)) => Value::Bool(s1 == s2),
-            (Value::String(s1), LogicOperation::NotEqual, Value::String(s2)) => {
+            (Value::String(s1), LogicOperation::Equal(_), Value::String(s2)) => {
+                Value::Bool(s1 == s2)
+            }
+            (Value::String(s1), LogicOperation::NotEqual(_), Value::String(s2)) => {
                 Value::Bool(s1 != s2)
             }
 
-            (Value::Null, LogicOperation::NotEqual, v) => Value::Bool(left != *v),
-            (v, LogicOperation::NotEqual, Value::Null) => Value::Bool(*v != right),
+            (Value::Null, LogicOperation::NotEqual(_), v) => Value::Bool(left != *v),
+            (v, LogicOperation::NotEqual(_), Value::Null) => Value::Bool(*v != right),
 
-            (Value::Null, LogicOperation::Equal, v) => Value::Bool(left == *v),
-            (v, LogicOperation::Equal, Value::Null) => Value::Bool(*v == right),
+            (Value::Null, LogicOperation::Equal(_), v) => Value::Bool(left == *v),
+            (v, LogicOperation::Equal(_), Value::Null) => Value::Bool(*v == right),
             _ => panic!(
                 "Invalid logic operation {} on {} and {}",
                 logic.op, left, right
@@ -510,19 +519,19 @@ impl Interpreter {
     }
 
     fn eval_literal(&mut self, lit: &Literal) -> InterpreterResult {
-        Ok(match &lit {
-            Literal::Int(v) => Value::Int(*v),
-            Literal::Float(v) => Value::Float(*v),
-            Literal::Bool(v) => Value::Bool(*v),
-            Literal::String(v) => Value::String(v.to_string()),
-            Literal::Array(v) => {
+        Ok(match &lit.value {
+            LiteralValue::Int(v) => Value::Int(*v),
+            LiteralValue::Float(v) => Value::Float(*v),
+            LiteralValue::Bool(v) => Value::Bool(*v),
+            LiteralValue::String(v) => Value::String(v.to_string()),
+            LiteralValue::Array(v) => {
                 let mut res = vec![];
                 for e in v {
                     res.push(self.expression(e)?);
                 }
                 Value::array(res)
             }
-            Literal::Null => Value::Null,
+            LiteralValue::Null => Value::Null,
         })
     }
 

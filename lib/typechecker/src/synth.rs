@@ -47,12 +47,12 @@ impl TypeChecker {
 
     fn synth(&self, expr: &Expression, env: &Rc<RefCell<Env>>) -> Result<Type, TypeError> {
         match expr {
-            Expression::Literal(lit) => Ok(match &lit.0 {
-                ast::Literal::Int(_) => Type::int(),
-                ast::Literal::Float(_) => Type::float(),
-                ast::Literal::Bool(_) => Type::bool(),
-                ast::Literal::String(_) => Type::string(),
-                ast::Literal::Array(arr) => match arr.is_empty() {
+            Expression::Literal(lit) => Ok(match &lit.value {
+                ast::LiteralValue::Int(_) => Type::int(),
+                ast::LiteralValue::Float(_) => Type::float(),
+                ast::LiteralValue::Bool(_) => Type::bool(),
+                ast::LiteralValue::String(_) => Type::string(),
+                ast::LiteralValue::Array(arr) => match arr.is_empty() {
                     false => {
                         let first = self.synth(&arr[0], env)?;
 
@@ -67,13 +67,11 @@ impl TypeChecker {
                     }
                     true => Type::array(Type::Unknown),
                 },
-                ast::Literal::Null => todo!(),
+                ast::LiteralValue::Null => todo!(),
             }),
             Expression::BreakExpr(_) => Ok(Type::Unit),
             Expression::ContinueExpr(_) => Ok(Type::Unit),
             Expression::Let(expr) => {
-                let expr = &expr.0;
-
                 if let Some(t) = &expr.name.value_type {
                     let ttype = Type::from_ast_type(t.clone(), env);
                     if let Some(e) = &expr.value {
@@ -89,16 +87,13 @@ impl TypeChecker {
 
                 Ok(Type::Unit)
             }
-            Expression::LetRef(expr) => {
-                let let_ref = &expr.0;
-                match env.borrow_mut().get(&let_ref.name.value) {
-                    Some(t) => Ok(t),
-                    None => Err(TypeError::UndefinedVariable(
-                        let_ref.name.value.to_string(),
-                        expr.1.clone(),
-                    )),
-                }
-            }
+            Expression::LetRef(expr) => match env.borrow_mut().get(&expr.name.value) {
+                Some(t) => Ok(t),
+                None => Err(TypeError::UndefinedVariable(
+                    expr.name.value.to_string(),
+                    expr.span.clone(),
+                )),
+            },
             Expression::Assign(expr) => {
                 let ttype = match env.borrow_mut().get(&expr.name.value) {
                     Some(t) => t,
@@ -115,7 +110,6 @@ impl TypeChecker {
                 Ok(ttype)
             }
             Expression::Block(expr) => {
-                let expr = &expr.0;
                 let env = Rc::new(RefCell::new(Env::with_parent(Rc::clone(&env))));
 
                 let mut ret_type = Type::Unit;
@@ -131,10 +125,7 @@ impl TypeChecker {
 
                 Ok(ret_type)
             }
-            Expression::ImplicitReturn(expr) => {
-                let expr = &expr.0;
-                self.synth(&expr.value, &env)
-            }
+            Expression::ImplicitReturn(expr) => self.synth(&expr.value, &env),
             Expression::Return(expr) => match &*expr.value {
                 Some(e) => self.synth(e, env),
                 None => Ok(Type::Unit),
@@ -289,13 +280,12 @@ impl TypeChecker {
                 Ok(Type::Unit)
             }
             Expression::DataStructInstance(expr) => {
-                let instance = &expr.0;
-                let ttype = match env.borrow_mut().get(&instance.name.value) {
+                let ttype = match env.borrow_mut().get(&expr.name.value) {
                     Some(t) => t,
                     None => {
                         return Err(TypeError::UndefinedVariable(
-                            instance.name.value.to_string(),
-                            expr.1.clone(),
+                            expr.name.value.to_string(),
+                            expr.span.clone(),
                         ));
                     }
                 };
@@ -303,26 +293,26 @@ impl TypeChecker {
                 match &ttype {
                     Type::DataStruct(d) => {
                         for field in &d.fields {
-                            let prop = instance.fields.iter().find(|p| p.name.value == field.name);
+                            let prop = expr.fields.iter().find(|p| p.name.value == field.name);
                             match prop {
                                 None => {
                                     return Err(TypeError::MissingProperty(
                                         field.name.to_string(),
-                                        expr.1.clone(),
+                                        expr.span.clone(),
                                     ));
                                 }
                                 _ => {}
                             }
                         }
 
-                        for field in &instance.fields {
+                        for field in &expr.fields {
                             let prop = d.fields.iter().find(|p| p.name == field.name.value);
                             match prop {
                                 Some(p) => self.check(&field.value, p.ttype.clone(), env)?,
                                 None => {
                                     return Err(TypeError::ExtraProperty(
                                         field.name.value.to_string(),
-                                        expr.1.clone(),
+                                        expr.span.clone(),
                                     ));
                                 }
                             }
@@ -330,10 +320,10 @@ impl TypeChecker {
 
                         Ok(Type::DataStructInstance(d.clone()))
                     }
-                    _ => Err(TypeError::InvalidDataStructInstantiation(expr.1.clone())),
+                    _ => Err(TypeError::InvalidDataStructInstantiation(expr.span.clone())),
                 }
             }
-            Expression::SelfExpr(expr) => match env.borrow_mut().get(&expr.0.name) {
+            Expression::SelfExpr(expr) => match env.borrow_mut().get(&expr.name) {
                 Some(t) => Ok(t),
                 None => unreachable!(),
             },
@@ -401,7 +391,7 @@ impl TypeChecker {
 
                 Ok(prop_type)
             }
-            Expression::Grouping(expr) => self.synth(&expr.0.expr, env),
+            Expression::Grouping(expr) => self.synth(&expr.expr, env),
 
             Expression::BinOp(expr) => {
                 let binop = &expr;
@@ -453,51 +443,52 @@ impl TypeChecker {
                 }
             }
             Expression::Logic(expr) => {
-                let expr = &expr.0;
-
                 let (lhs, rhs) = self.synth_left_and_right(&expr.lhs, &expr.rhs, env)?;
 
                 match &expr.op {
-                    ast::LogicOperation::Or | ast::LogicOperation::And => match (&lhs, &rhs) {
-                        (Type::Singleton(Singleton::Bool), Type::Singleton(Singleton::Bool)) => {
-                            Ok(Type::bool())
-                        }
-                        (_, Type::Singleton(Singleton::Bool)) => {
-                            return Err(TypeError::Expected(
-                                Type::bool(),
-                                lhs,
-                                expr.lhs.get_span(),
-                            ));
-                        }
-                        (Type::Singleton(Singleton::Bool), _) => {
-                            return Err(TypeError::Expected(
-                                Type::bool(),
-                                rhs,
-                                expr.rhs.get_span(),
-                            ));
-                        }
-                        _ => {
-                            return Err(TypeError::LeftAndRight(
-                                Box::new(TypeError::Expected(
+                    ast::LogicOperation::Or(_) | ast::LogicOperation::And(_) => {
+                        match (&lhs, &rhs) {
+                            (
+                                Type::Singleton(Singleton::Bool),
+                                Type::Singleton(Singleton::Bool),
+                            ) => Ok(Type::bool()),
+                            (_, Type::Singleton(Singleton::Bool)) => {
+                                return Err(TypeError::Expected(
                                     Type::bool(),
                                     lhs,
                                     expr.lhs.get_span(),
-                                )),
-                                Box::new(TypeError::Expected(
+                                ));
+                            }
+                            (Type::Singleton(Singleton::Bool), _) => {
+                                return Err(TypeError::Expected(
                                     Type::bool(),
                                     rhs,
                                     expr.rhs.get_span(),
-                                )),
-                            ))
+                                ));
+                            }
+                            _ => {
+                                return Err(TypeError::LeftAndRight(
+                                    Box::new(TypeError::Expected(
+                                        Type::bool(),
+                                        lhs,
+                                        expr.lhs.get_span(),
+                                    )),
+                                    Box::new(TypeError::Expected(
+                                        Type::bool(),
+                                        rhs,
+                                        expr.rhs.get_span(),
+                                    )),
+                                ))
+                            }
                         }
-                    },
+                    }
 
-                    ast::LogicOperation::Equal
-                    | ast::LogicOperation::NotEqual
-                    | ast::LogicOperation::LessThan
-                    | ast::LogicOperation::LessThanEqual
-                    | ast::LogicOperation::GreaterThan
-                    | ast::LogicOperation::GreaterThanEqual => match (&lhs, &rhs) {
+                    ast::LogicOperation::Equal(_)
+                    | ast::LogicOperation::NotEqual(_)
+                    | ast::LogicOperation::LessThan(_)
+                    | ast::LogicOperation::LessThanEqual(_)
+                    | ast::LogicOperation::GreaterThan(_)
+                    | ast::LogicOperation::GreaterThanEqual(_) => match (&lhs, &rhs) {
                         (Type::Singleton(Singleton::Int), Type::Singleton(Singleton::Int)) => {
                             Ok(Type::bool())
                         }
@@ -543,7 +534,6 @@ impl TypeChecker {
                 Ok(then)
             }
             Expression::LoopExpr(expr) => {
-                let expr = &expr.0;
                 if let Some(e) = &expr.iterator {
                     let it = self.synth(e, env)?;
                     let env = Rc::new(RefCell::new(Env::with_parent(env.clone())));
@@ -560,7 +550,7 @@ impl TypeChecker {
                     };
 
                     let name = match &*expr.condition {
-                        Expression::Let(l) => l.0.name.value.to_string(),
+                        Expression::Let(l) => l.name.value.to_string(),
                         _ => unreachable!(),
                     };
 
@@ -703,8 +693,8 @@ impl TypeChecker {
         env: &Rc<RefCell<Env>>,
     ) -> Result<(), TypeError> {
         let arr = match expr {
-            Expression::Literal(lit) => match &lit.0 {
-                ast::Literal::Array(arr) => arr,
+            Expression::Literal(lit) => match &lit.value {
+                ast::LiteralValue::Array(arr) => arr,
                 _ => unreachable!(),
             },
             _ => unreachable!(),
