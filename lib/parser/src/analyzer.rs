@@ -214,7 +214,7 @@ mod tests {
         if analyzer_errors.len() != expected_errors.len() {
             println!("{:#?}", analyzer_errors);
             panic!(
-                "analyzer emmitted {} errors, expected errors has {} errors",
+                "analyzer emitted {} errors, expected errors has {} errors",
                 analyzer_errors.len(),
                 expected_errors.len()
             );

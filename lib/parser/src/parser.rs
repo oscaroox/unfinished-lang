@@ -480,14 +480,14 @@ impl Parser {
 
         if let Some(_) = left_param {
             match (kind, self.check(TokenType::SELF)) {
-                (FunctionKind::Method(data_struct_indentifier), true) => {
+                (FunctionKind::Method(data_struct_identifier), true) => {
                     let token = self.eat(TokenType::SELF, "Expected 'self'")?;
                     self.eat_optional(TokenType::Comma);
                     is_static = false;
                     params.push(Identifier::with_all(
                         token.value,
                         token.token_type,
-                        Type::Identifier(data_struct_indentifier),
+                        Type::Identifier(data_struct_identifier),
                         token.span,
                     ));
                 }
@@ -936,7 +936,7 @@ impl Parser {
                 }
             }
 
-            self.eat(TokenType::RightBracket, "Expcted ']'")?;
+            self.eat(TokenType::RightBracket, "Expected ']'")?;
             let span: Span = (token.span.start..self.curr_token.span.start).into();
             return Ok(Expression::create_literal(LiteralValue::Array(exprs), span));
         }
@@ -1009,7 +1009,8 @@ impl Parser {
         self.advance(); // advance over '"'
         let quote_end = self.prev_token.clone();
         let out_len = out.len();
-        let span: Span = quote_start.span.extend(quote_end.span);
+        let span: Span = quote_start.span.extend(quote_end.span.clone());
+
         if out_len == 0 {
             // return a empty string if there is no output
             return Ok(Expression::create_literal(
@@ -1032,7 +1033,7 @@ impl Parser {
             // should be an expression other than string literal
             // append to empty string so it gets formatted as string
             return Ok(Expression::create_binop(
-                Expression::create_literal(LiteralValue::String("".to_string()), Span::fake()),
+                Expression::create_literal(LiteralValue::String("".to_string()), span.clone()),
                 BinaryOperation::ConcatInterpolation,
                 out[0].clone(),
                 span,
@@ -1278,10 +1279,6 @@ mod test {
         body: Expression,
     ) -> Expression {
         Expression::create_function(name, params, return_type, is_static, body, Span::fake())
-    }
-
-    fn binary_add() -> BinaryOperation {
-        BinaryOperation::Add(Span::fake())
     }
 
     #[test]
@@ -1541,9 +1538,9 @@ mod test {
     }
 
     #[test]
-    fn parse_string_interplation() {
+    fn parse_string_interpolation() {
         // TODO test parser errors for unterminated string and interpolation
-        // "$() -> this returns a error "Expcted ';' after expression" should be unterminated string
+        // "$() -> this returns a error "Expected ';' after expression" should be unterminated string
         // "
         parse(
             r#"
@@ -1755,7 +1752,7 @@ mod test {
                     ident("num"),
                     create_binop(
                         create_let_ref("num"),
-                        BinaryOperation::Substract(Span::fake()),
+                        BinaryOperation::Subtract(Span::fake()),
                         int(1),
                     ),
                 ),
@@ -1915,7 +1912,7 @@ mod test {
                     int(0),
                     create_binop(
                         create_index(create_let_ref("array"), int(0)),
-                        BinaryOperation::Substract(Span::fake()),
+                        BinaryOperation::Subtract(Span::fake()),
                         int(1),
                     ),
                 ),
@@ -2447,7 +2444,7 @@ mod test {
                     ident("age"),
                     create_binop(
                         create_get_property(create_let_ref("p"), ident("age"), false),
-                        BinaryOperation::Substract(Span::fake()),
+                        BinaryOperation::Subtract(Span::fake()),
                         int(1),
                     ),
                 ),

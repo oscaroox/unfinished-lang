@@ -1,5 +1,5 @@
 use crate::TokenType;
-use span_util::{Span, WithSpan};
+use span_util::Span;
 use std::ops::Range;
 
 macro_rules! impl_token {
@@ -121,6 +121,10 @@ impl Token {
 
     pub fn is_semi_colon(&self) -> bool {
         self.token_type == TokenType::SemiColon
+    }
+
+    pub fn replace_span(&mut self, new_span: Span) {
+        self.span = new_span;
     }
 }
 

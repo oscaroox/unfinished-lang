@@ -329,7 +329,7 @@ impl Scanner {
 
     fn scan_interpolated(&mut self) -> Token {
         let pos = self.pos;
-        let token = match self.ch {
+        let mut token = match self.ch {
             '"' => Token::double_quote(pos..self.pos),
             '\0' => Token::eof(pos..self.pos),
             '$' => match self.peek() {
@@ -350,6 +350,7 @@ impl Scanner {
             _ => self.read_interpolation(self.ch),
         };
         self.advance();
+        token.replace_span((pos..self.pos).into());
         token
     }
 
@@ -581,7 +582,7 @@ mod tests {
     fn scan_comments() {
         test_scan(
             "
-        // this is a commeents
+        // this is a comment
         // let test = 123;
         ",
             vec![(TokenType::EOF, None)],

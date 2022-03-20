@@ -18,8 +18,8 @@ pub struct Interpreter {
 
 type InterpreterResult = Result<Value, RuntimeError>;
 
-// macro used for swapping the parent environment with the new supplied environmet
-// this also makes sure this code isnt duplicated when evaluating if, block and function calls
+// macro used for swapping the parent environment with the new supplied environment
+// this also makes sure this code isn't duplicated when evaluating if, block and function calls
 macro_rules! eval_with_new_env_in_scope {
     ($self:ident, $env:expr, $fun:ident, $exprs:expr) => {{
         let parent_env = $self.env.clone();
@@ -31,12 +31,12 @@ macro_rules! eval_with_new_env_in_scope {
 }
 
 macro_rules! eval_loop_body {
-    ($self:ident, $env:expr, $outval:expr, $fun:ident, $exprs:expr) => {{
+    ($self:ident, $env:expr, $out:expr, $fun:ident, $exprs:expr) => {{
         let val = eval_with_new_env_in_scope!($self, $env.clone(), $fun, $exprs)?;
         match val {
             Value::Break | Value::ReturnVal(_) => {
                 if let Value::ReturnVal(_) = val {
-                    $outval = val;
+                    $out = val;
                 }
                 break;
             }
@@ -148,7 +148,7 @@ impl Interpreter {
 
     fn eval_loop_expr(&mut self, loop_expr: &LoopExpr) -> InterpreterResult {
         let env = Rc::new(RefCell::new(Environment::with_outer(Rc::clone(&self.env))));
-        let mut outval = Value::Unit;
+        let mut out = Value::Unit;
         if let Some(iter) = &loop_expr.iterator {
             let iter = self.expression(iter)?;
 
@@ -165,15 +165,15 @@ impl Interpreter {
             for x in values {
                 env.borrow_mut()
                     .assign(let_expr.name.value.to_string(), x.clone());
-                eval_loop_body!(self, env.clone(), outval, expression, &*loop_expr.body);
+                eval_loop_body!(self, env.clone(), out, expression, &*loop_expr.body);
             }
         } else {
             while (self.expression(&loop_expr.condition)?).is_truthy() {
-                eval_loop_body!(self, env.clone(), outval, expression, &*loop_expr.body);
+                eval_loop_body!(self, env.clone(), out, expression, &*loop_expr.body);
             }
         }
 
-        Ok(outval)
+        Ok(out)
     }
 
     fn eval_self_expr(&mut self, self_expr: &SelfExpr) -> InterpreterResult {
@@ -213,7 +213,7 @@ impl Interpreter {
                     instance.borrow().get(get_property.name.value.to_string())
                 };
 
-                // if propery is a function bind self keyword to function closure
+                // if property is a function, bind self keyword to function closure
                 if let Value::Function(ref mut fun) = val {
                     fun.closure.borrow_mut().define(
                         "self".to_string(),
@@ -247,7 +247,7 @@ impl Interpreter {
                 Value::DataClass(class) => class.clone(),
                 _ => panic!("Cannot only instantiate data struct got {}", val),
             },
-            None => panic!("Unkown data struct {}", data_struct_identifier),
+            None => panic!("Unknown data struct {}", data_struct_identifier),
         };
 
         let mut eval_fields = HashMap::new();
@@ -496,22 +496,22 @@ impl Interpreter {
         eval_with_new_env_in_scope!(self, env, eval_expressions, &block.exprs)
     }
 
-    fn eval_if_conditional(&mut self, ifcond: &IfConditional) -> InterpreterResult {
-        let cond = self.expression(&ifcond.condition)?;
+    fn eval_if_conditional(&mut self, if_condition: &IfConditional) -> InterpreterResult {
+        let cond = self.expression(&if_condition.condition)?;
         let env = Rc::new(RefCell::new(Environment::with_outer(self.env.clone())));
         let val = Value::Null;
 
         if cond.is_truthy() {
-            return eval_with_new_env_in_scope!(self, env, expression, &*ifcond.then);
-        } else if let Some(el) = &ifcond.not_then {
+            return eval_with_new_env_in_scope!(self, env, expression, &*if_condition.then);
+        } else if let Some(el) = &if_condition.not_then {
             return eval_with_new_env_in_scope!(self, env, expression, &*el);
         }
 
         Ok(val)
     }
 
-    fn eval_let_reference(&mut self, letref: &ast::LetRef) -> InterpreterResult {
-        let ident = letref.name.value.to_string();
+    fn eval_let_reference(&mut self, let_ref: &ast::LetRef) -> InterpreterResult {
+        let ident = let_ref.name.value.to_string();
         match self.env.borrow().get(&ident) {
             Some(var) => Ok(var.clone()),
             None => panic!("undefined variable {}", ident),
@@ -567,13 +567,13 @@ impl Interpreter {
         let res = match (&left, &binop.op, &right) {
             // integer binop
             (Value::Int(n1), BinaryOperation::Add(_), Value::Int(n2)) => Value::Int(n1 + n2),
-            (Value::Int(n1), BinaryOperation::Substract(_), Value::Int(n2)) => Value::Int(n1 - n2),
+            (Value::Int(n1), BinaryOperation::Subtract(_), Value::Int(n2)) => Value::Int(n1 - n2),
             (Value::Int(n1), BinaryOperation::Multiply(_), Value::Int(n2)) => Value::Int(n1 * n2),
             (Value::Int(n1), BinaryOperation::Divide(_), Value::Int(n2)) => Value::Int(n1 / n2),
 
             // float binop
             (Value::Float(n1), BinaryOperation::Add(_), Value::Float(n2)) => Value::Float(n1 + n2),
-            (Value::Float(n1), BinaryOperation::Substract(_), Value::Float(n2)) => {
+            (Value::Float(n1), BinaryOperation::Subtract(_), Value::Float(n2)) => {
                 Value::Float(n1 - n2)
             }
             (Value::Float(n1), BinaryOperation::Multiply(_), Value::Float(n2)) => {
@@ -896,7 +896,7 @@ mod test {
     }
 
     #[test]
-    pub fn eval_if_condiditional() {
+    pub fn eval_if_conditional() {
         run("if true { 1 };", Value::Int(1));
         run("if false { 1 } else { 2 };", Value::Int(2));
         run("let x = if false { 1 } else { 2 }; x;", Value::Int(2));
@@ -1127,7 +1127,7 @@ mod test {
         );
         map.insert(String::from("age"), Value::Int(40));
 
-        let field_idents = vec![
+        let field_identifiers = vec![
             ident_string("first_name"),
             ident_string("last_name"),
             ident_int("age"),
@@ -1145,12 +1145,12 @@ mod test {
                 ident("Person"),
                 data_struct(
                     "Person",
-                    field_idents.clone(),
+                    field_identifiers.clone(),
                     HashMap::new(),
                     HashMap::new(),
                 ),
                 map.clone(),
-                field_idents.clone(),
+                field_identifiers.clone(),
             ),
         );
 
@@ -1168,12 +1168,12 @@ mod test {
                 ident("Person"),
                 data_struct(
                     "Person",
-                    field_idents.clone(),
+                    field_identifiers.clone(),
                     HashMap::new(),
                     HashMap::new(),
                 ),
                 map.clone(),
-                field_idents.clone(),
+                field_identifiers.clone(),
             ),
         );
 
@@ -1193,12 +1193,12 @@ mod test {
                 ident("Person"),
                 data_struct(
                     "Person",
-                    field_idents.clone(),
+                    field_identifiers.clone(),
                     HashMap::new(),
                     HashMap::new(),
                 ),
                 map.clone(),
-                field_idents.clone(),
+                field_identifiers.clone(),
             ),
         );
     }

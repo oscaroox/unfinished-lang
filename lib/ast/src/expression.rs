@@ -5,7 +5,7 @@ use crate::{
     LogicOperation, LoopExpr, ReturnExpr, SelfExpr, SetIndex, SetProperty, Type, UnaryOp,
     UnaryOperation,
 };
-use span_util::{Span, WithSpan};
+use span_util::Span;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {

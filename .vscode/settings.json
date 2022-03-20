@@ -1,6 +1,12 @@
 {
   "cSpell.words": [
+    "arity",
+    "binop",
+    "builtins",
+    "curr",
+    "itype",
     "thiserror",
-    "ttype"
+    "ttype",
+    "unaryop"
   ]
 }

@@ -400,7 +400,7 @@ impl TypeChecker {
 
                 match &binop.op {
                     ast::BinaryOperation::Add(_)
-                    | ast::BinaryOperation::Substract(_)
+                    | ast::BinaryOperation::Subtract(_)
                     | ast::BinaryOperation::Multiply(_)
                     | ast::BinaryOperation::Divide(_) => match (&lhs, &rhs) {
                         (Type::Singleton(Singleton::Int), Type::Singleton(Singleton::Int)) => {
@@ -795,7 +795,7 @@ mod test {
     fn test_function_callback_synth() {
         // let n: fn(x: usize) -> usize = |x: f64| 2;
 
-        // TODO dont throw annnotation needed error in parser
+        // TODO don't throw annotation needed error in parser
         parse(
             "
             let main: Fun(cb: Fun(id: int)) = fun(cb) {
