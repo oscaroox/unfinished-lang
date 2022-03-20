@@ -558,6 +558,7 @@ impl Parser {
     }
 
     fn if_expression(&mut self) -> ParserResult {
+        let if_token = self.prev_token.clone();
         let left_paren = self.eat_optional(TokenType::LeftParen);
         let expr = self.expression()?;
         let expr_span = expr.get_span();
@@ -575,7 +576,13 @@ impl Parser {
             not_then = Some(self.block_expression()?);
         }
 
-        Ok(Expression::create_if(expr, then, not_then, expr_span))
+        Ok(Expression::create_if(
+            expr,
+            then,
+            not_then,
+            expr_span,
+            if_token.span,
+        ))
     }
 
     fn assignment(&mut self) -> ParserResult {
@@ -1239,7 +1246,7 @@ mod test {
         then: Expression,
         not_then: Option<Expression>,
     ) -> Expression {
-        Expression::create_if(condition, then, not_then, Span::fake())
+        Expression::create_if(condition, then, not_then, Span::fake(), Span::fake())
     }
 
     fn create_set_index(lhs: Expression, index: Expression, value: Expression) -> Expression {

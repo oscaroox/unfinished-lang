@@ -118,7 +118,7 @@ impl Interpreter {
             Expression::Call(expr) => self.eval_call(&expr),
             Expression::Function(expr) => self.eval_function(&expr),
             Expression::Block(expr) => self.eval_block(&expr.0),
-            Expression::If(expr) => self.eval_if_conditional(&expr.0),
+            Expression::If(expr) => self.eval_if_conditional(&expr),
             Expression::Index(expr) => self.eval_index(&expr.0),
             Expression::SetIndex(expr) => self.eval_set_index(&expr.0),
             Expression::Return(expr) => self.eval_return(&expr.0),

@@ -25,7 +25,7 @@ pub enum Expression {
     DataStruct(DataStruct),
     DataStructInstance(WithSpan<DataStructInstance>),
     Block(WithSpan<Block>),
-    If(WithSpan<IfConditional>),
+    If(IfConditional),
     ImplicitReturn(WithSpan<ImplicitReturn>),
     Return(WithSpan<ReturnExpr>),
     SelfExpr(WithSpan<SelfExpr>),
@@ -226,20 +226,20 @@ impl Expression {
         then: Expression,
         not_then: Option<Expression>,
         span: Span,
+        if_token_span: Span,
     ) -> Expression {
         let not_then = if let Some(e) = not_then {
             Some(Box::new(e))
         } else {
             None
         };
-        Expression::If(WithSpan(
-            IfConditional {
-                condition: Box::new(condition),
-                then: Box::new(then),
-                not_then,
-            },
+        Expression::If(IfConditional {
+            condition: Box::new(condition),
+            then: Box::new(then),
+            not_then,
+            if_token: if_token_span,
             span,
-        ))
+        })
     }
 
     pub fn create_logic(
@@ -354,7 +354,7 @@ impl Expression {
             Expression::DataStruct(s) => s.span.clone(),
             Expression::DataStructInstance(s) => s.1.clone(),
             Expression::Block(s) => s.1.clone(),
-            Expression::If(s) => s.1.clone(),
+            Expression::If(s) => s.span.clone(),
             Expression::ImplicitReturn(s) => s.1.clone(),
             Expression::Return(s) => s.1.clone(),
             Expression::SelfExpr(s) => s.1.clone(),

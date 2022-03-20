@@ -522,27 +522,26 @@ impl TypeChecker {
                 }
             }
             Expression::If(expr) => {
-                let if_expr = &expr.0;
-                let cond = self.synth(&if_expr.condition, env)?;
+                let cond = self.synth(&expr.condition, env)?;
 
                 if !cond.is_bool() {
                     return Err(TypeError::Expected(
                         Type::bool(),
                         cond,
-                        if_expr.condition.get_span(),
+                        expr.condition.get_span(),
                     ));
                 }
 
-                let then = self.synth(&if_expr.then, env)?;
+                let then = self.synth(&expr.then, env)?;
 
-                if let Some(not_then) = &if_expr.not_then {
+                if let Some(not_then) = &expr.not_then {
                     let not_then = self.synth(not_then, env)?;
                     if then != not_then {
                         return Err(TypeError::BranchesIncompatibleTypes(
                             then,
                             not_then,
                             // TODO: span should point to 'if' token instead of condition
-                            expr.1.clone(),
+                            expr.span.clone(),
                         ));
                     }
                 }
