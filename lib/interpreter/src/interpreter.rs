@@ -110,7 +110,7 @@ impl Interpreter {
             Expression::Let(expr) => self.eval_let_expression(&expr.0),
             Expression::BinOp(expr) => self.eval_binop(&expr),
             Expression::Literal(expr) => self.eval_literal(&expr.0),
-            Expression::Assign(expr) => self.eval_assignment(&expr.0),
+            Expression::Assign(expr) => self.eval_assignment(&expr),
             Expression::LetRef(expr) => self.eval_let_reference(&expr.0),
             Expression::UnaryOp(expr) => self.eval_unaryop(&expr.0),
             Expression::Grouping(expr) => self.expression(&expr.0.expr),

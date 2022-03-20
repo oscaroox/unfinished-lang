@@ -10,7 +10,7 @@ use span_util::{Span, WithSpan};
 pub enum Expression {
     BinOp(BinOp),
     Literal(WithSpan<Literal>),
-    Assign(WithSpan<Assign>),
+    Assign(Assign),
     Index(WithSpan<Index>),
     SetIndex(WithSpan<SetIndex>),
     GetProperty(WithSpan<GetProperty>),
@@ -37,7 +37,7 @@ pub enum Expression {
 impl Expression {
     pub fn to_assign(&self) -> Assign {
         match &self {
-            Expression::Assign(e) => e.0.clone(),
+            Expression::Assign(e) => e.clone(),
             _ => panic!("Cannot cast to assign"),
         }
     }
@@ -111,13 +111,11 @@ impl Expression {
     }
 
     pub fn create_assign(name: Identifier, rhs: Expression, span: Span) -> Expression {
-        Expression::Assign(WithSpan(
-            Assign {
-                name,
-                rhs: Box::new(rhs),
-            },
+        Expression::Assign(Assign {
+            name,
+            rhs: Box::new(rhs),
             span,
-        ))
+        })
     }
 
     pub fn create_let_ref(ident: Identifier, span: Span) -> Expression {
@@ -351,7 +349,7 @@ impl Expression {
         match &self {
             Expression::BinOp(s) => s.span.clone(),
             Expression::Literal(s) => s.1.clone(),
-            Expression::Assign(s) => s.1.clone(),
+            Expression::Assign(s) => s.span.clone(),
             Expression::Index(s) => s.1.clone(),
             Expression::SetIndex(s) => s.1.clone(),
             Expression::GetProperty(s) => s.1.clone(),

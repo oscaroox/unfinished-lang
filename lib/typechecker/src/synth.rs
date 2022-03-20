@@ -100,18 +100,17 @@ impl TypeChecker {
                 }
             }
             Expression::Assign(expr) => {
-                let assign = &expr.0;
-                let ttype = match env.borrow_mut().get(&assign.name.value) {
+                let ttype = match env.borrow_mut().get(&expr.name.value) {
                     Some(t) => t,
                     None => {
                         return Err(TypeError::UndefinedVariable(
-                            assign.name.value.to_string(),
-                            expr.1.clone(),
+                            expr.name.value.to_string(),
+                            expr.span.clone(),
                         ))
                     }
                 };
 
-                self.check(&assign.rhs, ttype.clone(), env)?;
+                self.check(&expr.rhs, ttype.clone(), env)?;
 
                 Ok(ttype)
             }
