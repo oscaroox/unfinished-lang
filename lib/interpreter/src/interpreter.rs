@@ -123,7 +123,7 @@ impl Interpreter {
             Expression::SetIndex(expr) => self.eval_set_index(&expr.0),
             Expression::Return(expr) => self.eval_return(&expr.0),
             Expression::ImplicitReturn(expr) => self.eval_implicit_return(&expr.0),
-            Expression::DataStruct(expr) => self.eval_data_struct(&expr.0),
+            Expression::DataStruct(expr) => self.eval_data_struct(&expr),
             Expression::DataStructInstance(expr) => self.eval_data_struct_instance(&expr.0),
             Expression::GetProperty(expr) => self.eval_get_property(&expr.0),
             Expression::SetProperty(expr) => self.eval_set_property(&expr.0),

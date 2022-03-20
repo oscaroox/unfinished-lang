@@ -214,7 +214,6 @@ impl TypeChecker {
                 }
             }
             Expression::DataStruct(expr) => {
-                let expr = &expr.0;
                 let filler = Type::data_struct(expr.name.value.to_string(), vec![], vec![]);
 
                 // register data struct name making it possible to reference in methods

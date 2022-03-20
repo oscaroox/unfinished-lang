@@ -1,3 +1,5 @@
+use span_util::Span;
+
 use crate::{Expression, Identifier};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -6,4 +8,5 @@ pub struct DataStruct {
     // TODO add spans to fields
     pub fields: Vec<Identifier>,
     pub methods: Vec<Expression>,
+    pub span: Span,
 }

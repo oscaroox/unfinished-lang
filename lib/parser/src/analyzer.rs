@@ -109,7 +109,7 @@ impl Analyzer {
                 self.function_scopes.pop();
             }
             Expression::DataStruct(expr) => {
-                for method in &expr.0.methods {
+                for method in &expr.methods {
                     self.function_scopes.push(FunctionScope::Method);
                     self.expression(method)?;
                     self.function_scopes.pop();

@@ -22,7 +22,7 @@ pub enum Expression {
     Logic(WithSpan<Logic>),
     Call(Call),
     Function(WithSpan<Function>),
-    DataStruct(WithSpan<DataStruct>),
+    DataStruct(DataStruct),
     DataStructInstance(WithSpan<DataStructInstance>),
     Block(WithSpan<Block>),
     If(WithSpan<IfConditional>),
@@ -292,14 +292,12 @@ impl Expression {
         methods: Vec<Expression>,
         span: Span,
     ) -> Expression {
-        Expression::DataStruct(WithSpan(
-            DataStruct {
-                fields,
-                name,
-                methods,
-            },
+        Expression::DataStruct(DataStruct {
+            fields,
+            name,
+            methods,
             span,
-        ))
+        })
     }
 
     pub fn create_data_struct_instance(
@@ -359,7 +357,7 @@ impl Expression {
             Expression::Logic(s) => s.1.clone(),
             Expression::Call(s) => s.span.clone(),
             Expression::Function(s) => s.1.clone(),
-            Expression::DataStruct(s) => s.1.clone(),
+            Expression::DataStruct(s) => s.span.clone(),
             Expression::DataStructInstance(s) => s.1.clone(),
             Expression::Block(s) => s.1.clone(),
             Expression::If(s) => s.1.clone(),
