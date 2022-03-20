@@ -2,10 +2,10 @@ use crate::{
     Assign, BinOp, BinaryOperation, Block, BreakExpr, Call, ContinueExpr, DataStruct,
     DataStructInstance, DataStructInstanceField, Function, GetIndex, GetProperty, Grouping,
     Identifier, IfConditional, ImplicitReturn, LetExpr, LetRef, Literal, LiteralValue, Logic,
-    LogicOperation, LoopExpr, ReturnExpr, SelfExpr, SetIndex, SetProperty, Type, UnaryOp,
-    UnaryOperation,
+    LogicOperation, LoopExpr, ReturnExpr, SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation,
 };
 use span_util::Span;
+use type_core::Type;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {

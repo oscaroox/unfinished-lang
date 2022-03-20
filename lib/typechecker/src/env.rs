@@ -1,7 +1,7 @@
-use crate::Type;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use type_core::Type;
 
 #[derive(Debug)]
 pub struct Env {

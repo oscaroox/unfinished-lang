@@ -7,5 +7,6 @@ members = [
     "lib/interpreter",
     "lib/parser",
     "lib/scanner",
-    "lib/span_util"
+    "lib/span_util",
+    "lib/type_core",
 ]

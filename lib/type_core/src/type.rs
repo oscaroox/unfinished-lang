@@ -1,7 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
-use crate::env::Env;
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct DataStructField {
     pub name: String,
@@ -28,7 +24,7 @@ pub enum Type {
     Unknown,
     Unit,
     Array(Box<Type>),
-    Identifier(Box<Type>),
+    Identifier(String),
     Function(Vec<Type>, Box<Type>),
     DataStruct(DataStruct),
     DataStructInstance(DataStruct),
@@ -99,6 +95,18 @@ impl Type {
         Type::Array(Box::new(t))
     }
 
+    pub fn unit() -> Type {
+        Type::Unit
+    }
+
+    pub fn identifier(t: String) -> Type {
+        Type::Identifier(t)
+    }
+
+    pub fn function(params: Vec<Type>, return_type: Type) -> Type {
+        Type::Function(params, Box::new(return_type))
+    }
+
     pub fn data_struct(
         name: String,
         fields: Vec<DataStructField>,
@@ -157,30 +165,30 @@ impl Type {
         }
     }
 
-    pub fn from_ast_type(atype: ast::Type, env: &Rc<RefCell<Env>>) -> Type {
-        match atype {
-            ast::Type::Int => Type::Singleton(Singleton::Int),
-            ast::Type::Float => Type::Singleton(Singleton::Float),
-            ast::Type::String => Type::Singleton(Singleton::String),
-            ast::Type::Bool => Type::Singleton(Singleton::Bool),
-            ast::Type::Unit => Type::Unit,
-            ast::Type::Array(t) => Type::from_ast_type(*t, env),
-            ast::Type::Fun(params, ret) => {
-                let p: Vec<Type> = params
-                    .iter()
-                    .map(|i| Type::from_ast_type(i.value_type.as_ref().unwrap().clone(), env))
-                    .collect();
-                let ret = Type::from_ast_type(*ret, env);
-                Type::Function(p, Box::new(ret))
-            }
-            ast::Type::Identifier(s) => match env.borrow_mut().get(&s) {
-                Some(t) => match &t {
-                    // Type::DataStruct(_, _, _) => Type::DataStructInstance(Box::new(t)),
-                    Type::DataStruct(d) => Type::DataStructInstance(d.clone()),
-                    _ => t,
-                },
-                None => panic!("Undefined type {}", s),
-            },
-        }
-    }
+    // pub fn from_ast_type(atype: ast::Type, env: &Rc<RefCell<Env>>) -> Type {
+    //     match atype {
+    //         ast::Type::Int => Type::Singleton(Singleton::Int),
+    //         ast::Type::Float => Type::Singleton(Singleton::Float),
+    //         ast::Type::String => Type::Singleton(Singleton::String),
+    //         ast::Type::Bool => Type::Singleton(Singleton::Bool),
+    //         ast::Type::Unit => Type::Unit,
+    //         ast::Type::Array(t) => Type::from_ast_type(*t, env),
+    //         ast::Type::Fun(params, ret) => {
+    //             let p: Vec<Type> = params
+    //                 .iter()
+    //                 .map(|i| Type::from_ast_type(i.value_type.as_ref().unwrap().clone(), env))
+    //                 .collect();
+    //             let ret = Type::from_ast_type(*ret, env);
+    //             Type::Function(p, Box::new(ret))
+    //         }
+    //         ast::Type::Identifier(s) => match env.borrow_mut().get(&s) {
+    //             Some(t) => match &t {
+    //                 // Type::DataStruct(_, _, _) => Type::DataStructInstance(Box::new(t)),
+    //                 Type::DataStruct(d) => Type::DataStructInstance(d.clone()),
+    //                 _ => t,
+    //             },
+    //             None => panic!("Undefined type {}", s),
+    //         },
+    //     }
+    // }
 }

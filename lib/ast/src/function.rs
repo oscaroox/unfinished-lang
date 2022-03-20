@@ -1,7 +1,7 @@
 use span_util::Span;
 
-use crate::{Expression, Identifier, Type};
-
+use crate::{Expression, Identifier};
+use type_core::Type;
 #[derive(Debug, PartialEq, Clone)]
 pub struct Function {
     pub name: Option<String>,

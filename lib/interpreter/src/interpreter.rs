@@ -600,10 +600,11 @@ mod test {
     use std::collections::HashMap;
 
     use crate::{DataStruct, FunctionValue, Interpreter, Value};
-    use ast::{Identifier, Type};
+    use ast::Identifier;
     use parser::Parser;
     use scanner::Scanner;
     use span_util::Span;
+    use type_core::Type;
 
     pub fn run(src: &str, expected: Value) {
         let scanner = Scanner::new(src.to_string());

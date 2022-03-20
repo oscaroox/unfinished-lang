@@ -9,4 +9,5 @@ edition = "2018"
 [dependencies]
 scanner = {path = "../scanner"}
 span_util = {path = "../span_util"}
+type_core = {path = "../type_core"}
 derivative = "2.2.0"

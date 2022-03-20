@@ -1,10 +1,11 @@
 use crate::ParserError;
 use ast::{
     BinaryOperation, DataStructInstanceField, Expression, Identifier, LiteralValue, LogicOperation,
-    Program, Type, UnaryOperation,
+    Program, UnaryOperation,
 };
 use scanner::{Scanner, ScannerMode, Token, TokenType};
 use span_util::Span;
+use type_core::Type;
 
 const RECOVER_SET: [TokenType; 5] = [
     TokenType::Let,
@@ -224,7 +225,11 @@ impl Parser {
             if self.eat_optional(TokenType::Colon).is_some() {
                 return_type = self.parse_type(true)?;
             }
-            Some(Type::fun(params, return_type))
+            let p: Vec<Type> = params
+                .iter()
+                .map(|i| i.value_type.as_ref().unwrap().clone())
+                .collect();
+            Some(Type::function(p, return_type))
         } else {
             None
         };
@@ -1070,10 +1075,11 @@ mod test {
 
     use ast::{
         BinaryOperation, DataStructInstanceField, Expression, Identifier, LiteralValue,
-        LogicOperation, Program, Type, UnaryOperation,
+        LogicOperation, Program, UnaryOperation,
     };
     use scanner::{Scanner, Token, TokenType};
     use span_util::Span;
+    use type_core::Type;
 
     fn run_parser(source: &str) -> (Program, Vec<ParserError>) {
         let scanner = Scanner::new(source.to_string());
@@ -1294,7 +1300,7 @@ mod test {
                 create_let_type(ident_type("cents", Type::int()), Some(int(2))),
                 create_let_type(ident_type("pi", Type::float()), Some(float(3.14))),
                 create_let_type(ident_type("name", Type::string()), Some(string_lit("test"))),
-                create_let_type(ident_type("exists", Type::Bool), Some(bool_lit(true))),
+                create_let_type(ident_type("exists", Type::bool()), Some(bool_lit(true))),
             ],
         );
 
@@ -1341,49 +1347,37 @@ mod test {
         ",
             vec![
                 create_let_type(
-                    ident_type(
-                        "x",
-                        Type::fun(vec![ident_type("a".into(), Type::string())], Type::unit()),
-                    ),
+                    ident_type("x", Type::function(vec![Type::string()], Type::unit())),
                     None,
                 ),
-                create_let_type(ident_type("x", Type::fun(vec![], Type::unit())), None),
-                create_let_type(ident_type("x", Type::fun(vec![], Type::unit())), None),
-                create_let_type(ident_type("x", Type::fun(vec![], Type::string())), None),
+                create_let_type(ident_type("x", Type::function(vec![], Type::unit())), None),
+                create_let_type(ident_type("x", Type::function(vec![], Type::unit())), None),
                 create_let_type(
-                    ident_type(
-                        "x",
-                        Type::fun(vec![ident_type("a".into(), Type::string())], Type::int()),
-                    ),
+                    ident_type("x", Type::function(vec![], Type::string())),
+                    None,
+                ),
+                create_let_type(
+                    ident_type("x", Type::function(vec![Type::string()], Type::int())),
                     None,
                 ),
                 create_let_type(
                     ident_type(
                         "x",
-                        Type::fun(
-                            vec![ident_type("a".into(), Type::string())],
-                            Type::array(Type::int()),
-                        ),
+                        Type::function(vec![Type::string()], Type::array(Type::int())),
                     ),
                     None,
                 ),
                 create_let_type(
                     ident_type(
                         "x",
-                        Type::array(Type::fun(
-                            vec![ident_type("b".into(), Type::int())],
-                            Type::int(),
-                        )),
+                        Type::array(Type::function(vec![Type::int()], Type::int())),
                     ),
                     None,
                 ),
                 create_let_type(
                     ident_type(
                         "x",
-                        Type::array(Type::fun(
-                            vec![ident_type("b".into(), Type::int())],
-                            Type::unit(),
-                        )),
+                        Type::array(Type::function(vec![Type::int()], Type::unit())),
                     ),
                     None,
                 ),
@@ -1401,7 +1395,7 @@ mod test {
         "#,
             vec![
                 create_let_type(
-                    ident_type("joe", Type::identifier("Person")),
+                    ident_type("joe", Type::identifier("Person".to_string())),
                     Some(create_data_struct_instance("Person".into(), vec![])),
                 ),
                 create_let_type(
@@ -1414,10 +1408,7 @@ mod test {
                 create_let_type(
                     ident_type(
                         "x",
-                        Type::fun(
-                            vec![ident_type("x".into(), Type::identifier("Person"))],
-                            Type::unit(),
-                        ),
+                        Type::function(vec![Type::identifier("Person".to_string())], Type::unit()),
                     ),
                     None,
                 ),

@@ -11,3 +11,4 @@ ast = { path="../ast" }
 scanner = { path="../scanner" }
 parser = { path="../parser" }
 span_util = { path="../span_util" }
+type_core = { path="../type_core" }

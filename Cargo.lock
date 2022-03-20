@@ -18,6 +18,7 @@ dependencies = [
  "derivative",
  "scanner",
  "span_util",
+ "type_core",
 ]
 
 [[package]]
@@ -226,6 +227,7 @@ dependencies = [
  "parser",
  "scanner",
  "span_util",
+ "type_core",
 ]
 
 [[package]]
@@ -316,6 +318,7 @@ dependencies = [
  "scanner",
  "span_util",
  "thiserror",
+ "type_core",
 ]
 
 [[package]]
@@ -509,6 +512,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "type_core"
+version = "0.1.0"
+
+[[package]]
 name = "typechecker"
 version = "0.1.0"
 dependencies = [
@@ -518,6 +525,7 @@ dependencies = [
  "scanner",
  "span_util",
  "thiserror",
+ "type_core",
 ]
 
 [[package]]

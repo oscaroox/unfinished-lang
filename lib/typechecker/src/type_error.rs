@@ -2,7 +2,7 @@ use ariadne::{Label, Report, ReportKind};
 use span_util::Span;
 use thiserror::Error;
 
-use crate::types::Type;
+use type_core::Type;
 
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum TypeError {

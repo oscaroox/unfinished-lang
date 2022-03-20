@@ -2,8 +2,8 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::env::Env;
 use crate::type_error::TypeError;
-use crate::types::{DataStructField, DataStructMethod, Singleton, Type};
 use ast::{Expression, Function};
+use type_core::{DataStructField, DataStructMethod, Singleton, Type};
 
 pub struct TypeChecker {
     errors: Vec<TypeError>,
@@ -45,6 +45,28 @@ impl TypeChecker {
         }
     }
 
+    fn resolve_type(&self, ttype: Type, env: &Rc<RefCell<Env>>) -> Type {
+        match ttype {
+            Type::Identifier(identifier) => match env.borrow_mut().get(&identifier) {
+                Some(t) => match &t {
+                    Type::DataStruct(d) => Type::DataStructInstance(d.clone()),
+                    _ => t,
+                },
+                None => panic!("Undefined type {}", identifier),
+            },
+            Type::Array(t) => self.resolve_type(*t, env),
+            Type::Function(params, ret) => {
+                let p: Vec<Type> = params
+                    .iter()
+                    .map(|i| self.resolve_type(i.clone(), env))
+                    .collect();
+                let ret = self.resolve_type(*ret, env);
+                Type::Function(p, Box::new(ret))
+            }
+            _ => ttype,
+        }
+    }
+
     fn synth(&self, expr: &Expression, env: &Rc<RefCell<Env>>) -> Result<Type, TypeError> {
         match expr {
             Expression::Literal(lit) => Ok(match &lit.value {
@@ -72,12 +94,12 @@ impl TypeChecker {
             Expression::BreakExpr(_) => Ok(Type::Unit),
             Expression::ContinueExpr(_) => Ok(Type::Unit),
             Expression::Let(expr) => {
-                if let Some(t) = &expr.name.value_type {
-                    let ttype = Type::from_ast_type(t.clone(), env);
+                if let Some(ttype) = &expr.name.value_type {
+                    let ttype = self.resolve_type(ttype.clone(), env);
                     if let Some(e) = &expr.value {
                         self.check(e, ttype.clone(), env)?;
                     }
-                    env.borrow_mut().set(&expr.name.value, ttype);
+                    env.borrow_mut().set(&expr.name.value, ttype.clone());
                 } else if let Some(e) = &expr.value {
                     let ttype = self.synth(e, env)?;
                     env.borrow_mut().set(&expr.name.value, ttype);
@@ -208,11 +230,11 @@ impl TypeChecker {
                 let mut methods = vec![];
 
                 for field in &expr.fields {
-                    let t = match &field.value_type {
-                        Some(t) => t.clone(),
+                    let ttype = match &field.value_type {
+                        Some(t) => self.resolve_type(t.clone(), env),
                         None => panic!("Type Annotation needed"), // TODO: get better spans for identifier
                     };
-                    let ttype = Type::from_ast_type(t, &env);
+
                     fields.push(DataStructField {
                         name: field.value.to_string(),
                         ttype,
@@ -525,8 +547,7 @@ impl TypeChecker {
                         return Err(TypeError::BranchesIncompatibleTypes(
                             then,
                             not_then,
-                            // TODO: span should point to 'if' token instead of condition
-                            expr.span.clone(),
+                            expr.if_token.clone(),
                         ));
                     }
                 }
@@ -605,14 +626,15 @@ impl TypeChecker {
             .params
             .iter()
             .map(|e| match &e.value_type {
-                Some(t) => Type::from_ast_type(t.clone(), &env),
+                Some(t) => self.resolve_type(t.clone(), env),
                 None => panic!("Annotation type needed"),
             })
             .collect();
 
-        let ret_type = Type::from_ast_type(expr.return_type.clone(), &env);
-
-        Ok(Type::Function(param_types, Box::new(ret_type)))
+        Ok(Type::Function(
+            param_types,
+            Box::new(self.resolve_type(expr.return_type.clone(), env)),
+        ))
     }
 
     fn check(
@@ -676,7 +698,7 @@ impl TypeChecker {
                 env.borrow_mut().set(&ident.value, ttype.clone());
 
                 match &ident.value_type {
-                    Some(v) => Type::from_ast_type(v.clone(), &env),
+                    Some(v) => self.resolve_type(v.clone(), &env),
                     None => ttype.clone(),
                 }
             })

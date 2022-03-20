@@ -13,4 +13,4 @@ ariadne = "0.1.5"
 ast = { path = "../ast" }
 scanner = { path = "../scanner" }
 span_util = { path = "../span_util" }
-
+type_core = { path = "../type_core" }

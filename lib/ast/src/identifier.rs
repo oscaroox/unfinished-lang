@@ -1,7 +1,7 @@
 use scanner::TokenType;
 use span_util::Span;
 
-use crate::Type;
+use type_core::Type;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Identifier {
@@ -71,7 +71,8 @@ impl std::fmt::Display for Identifier {
 pub mod test {
     use span_util::Span;
 
-    use crate::{Identifier, Type};
+    use crate::Identifier;
+    use type_core::Type;
 
     pub fn ident(name: &str) -> Identifier {
         Identifier::new(name.into(), Span::fake())
