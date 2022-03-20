@@ -193,26 +193,24 @@ impl TypeChecker {
                 }
             }
             Expression::Call(expr) => {
-                let call = &expr.0;
-
-                let callee = self.synth(&call.callee, env)?;
+                let callee = self.synth(&expr.callee, env)?;
 
                 match callee {
                     Type::Function(params, ret) => {
                         // TODO handle self param in methods
-                        if params.len() != call.arguments.len() {
+                        if params.len() != expr.arguments.len() {
                             return Err(TypeError::ExpectedArguments(
                                 params.len(),
-                                call.arguments.len(),
-                                expr.1.clone(),
+                                expr.arguments.len(),
+                                expr.span.clone(),
                             ));
                         }
-                        for (t, e) in params.iter().zip(call.arguments.iter()) {
+                        for (t, e) in params.iter().zip(expr.arguments.iter()) {
                             self.check(e, t.clone(), &env)?;
                         }
                         Ok(*ret)
                     }
-                    _ => Err(TypeError::NotCallable(callee, call.callee.get_span())),
+                    _ => Err(TypeError::NotCallable(callee, expr.callee.get_span())),
                 }
             }
             Expression::DataStruct(expr) => {

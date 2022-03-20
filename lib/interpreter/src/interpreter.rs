@@ -115,7 +115,7 @@ impl Interpreter {
             Expression::UnaryOp(expr) => self.eval_unaryop(&expr.0),
             Expression::Grouping(expr) => self.expression(&expr.0.expr),
             Expression::Logic(expr) => self.eval_logic_expression(&expr.0),
-            Expression::Call(expr) => self.eval_call(&expr.0),
+            Expression::Call(expr) => self.eval_call(&expr),
             Expression::Function(expr) => self.eval_function(&expr.0),
             Expression::Block(expr) => self.eval_block(&expr.0),
             Expression::If(expr) => self.eval_if_conditional(&expr.0),

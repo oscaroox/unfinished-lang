@@ -20,7 +20,7 @@ pub enum Expression {
     UnaryOp(WithSpan<UnaryOp>),
     Grouping(WithSpan<Grouping>),
     Logic(WithSpan<Logic>),
-    Call(WithSpan<Call>),
+    Call(Call),
     Function(WithSpan<Function>),
     DataStruct(WithSpan<DataStruct>),
     DataStructInstance(WithSpan<DataStructInstance>),
@@ -142,13 +142,11 @@ impl Expression {
     }
 
     pub fn create_call(callee: Expression, args: Vec<Expression>, span: Span) -> Expression {
-        Expression::Call(WithSpan(
-            Call {
-                callee: Box::new(callee),
-                arguments: args,
-            },
+        Expression::Call(Call {
+            callee: Box::new(callee),
+            arguments: args,
             span,
-        ))
+        })
     }
 
     pub fn create_index(lhs: Expression, index: Expression, span: Span) -> Expression {
@@ -359,7 +357,7 @@ impl Expression {
             Expression::UnaryOp(s) => s.1.clone(),
             Expression::Grouping(s) => s.1.clone(),
             Expression::Logic(s) => s.1.clone(),
-            Expression::Call(s) => s.1.clone(),
+            Expression::Call(s) => s.span.clone(),
             Expression::Function(s) => s.1.clone(),
             Expression::DataStruct(s) => s.1.clone(),
             Expression::DataStructInstance(s) => s.1.clone(),
