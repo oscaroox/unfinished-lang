@@ -1,4 +1,4 @@
-use crate::{token::Token, TokenWithSpan};
+use crate::token::Token;
 
 #[derive(Debug)]
 pub enum ScannerMode {
@@ -104,7 +104,7 @@ impl Scanner {
         }
     }
 
-    fn read_digit(&mut self) -> TokenWithSpan {
+    fn read_digit(&mut self) -> Token {
         let mut res = vec![];
         let pos = self.pos;
         while !self.is_end() && self.is_digit(self.ch) {
@@ -132,7 +132,7 @@ impl Scanner {
         Token::int_const(res.into_iter().collect(), pos..self.pos)
     }
 
-    fn read_identifier(&mut self) -> TokenWithSpan {
+    fn read_identifier(&mut self) -> Token {
         let mut res = vec![];
         let pos = self.pos;
         while !self.is_end() && self.is_alphanumeric(self.ch) {
@@ -169,7 +169,7 @@ impl Scanner {
         }
     }
 
-    pub fn next_token(&mut self) -> TokenWithSpan {
+    pub fn next_token(&mut self) -> Token {
         self.set_checkpoint();
         match self.mode {
             ScannerMode::Default => self.scan_normal(),
@@ -177,7 +177,7 @@ impl Scanner {
         }
     }
 
-    fn scan_normal(&mut self) -> TokenWithSpan {
+    fn scan_normal(&mut self) -> Token {
         self.skip_whitespace();
 
         let curr_ch = self.ch;
@@ -327,7 +327,7 @@ impl Scanner {
         token
     }
 
-    fn scan_interpolated(&mut self) -> TokenWithSpan {
+    fn scan_interpolated(&mut self) -> Token {
         let pos = self.pos;
         let token = match self.ch {
             '"' => Token::double_quote(pos..self.pos),
@@ -353,7 +353,7 @@ impl Scanner {
         token
     }
 
-    fn read_interpolation(&mut self, first_ch: char) -> TokenWithSpan {
+    fn read_interpolation(&mut self, first_ch: char) -> Token {
         let mut out = vec![first_ch];
         let pos = self.pos;
         loop {
@@ -399,9 +399,9 @@ mod tests {
             let value = e.1;
             let token = scanner.next_token();
 
-            assert_eq!(token.0.token_type, token_type);
+            assert_eq!(token.token_type, token_type);
             if let Some(val) = value {
-                assert_eq!(token.0.value, val.to_string());
+                assert_eq!(token.value, val.to_string());
             }
         });
     }
@@ -417,30 +417,30 @@ mod tests {
         let src = "let fun hello;";
         let mut scanner = Scanner::new(src.to_string());
 
-        let token = scanner.next_token().0;
+        let token = scanner.next_token();
         assert_eq!(token.token_type, TokenType::Let);
 
-        let token = scanner.next_token().0;
+        let token = scanner.next_token();
         assert_eq!(token.token_type, TokenType::Fun);
 
         scanner.backtrack();
 
-        let token = scanner.next_token().0;
+        let token = scanner.next_token();
         assert_eq!(token.token_type, TokenType::Fun);
 
-        let token = scanner.next_token().0;
+        let token = scanner.next_token();
         assert_eq!(token.token_type, TokenType::Identifier);
         assert_eq!(token.value, "hello".to_string());
 
-        let token = scanner.next_token().0;
+        let token = scanner.next_token();
         assert_eq!(token.token_type, TokenType::SemiColon);
 
         scanner.backtrack();
 
-        let token = scanner.next_token().0;
+        let token = scanner.next_token();
         assert_eq!(token.token_type, TokenType::SemiColon);
 
-        let token = scanner.next_token().0;
+        let token = scanner.next_token();
         assert_eq!(token.token_type, TokenType::EOF);
     }
 
@@ -449,24 +449,24 @@ mod tests {
         let src = r#" "hello, $(world) hows it" "" 123"#;
         let mut scanner = Scanner::new(src.to_string());
 
-        let tok = scanner.next_token().0;
+        let tok = scanner.next_token();
         assert_eq!(tok.token_type, TokenType::DoubleQuote);
 
         if tok.token_type == TokenType::DoubleQuote {
             scanner.set_mode(ScannerMode::String);
         }
 
-        let tok = scanner.next_token().0;
+        let tok = scanner.next_token();
         assert_eq!(tok.token_type, TokenType::StringConst);
         assert_eq!(tok.value, String::from("hello, "));
 
-        let tok = scanner.next_token().0;
+        let tok = scanner.next_token();
 
         assert_eq!(tok.token_type, TokenType::LeftParen);
 
         scanner.set_mode(ScannerMode::Default);
 
-        let tok = scanner.next_token().0;
+        let tok = scanner.next_token();
         assert_eq!(tok.token_type, TokenType::Identifier);
 
         // skip the closing paren
@@ -474,32 +474,32 @@ mod tests {
 
         scanner.set_mode(ScannerMode::String);
 
-        let tok = scanner.next_token().0;
+        let tok = scanner.next_token();
         assert_eq!(tok.token_type, TokenType::StringConst);
         assert_eq!(tok.value, String::from(" hows it"));
 
-        let tok = scanner.next_token().0;
+        let tok = scanner.next_token();
         assert_eq!(tok.token_type, TokenType::DoubleQuote);
 
         if tok.token_type == TokenType::DoubleQuote {
             scanner.set_mode(ScannerMode::Default);
         }
 
-        let tok = scanner.next_token().0;
+        let tok = scanner.next_token();
         assert_eq!(tok.token_type, TokenType::DoubleQuote);
 
         if tok.token_type == TokenType::DoubleQuote {
             scanner.set_mode(ScannerMode::String);
         }
 
-        let tok = scanner.next_token().0;
+        let tok = scanner.next_token();
         assert_eq!(tok.token_type, TokenType::DoubleQuote);
 
         if tok.token_type == TokenType::DoubleQuote {
             scanner.set_mode(ScannerMode::Default);
         }
 
-        let tok = scanner.next_token().0;
+        let tok = scanner.next_token();
         assert_eq!(tok.token_type, TokenType::IntConst);
         assert_eq!(tok.value, "123");
     }
@@ -600,20 +600,23 @@ mod tests {
 
     #[test]
     fn scan_label() {
-        let src = "+
+        let src = r#"+
 let
 fun
-this_is_a_identifier";
+this_is_a_identifier
+1"#;
         let mut scanner = Scanner::new(src.to_string());
-        let plus = scanner.next_token().1;
-        let let_kw = scanner.next_token().1;
-        let fun_kw = scanner.next_token().1;
-        let ident = scanner.next_token().1;
+        let plus = scanner.next_token();
+        let let_kw = scanner.next_token();
+        let fun_kw = scanner.next_token();
+        let ident = scanner.next_token();
+        let int = scanner.next_token();
 
-        assert_eq!(plus.to_range(), 0..0);
-        assert_eq!(let_kw.to_range(), 2..5);
-        assert_eq!(fun_kw.to_range(), 6..9);
-        assert_eq!(ident.to_range(), 10..30);
+        assert_eq!(plus.span.to_range(), 0..0);
+        assert_eq!(let_kw.span.to_range(), 2..5);
+        assert_eq!(fun_kw.span.to_range(), 6..9);
+        assert_eq!(ident.span.to_range(), 10..30);
+        assert_eq!(int.span.to_range(), 31..32);
     }
 
     #[test]

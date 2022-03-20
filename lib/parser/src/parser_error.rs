@@ -1,41 +1,41 @@
 use ariadne::{Label, Report, ReportKind};
-use scanner::TokenWithSpan;
+use scanner::Token;
 use thiserror::Error;
 
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum ParserError {
     #[error("{0}")]
-    ExpectedToken(String, TokenWithSpan),
+    ExpectedToken(String, Token),
 
     #[error("{0}")]
-    Error(String, TokenWithSpan),
+    Error(String, Token),
 
     #[error("Unexpected token {0}")]
-    UnexpectedToken(TokenWithSpan),
+    UnexpectedToken(Token),
 
     #[error("Unterminated string")]
-    UnterminatedString(TokenWithSpan),
+    UnterminatedString(Token),
 
     #[error("Unterminated string interpolation")]
-    UnterminatedInterpolation(TokenWithSpan),
+    UnterminatedInterpolation(Token),
 
     #[error("Unterminated function call")]
-    UnterminatedFunctionCall(TokenWithSpan),
+    UnterminatedFunctionCall(Token),
 
     #[error("Invalid assignment target")]
-    InvalidAssignmentTarget(TokenWithSpan),
+    InvalidAssignmentTarget(Token),
 
     #[error("Invalid unary operation")]
-    InvalidUnaryOperation(TokenWithSpan),
+    InvalidUnaryOperation(Token),
 
     #[error("Invalid use of 'unit' type, cannot use 'unit' as type")]
-    InvalidUseOfUnitType(TokenWithSpan),
+    InvalidUseOfUnitType(Token),
 
     #[error("Invalid type '{0}'")]
-    InvalidType(TokenWithSpan),
+    InvalidType(Token),
 
     #[error("Type annotation needed")]
-    TypeAnnotationNeeded(TokenWithSpan),
+    TypeAnnotationNeeded(Token),
 }
 
 impl ParserError {
@@ -53,7 +53,7 @@ impl ParserError {
             | ParserError::InvalidType(tok)
             | ParserError::TypeAnnotationNeeded(tok)
             | ParserError::UnterminatedString(tok) => {
-                let label = Label::new(tok.1.to_range());
+                let label = Label::new(tok.span.to_range());
                 Report::build(ReportKind::Error, (), 99)
                     .with_message("Parser Error")
                     .with_label(label.with_message(msg))

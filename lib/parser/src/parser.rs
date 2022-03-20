@@ -3,7 +3,7 @@ use ast::{
     BinaryOperation, DataStructInstanceField, Expression, Identifier, Literal, LogicOperation,
     Program, Type, UnaryOperation,
 };
-use scanner::{Scanner, ScannerMode, Token, TokenType, TokenWithSpan};
+use scanner::{Scanner, ScannerMode, Token, TokenType};
 use span_util::Span;
 
 const RECOVER_SET: [TokenType; 5] = [
@@ -26,8 +26,8 @@ type ParserResult = Result<Expression, ParserError>;
 #[derive(Debug)]
 pub struct Parser {
     scanner: Scanner,
-    prev_token: TokenWithSpan,
-    curr_token: TokenWithSpan,
+    prev_token: Token,
+    curr_token: Token,
     errors: Vec<ParserError>,
 }
 
@@ -62,11 +62,11 @@ impl Parser {
         self.advance();
 
         while !self.is_end() {
-            if self.prev_token.0.token_type == TokenType::SemiColon {
+            if self.prev_token.token_type == TokenType::SemiColon {
                 return;
             }
 
-            if RECOVER_SET.contains(&self.curr_token.0.token_type) {
+            if RECOVER_SET.contains(&self.curr_token.token_type) {
                 return;
             }
             self.advance();
@@ -75,7 +75,7 @@ impl Parser {
 
     fn matches(&mut self, types: Vec<TokenType>) -> bool {
         for token_type in types.iter() {
-            if *token_type == self.curr_token.0.token_type {
+            if *token_type == self.curr_token.token_type {
                 self.advance();
                 return true;
             }
@@ -84,7 +84,7 @@ impl Parser {
     }
 
     fn check(&mut self, token_type: TokenType) -> bool {
-        self.curr_token.0.token_type == token_type
+        self.curr_token.token_type == token_type
     }
 
     fn check_peek(&mut self, token_type: TokenType) -> bool {
@@ -94,41 +94,41 @@ impl Parser {
     fn peek(&mut self) -> Token {
         let token = self.scanner.next_token();
         self.scanner.backtrack();
-        token.0
+        token
     }
 
-    fn advance(&mut self) -> TokenWithSpan {
+    fn advance(&mut self) -> Token {
         self.prev_token = self.curr_token.clone();
         self.curr_token = self.scanner.next_token();
         self.prev_token.clone()
     }
 
     fn is_end(&self) -> bool {
-        self.curr_token.0.is_eof()
+        self.curr_token.is_eof()
     }
 
-    fn eat(&mut self, token_type: TokenType, msg: &str) -> Result<TokenWithSpan, ParserError> {
-        if self.curr_token.0.token_type == token_type {
+    fn eat(&mut self, token_type: TokenType, msg: &str) -> Result<Token, ParserError> {
+        if self.curr_token.token_type == token_type {
             return Ok(self.advance());
         }
 
-        let tok = match self.curr_token.0.is_eof() {
+        let tok = match self.curr_token.is_eof() {
             true => self.prev_token.clone(),
             false => self.curr_token.clone(),
         };
 
-        let msg = format!("{}, found '{}'", msg.to_string(), tok.0);
+        let msg = format!("{}, found '{}'", msg.to_string(), tok);
         Err(ParserError::ExpectedToken(msg, tok))
     }
 
-    fn eat_optional(&mut self, token_type: TokenType) -> Option<TokenWithSpan> {
-        if self.curr_token.0.token_type == token_type {
+    fn eat_optional(&mut self, token_type: TokenType) -> Option<Token> {
+        if self.curr_token.token_type == token_type {
             return Some(self.advance());
         }
         None
     }
 
-    fn eat_semi(&mut self) -> Result<TokenWithSpan, ParserError> {
+    fn eat_semi(&mut self) -> Result<Token, ParserError> {
         self.eat(TokenType::SemiColon, "Expected ';' after expression")
     }
 
@@ -162,7 +162,7 @@ impl Parser {
 
     fn parse_parameters(&mut self, token_end: TokenType) -> Result<Vec<Identifier>, ParserError> {
         let mut params = vec![];
-        if self.curr_token.0.token_type != token_end {
+        if self.curr_token.token_type != token_end {
             loop {
                 if self.check(TokenType::SELF) {
                     return Err(ParserError::Error(
@@ -175,17 +175,16 @@ impl Parser {
 
                 let ident = if self.eat_optional(TokenType::Colon).is_none() {
                     // return Err(ParserError::TypeAnnotationNeeded(ident));
-                    Identifier::new(ident.0.value, ident.1)
+                    Identifier::new(ident.value, ident.span)
                 } else {
                     let ttype = self.parse_type(false)?;
-                    Identifier::with_value_type(ident.0.value, Some(ttype), ident.1)
+                    Identifier::with_value_type(ident.value, Some(ttype), ident.span)
                 };
                 // let ttype = self.parse_type(false)?;
 
                 params.push(ident);
 
-                if !self.matches(vec![TokenType::Comma])
-                    || self.curr_token.0.token_type == token_end
+                if !self.matches(vec![TokenType::Comma]) || self.curr_token.token_type == token_end
                 {
                     break;
                 }
@@ -208,12 +207,12 @@ impl Parser {
             TokenType::Bool,
             TokenType::Identifier,
         ]) {
-            let ttype = match &token.0.token_type {
+            let ttype = match &token.token_type {
                 TokenType::Int => Type::int(),
                 TokenType::Float => Type::float(),
                 TokenType::String => Type::string(),
                 TokenType::Bool => Type::bool(),
-                TokenType::Identifier => Type::identifier(token.0.value.to_string()),
+                TokenType::Identifier => Type::identifier(token.value.to_string()),
                 _ => unreachable!(),
             };
             Some(ttype)
@@ -256,7 +255,7 @@ impl Parser {
     }
 
     fn let_expression(&mut self) -> ParserResult {
-        let start_span: Span = self.prev_token.1.clone();
+        let start_span: Span = self.prev_token.span.clone();
         let ident = self.curr_token.clone();
         let identifier = self.eat(TokenType::Identifier, "Expected identifier")?;
 
@@ -273,7 +272,7 @@ impl Parser {
             let expr = match self.expression() {
                 Ok(expr) => match expr {
                     Expression::Function(fun) => Expression::create_function(
-                        Some(identifier.0.value.to_string()),
+                        Some(identifier.value.to_string()),
                         fun.0.params,
                         fun.0.return_type,
                         fun.0.is_static,
@@ -287,7 +286,7 @@ impl Parser {
                         return Err(ParserError::ExpectedToken(
                             format!(
                                 "Expected expression here, found '{}'",
-                                self.curr_token.0.clone()
+                                self.curr_token.clone()
                             ),
                             self.curr_token.clone(),
                         ));
@@ -302,25 +301,25 @@ impl Parser {
             return Err(ParserError::TypeAnnotationNeeded(ident));
         }
 
-        let span: Span = start_span.extend(self.curr_token.1.clone());
+        let span: Span = start_span.extend(self.curr_token.span.clone());
 
         Ok(Expression::create_let(
-            Identifier::with_value_type(identifier.0.value, itype, identifier.1),
+            Identifier::with_value_type(identifier.value, itype, identifier.span),
             init,
             span,
         ))
     }
 
     fn continue_break_expression(&mut self) -> ParserResult {
-        Ok(match self.prev_token.0.token_type {
-            TokenType::Break => Expression::create_break(self.prev_token.1.clone()),
-            TokenType::Continue => Expression::create_continue(self.prev_token.1.clone()),
+        Ok(match self.prev_token.token_type {
+            TokenType::Break => Expression::create_break(self.prev_token.span.clone()),
+            TokenType::Continue => Expression::create_continue(self.prev_token.span.clone()),
             _ => unreachable!(),
         })
     }
 
     fn loop_expression(&mut self) -> ParserResult {
-        let if_span = self.prev_token.1.clone();
+        let if_span = self.prev_token.span.clone();
         let token = self.curr_token.clone();
         let condition = if !self.check(TokenType::LeftBrace) {
             self.expression()?
@@ -358,26 +357,26 @@ impl Parser {
     }
 
     fn data_struct_instantiate(&mut self) -> ParserResult {
-        let identifier_span = self.curr_token.1.clone();
+        let identifier_span = self.curr_token.span.clone();
         let ident = self.eat(TokenType::Identifier, "Expected identifier")?;
         self.eat(TokenType::LeftBrace, "Expected '{'")?;
 
         let mut fields = vec![];
 
-        if self.curr_token.0.token_type != TokenType::RightBrace {
-            while !self.curr_token.0.is_eof() {
-                let id_span = self.curr_token.1.clone();
+        if self.curr_token.token_type != TokenType::RightBrace {
+            while !self.curr_token.is_eof() {
+                let id_span = self.curr_token.span.clone();
                 let id = self.eat(TokenType::Identifier, "Expected identifier")?;
 
                 if self.matches(vec![TokenType::Comma])
-                    || self.curr_token.0.token_type == TokenType::RightBrace
+                    || self.curr_token.token_type == TokenType::RightBrace
                 {
-                    let ident = Identifier::new(id.0.value.to_string(), id.1);
+                    let ident = Identifier::new(id.value.to_string(), id.span);
                     fields.push(DataStructInstanceField::new(
                         ident.clone(),
                         Expression::create_let_ref(ident, id_span),
                     ));
-                    if self.curr_token.0.token_type == TokenType::RightBrace {
+                    if self.curr_token.token_type == TokenType::RightBrace {
                         break;
                     }
                     continue;
@@ -386,13 +385,13 @@ impl Parser {
                 self.eat(TokenType::Colon, "Expected ':'")?;
                 let expr = self.expression()?;
                 let field = DataStructInstanceField::new(
-                    Identifier::new(id.0.value.to_string(), id.1),
+                    Identifier::new(id.value.to_string(), id.span),
                     expr,
                 );
                 fields.push(field);
 
                 if !self.matches(vec![TokenType::Comma])
-                    || self.curr_token.0.token_type == TokenType::RightBrace
+                    || self.curr_token.token_type == TokenType::RightBrace
                 {
                     break;
                 }
@@ -401,14 +400,14 @@ impl Parser {
 
         self.eat(TokenType::RightBrace, "Expected '}'")?;
         Ok(Expression::create_data_struct_instance(
-            Identifier::new(ident.0.value.to_string(), ident.1),
+            Identifier::new(ident.value.to_string(), ident.span),
             fields,
             identifier_span,
         ))
     }
 
     fn data_struct_expression(&mut self) -> ParserResult {
-        let ident_span = self.curr_token.1.clone();
+        let ident_span = self.curr_token.span.clone();
         let ident = self.eat(TokenType::Identifier, "Expected identifier")?;
         self.eat(TokenType::LeftBrace, "Expected '{'")?;
 
@@ -424,14 +423,14 @@ impl Parser {
 
             while !self.check(TokenType::RightBrace) && !self.is_end() {
                 self.eat(TokenType::Fun, "Expected 'fun'")?;
-                methods.push(self.fun_expression(FunctionKind::Method(ident.0.value.clone()))?);
+                methods.push(self.fun_expression(FunctionKind::Method(ident.value.clone()))?);
             }
 
             self.eat(TokenType::RightBrace, "Expected '}'")?;
         }
 
         Ok(Expression::create_data_struct(
-            Identifier::new(ident.0.value.to_string(), ident.1),
+            Identifier::new(ident.value.to_string(), ident.span),
             fields,
             methods,
             ident_span,
@@ -439,28 +438,28 @@ impl Parser {
     }
 
     fn return_expression(&mut self) -> ParserResult {
-        let mut span: Span = self.prev_token.1.clone();
+        let mut span: Span = self.prev_token.span.clone();
         let mut value = None;
 
-        if !self.curr_token.0.is_semi_colon() {
+        if !self.curr_token.is_semi_colon() {
             let expr = self.expression()?;
             span = span.extend(expr.get_span());
             value = Some(expr);
         }
 
-        let span = span.extend(self.curr_token.1.clone());
+        let span = span.extend(self.curr_token.span.clone());
         Ok(Expression::create_return(value, span))
     }
 
     fn fun_expression(&mut self, kind: FunctionKind) -> ParserResult {
-        let fun_span: Span = self.prev_token.1.clone();
+        let fun_span: Span = self.prev_token.span.clone();
         let mut name = None;
         let mut params = vec![];
         let mut is_static = true;
 
         if let FunctionKind::Method(_) = kind {
             let ident = self.eat(TokenType::Identifier, "Expected method identifier")?;
-            name = Some(ident.0.value);
+            name = Some(ident.value);
         }
 
         let left_param = self.eat_optional(TokenType::LeftParen);
@@ -472,10 +471,10 @@ impl Parser {
                     self.eat_optional(TokenType::Comma);
                     is_static = false;
                     params.push(Identifier::with_all(
-                        token.0.value,
-                        token.0.token_type,
+                        token.value,
+                        token.token_type,
                         Type::Identifier(data_struct_indentifier),
-                        token.1,
+                        token.span,
                     ));
                 }
                 (FunctionKind::Function, true) => {
@@ -498,7 +497,7 @@ impl Parser {
         };
 
         if self.matches(vec![TokenType::Arrow]) {
-            let arrow_span: Span = self.prev_token.1.clone();
+            let arrow_span: Span = self.prev_token.span.clone();
             let expression = self.expression()?;
             let expr_span = expression.get_span();
             let full_span = fun_span.extend(arrow_span);
@@ -518,7 +517,7 @@ impl Parser {
             ));
         }
 
-        let span = fun_span.extend(self.prev_token.1.clone());
+        let span = fun_span.extend(self.prev_token.span.clone());
 
         self.eat(TokenType::LeftBrace, "Expected '{'")?;
         let block = self.block_expression()?;
@@ -534,7 +533,7 @@ impl Parser {
     }
 
     fn block_expression(&mut self) -> ParserResult {
-        let span_left_brace = self.prev_token.1.clone();
+        let span_left_brace = self.prev_token.span.clone();
         let mut exprs = vec![];
         while !self.check(TokenType::RightBrace) && !self.is_end() {
             match self.expression_statement(false) {
@@ -548,7 +547,7 @@ impl Parser {
             }
         }
 
-        if !exprs.is_empty() && !self.prev_token.0.is_semi_colon() {
+        if !exprs.is_empty() && !self.prev_token.is_semi_colon() {
             let expr = exprs.pop().unwrap();
             let span = expr.get_span();
             exprs.push(Expression::create_implicit_return(expr, span));
@@ -596,7 +595,7 @@ impl Parser {
             let full_span: Span = expr.get_span().extend(rhs_span.clone());
 
             match &expr {
-                Expression::LetRef(let_ref) => match assignment_tok.0.token_type {
+                Expression::LetRef(let_ref) => match assignment_tok.token_type {
                     TokenType::Assign => {
                         return Ok(Expression::create_assign(
                             // TODO pass full let ref expression to lhs of assign
@@ -614,7 +613,7 @@ impl Parser {
                                     let_ref.0.name.clone(),
                                     rhs_span.clone(),
                                 ),
-                                BinaryOperation::from_token(assignment_tok.0.clone()),
+                                BinaryOperation::from_token(assignment_tok.clone()),
                                 rhs,
                                 rhs_span,
                             ),
@@ -622,7 +621,7 @@ impl Parser {
                         ))
                     }
                 },
-                Expression::Index(idx) => match assignment_tok.0.token_type {
+                Expression::Index(idx) => match assignment_tok.token_type {
                     TokenType::Assign => {
                         return Ok(Expression::create_set_index(
                             *idx.0.lhs.clone(),
@@ -637,7 +636,7 @@ impl Parser {
                             *idx.0.index.clone(),
                             Expression::create_binop(
                                 expr,
-                                BinaryOperation::from_token(assignment_tok.0.clone()),
+                                BinaryOperation::from_token(assignment_tok.clone()),
                                 rhs,
                                 rhs_span,
                             ),
@@ -645,7 +644,7 @@ impl Parser {
                         ))
                     }
                 },
-                Expression::GetProperty(get) => match assignment_tok.0.token_type {
+                Expression::GetProperty(get) => match assignment_tok.token_type {
                     TokenType::Assign => {
                         return Ok(Expression::create_set_property(
                             *get.0.object.clone(),
@@ -660,7 +659,7 @@ impl Parser {
                             get.0.name.clone(),
                             Expression::create_binop(
                                 expr,
-                                BinaryOperation::from_token(assignment_tok.0.clone()),
+                                BinaryOperation::from_token(assignment_tok.clone()),
                                 rhs,
                                 rhs_span,
                             ),
@@ -703,7 +702,7 @@ impl Parser {
             let tok = self.prev_token.clone();
             let rhs = self.comparison()?;
             let span = expr.get_span().extend(rhs.get_span());
-            let op = match tok.0.token_type {
+            let op = match tok.token_type {
                 TokenType::EqualEqual => LogicOperation::Equal,
                 _ => LogicOperation::NotEqual,
             };
@@ -723,7 +722,7 @@ impl Parser {
             let tok = self.prev_token.clone();
             let rhs = self.term()?;
             let span = expr.get_span().extend(rhs.get_span());
-            let op = match tok.0.token_type {
+            let op = match tok.token_type {
                 TokenType::LessThan => LogicOperation::LessThan,
                 TokenType::LessThanEqual => LogicOperation::LessThanEqual,
                 TokenType::GreaterThan => LogicOperation::GreaterThan,
@@ -740,7 +739,7 @@ impl Parser {
             let tok = self.prev_token.clone();
             let rhs = self.factor()?;
             let span = expr.get_span().extend(rhs.get_span());
-            let op = match tok.0.token_type {
+            let op = match tok.token_type {
                 TokenType::Plus => BinaryOperation::Add,
                 _ => BinaryOperation::Substract,
             };
@@ -757,7 +756,7 @@ impl Parser {
             let tok = self.prev_token.clone();
             let rhs = self.unary()?;
             let span = expr.get_span().extend(rhs.get_span());
-            let op = match tok.0.token_type {
+            let op = match tok.token_type {
                 TokenType::Star => BinaryOperation::Multiply,
                 _ => BinaryOperation::Divide,
             };
@@ -770,8 +769,8 @@ impl Parser {
         if self.matches(vec![TokenType::Plus, TokenType::Minus, TokenType::Bang]) {
             let tok = self.prev_token.clone();
             let rhs = self.unary()?;
-            let span: Span = tok.1.extend(rhs.get_span());
-            let op = match tok.0.token_type {
+            let span: Span = tok.span.extend(rhs.get_span());
+            let op = match tok.token_type {
                 TokenType::Plus => UnaryOperation::Plus,
                 TokenType::Minus => UnaryOperation::Minus,
                 TokenType::Bang => UnaryOperation::Not,
@@ -791,7 +790,7 @@ impl Parser {
 
                 let mut args = vec![];
 
-                if self.curr_token.0.token_type != TokenType::RightParen && !self.is_end() {
+                if self.curr_token.token_type != TokenType::RightParen && !self.is_end() {
                     loop {
                         args.push(self.expression()?);
 
@@ -807,7 +806,7 @@ impl Parser {
                         return Err(ParserError::UnterminatedFunctionCall(paren));
                     }
                 }
-                let span: Span = primary_span.extend(self.prev_token.1.clone());
+                let span: Span = primary_span.extend(self.prev_token.span.clone());
                 expr = Expression::create_call(expr, args, span);
             } else if self.matches(vec![TokenType::LeftBracket]) {
                 let idx = self.expression()?;
@@ -817,15 +816,15 @@ impl Parser {
                 expr = Expression::create_index(
                     expr,
                     idx,
-                    primary_span.extend(self.prev_token.1.clone()),
+                    primary_span.extend(self.prev_token.span.clone()),
                 );
             } else if self.matches(vec![TokenType::Dot]) {
-                let ident_span = self.curr_token.1.clone();
+                let ident_span = self.curr_token.span.clone();
                 let name = self.eat(TokenType::Identifier, "Expected identifier")?;
                 let is_callable = self.check(TokenType::LeftParen);
                 expr = Expression::create_get_property(
                     expr,
-                    Identifier::new(name.0.value.to_string(), ident_span.clone()),
+                    Identifier::new(name.value.to_string(), ident_span.clone()),
                     is_callable,
                     ident_span,
                 )
@@ -839,9 +838,9 @@ impl Parser {
 
     fn primary(&mut self) -> ParserResult {
         let token = self.curr_token.clone();
-        let span: Span = token.1.clone();
+        let span: Span = token.span.clone();
         if self.matches(vec![TokenType::IntConst]) {
-            let val: i64 = match token.0.value.parse() {
+            let val: i64 = match token.value.parse() {
                 Ok(v) => v,
                 Err(msg) => panic!("not a integer {}", msg),
             };
@@ -849,7 +848,7 @@ impl Parser {
         }
 
         if self.matches(vec![TokenType::True, TokenType::False]) {
-            let bool = match token.0.token_type {
+            let bool = match token.token_type {
                 TokenType::True => true,
                 _ => false,
             };
@@ -858,7 +857,7 @@ impl Parser {
         }
 
         if self.matches(vec![TokenType::FloatConst]) {
-            let val: f64 = match token.0.value.parse() {
+            let val: f64 = match token.value.parse() {
                 Ok(v) => v,
                 Err(msg) => panic!("not a float {}", msg),
             };
@@ -875,7 +874,7 @@ impl Parser {
 
         if self.matches(vec![TokenType::StringConst]) {
             return Ok(Expression::create_literal(
-                Literal::String(token.0.value),
+                Literal::String(token.value),
                 span,
             ));
         }
@@ -897,16 +896,16 @@ impl Parser {
             //
             //  Possible solution is to use the :: token for instantiation
             //  e.g: Person :: { id: 1 };
-            && self.prev_token.0.token_type != TokenType::In
-            && self.prev_token.0.token_type != TokenType::If
-            && self.prev_token.0.token_type != TokenType::Loop
+            && self.prev_token.token_type != TokenType::In
+            && self.prev_token.token_type != TokenType::If
+            && self.prev_token.token_type != TokenType::Loop
         {
             return self.data_struct_instantiate();
         }
 
         if self.matches(vec![TokenType::Identifier]) {
             return Ok(Expression::create_let_ref(
-                Identifier::new(token.0.value.to_string(), token.1),
+                Identifier::new(token.value.to_string(), token.span),
                 span,
             ));
         }
@@ -916,18 +915,18 @@ impl Parser {
         }
 
         if self.matches(vec![TokenType::SELF]) {
-            return Ok(Expression::create_self(token.0.value, token.1));
+            return Ok(Expression::create_self(token.value, token.span));
         }
 
         if self.matches(vec![TokenType::LeftBracket]) {
             let mut exprs = vec![];
-            if self.curr_token.0.token_type != TokenType::RightBracket {
+            if self.curr_token.token_type != TokenType::RightBracket {
                 loop {
                     let expr = self.expression()?;
                     exprs.push(expr);
 
                     if !self.matches(vec![TokenType::Comma])
-                        || self.curr_token.0.token_type == TokenType::RightBracket
+                        || self.curr_token.token_type == TokenType::RightBracket
                     {
                         break;
                     }
@@ -935,14 +934,14 @@ impl Parser {
             }
 
             self.eat(TokenType::RightBracket, "Expcted ']'")?;
-            let span: Span = (token.1.start..self.curr_token.1.start).into();
+            let span: Span = (token.span.start..self.curr_token.span.start).into();
             return Ok(Expression::create_literal(Literal::Array(exprs), span));
         }
 
         if self.matches(vec![TokenType::LeftParen]) {
             let expr = self.expression()?;
             self.eat(TokenType::RightParen, "Unterminated grouping expression")?;
-            let span: Span = (token.1.start..self.prev_token.1.start).into();
+            let span: Span = (token.span.start..self.prev_token.span.start).into();
             return Ok(Expression::create_grouping(expr, span));
         }
 
@@ -968,7 +967,7 @@ impl Parser {
                         continue;
                     }
 
-                    if self.curr_token.0.token_type == TokenType::DoubleQuote {
+                    if self.curr_token.token_type == TokenType::DoubleQuote {
                         return Err(ParserError::UnterminatedInterpolation(dollar_sign));
                     }
 
@@ -987,10 +986,10 @@ impl Parser {
             }
 
             self.advance();
-            match self.curr_token.0.token_type {
+            match self.curr_token.token_type {
                 TokenType::StringConst => {
                     out.push(Expression::create_literal(
-                        Literal::String(self.curr_token.0.value.to_string()),
+                        Literal::String(self.curr_token.value.to_string()),
                         (0..0).into(),
                     ));
                 }
@@ -1007,7 +1006,7 @@ impl Parser {
         self.advance(); // advance over '"'
 
         let out_len = out.len();
-        let span: Span = (quote.1.start..self.prev_token.1.end).into();
+        let span: Span = (quote.span.start..self.prev_token.span.end).into();
         if out_len == 0 {
             // return a empty string if there is no output
             return Ok(Expression::create_literal(
