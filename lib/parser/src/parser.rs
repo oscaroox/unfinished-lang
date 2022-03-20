@@ -647,16 +647,16 @@ impl Parser {
                 Expression::GetProperty(get) => match assignment_tok.token_type {
                     TokenType::Assign => {
                         return Ok(Expression::create_set_property(
-                            *get.0.object.clone(),
-                            get.0.name.clone(),
+                            *get.object.clone(),
+                            get.name.clone(),
                             rhs,
                             full_span,
                         ))
                     }
                     _ => {
                         return Ok(Expression::create_set_property(
-                            *get.0.object.clone(),
-                            get.0.name.clone(),
+                            *get.object.clone(),
+                            get.name.clone(),
                             Expression::create_binop(
                                 expr,
                                 BinaryOperation::from_token(assignment_tok.clone()),

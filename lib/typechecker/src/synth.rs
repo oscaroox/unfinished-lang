@@ -343,26 +343,24 @@ impl TypeChecker {
                 None => unreachable!(),
             },
             Expression::GetProperty(expr) => {
-                let get = &expr.0;
-
-                let ttype = self.synth(&get.object, env)?;
+                let ttype = self.synth(&expr.object, env)?;
 
                 match &ttype {
                     Type::DataStruct(d) | Type::DataStructInstance(d) => {
                         let is_instance = ttype.is_data_struct_instance();
-                        let prop = match get.is_callable {
-                            true => match d.methods.iter().find(|e| e.name == get.name.value) {
+                        let prop = match expr.is_callable {
+                            true => match d.methods.iter().find(|e| e.name == expr.name.value) {
                                 Some(t) => {
                                     if is_instance && t.is_static {
                                         return Err(TypeError::CannotCallStaticMethod(
-                                            expr.1.clone(),
+                                            expr.span.clone(),
                                         ));
                                     }
                                     Some(t.ttype.clone())
                                 }
                                 None => todo!(),
                             },
-                            false => match d.fields.iter().find(|e| e.name == get.name.value) {
+                            false => match d.fields.iter().find(|e| e.name == expr.name.value) {
                                 Some(d) => Some(d.ttype.clone()),
                                 None => None,
                             },
@@ -372,41 +370,39 @@ impl TypeChecker {
                             Some(p) => Ok(p),
                             None => {
                                 return Err(TypeError::UnknownProperty(
-                                    get.name.value.to_string(),
-                                    expr.1.clone(),
+                                    expr.name.value.to_string(),
+                                    expr.span.clone(),
                                 ))
                             }
                         }
                     }
                     _ => Err(TypeError::InvalidPropertyAccess(
                         ttype,
-                        get.object.get_span(),
+                        expr.object.get_span(),
                     )),
                 }
             }
             Expression::SetProperty(expr) => {
-                let set = &expr.0;
-
-                let ttype = self.synth(&set.object, env)?;
+                let ttype = self.synth(&expr.object, env)?;
 
                 // TODO same as the get property
                 let prop_type = match ttype {
                     Type::DataStruct(d) | Type::DataStructInstance(d) => {
-                        let prop = d.fields.iter().find(|e| e.name == set.name.value);
+                        let prop = d.fields.iter().find(|e| e.name == expr.name.value);
                         match prop {
                             Some(p) => p.ttype.clone(),
                             None => {
                                 return Err(TypeError::UnknownProperty(
-                                    set.name.value.to_string(),
-                                    expr.1.clone(),
+                                    expr.name.value.to_string(),
+                                    expr.span.clone(),
                                 ))
                             }
                         }
                     }
-                    _ => return Err(TypeError::InvalidPropertyAccess(ttype, expr.1.clone())),
+                    _ => return Err(TypeError::InvalidPropertyAccess(ttype, expr.span.clone())),
                 };
 
-                self.check(&set.value, prop_type.clone(), env)?;
+                self.check(&expr.value, prop_type.clone(), env)?;
 
                 Ok(prop_type)
             }

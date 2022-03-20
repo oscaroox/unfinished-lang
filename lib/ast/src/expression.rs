@@ -13,8 +13,8 @@ pub enum Expression {
     Assign(Assign),
     Index(WithSpan<Index>),
     SetIndex(WithSpan<SetIndex>),
-    GetProperty(WithSpan<GetProperty>),
-    SetProperty(WithSpan<SetProperty>),
+    GetProperty(GetProperty),
+    SetProperty(SetProperty),
     Let(WithSpan<LetExpr>),
     LetRef(WithSpan<LetRef>),
     UnaryOp(WithSpan<UnaryOp>),
@@ -181,14 +181,12 @@ impl Expression {
         is_callable: bool,
         span: Span,
     ) -> Expression {
-        Expression::GetProperty(WithSpan(
-            GetProperty {
-                object: Box::new(object),
-                is_callable,
-                name,
-            },
+        Expression::GetProperty(GetProperty {
+            object: Box::new(object),
+            is_callable,
+            name,
             span,
-        ))
+        })
     }
 
     pub fn create_set_property(
@@ -197,14 +195,12 @@ impl Expression {
         value: Expression,
         span: Span,
     ) -> Expression {
-        Expression::SetProperty(WithSpan(
-            SetProperty {
-                object: Box::new(object),
-                name,
-                value: Box::new(value),
-            },
+        Expression::SetProperty(SetProperty {
+            object: Box::new(object),
+            name,
+            value: Box::new(value),
             span,
-        ))
+        })
     }
 
     pub fn create_function(
@@ -346,8 +342,8 @@ impl Expression {
             Expression::Assign(s) => s.span.clone(),
             Expression::Index(s) => s.1.clone(),
             Expression::SetIndex(s) => s.1.clone(),
-            Expression::GetProperty(s) => s.1.clone(),
-            Expression::SetProperty(s) => s.1.clone(),
+            Expression::GetProperty(s) => s.span.clone(),
+            Expression::SetProperty(s) => s.span.clone(),
             Expression::Let(s) => s.1.clone(),
             Expression::LetRef(s) => s.1.clone(),
             Expression::UnaryOp(s) => s.1.clone(),
