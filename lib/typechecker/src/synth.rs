@@ -418,15 +418,15 @@ impl TypeChecker {
             Expression::Grouping(expr) => self.synth(&expr.0.expr, env),
 
             Expression::BinOp(expr) => {
-                let binop = &expr.0;
+                let binop = &expr;
 
                 let (lhs, rhs) = self.synth_left_and_right(&binop.left, &binop.right, env)?;
 
                 match &binop.op {
-                    ast::BinaryOperation::Add
-                    | ast::BinaryOperation::Substract
-                    | ast::BinaryOperation::Multiply
-                    | ast::BinaryOperation::Divide => match (&lhs, &rhs) {
+                    ast::BinaryOperation::Add(_)
+                    | ast::BinaryOperation::Substract(_)
+                    | ast::BinaryOperation::Multiply(_)
+                    | ast::BinaryOperation::Divide(_) => match (&lhs, &rhs) {
                         (Type::Singleton(Singleton::Int), Type::Singleton(Singleton::Int)) => {
                             Ok(Type::int())
                         }
@@ -437,7 +437,7 @@ impl TypeChecker {
                             binop.op.to_string(),
                             lhs,
                             rhs,
-                            expr.1.clone(),
+                            expr.span.clone(),
                         )),
                     },
                     ast::BinaryOperation::ConcatInterpolation => todo!(),

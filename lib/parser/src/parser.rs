@@ -739,10 +739,8 @@ impl Parser {
             let tok = self.prev_token.clone();
             let rhs = self.factor()?;
             let span = expr.get_span().extend(rhs.get_span());
-            let op = match tok.token_type {
-                TokenType::Plus => BinaryOperation::Add,
-                _ => BinaryOperation::Substract,
-            };
+
+            let op = BinaryOperation::from_token(tok);
             expr = Expression::create_binop(expr, op, rhs, span)
         }
 
@@ -756,10 +754,7 @@ impl Parser {
             let tok = self.prev_token.clone();
             let rhs = self.unary()?;
             let span = expr.get_span().extend(rhs.get_span());
-            let op = match tok.token_type {
-                TokenType::Star => BinaryOperation::Multiply,
-                _ => BinaryOperation::Divide,
-            };
+            let op = BinaryOperation::from_token(tok);
             expr = Expression::create_binop(expr, op, rhs, span)
         }
         Ok(expr)
@@ -1269,6 +1264,10 @@ mod test {
         Expression::create_function(name, params, return_type, is_static, body, Span::fake())
     }
 
+    fn binary_add() -> BinaryOperation {
+        BinaryOperation::Add(Span::fake())
+    }
+
     #[test]
     fn parse_type_let_expr() {
         parse(
@@ -1730,19 +1729,35 @@ mod test {
                 create_assign(ident("num"), int(1)),
                 create_assign(
                     ident("num"),
-                    create_binop(create_let_ref("num"), BinaryOperation::Add, int(1)),
+                    create_binop(
+                        create_let_ref("num"),
+                        BinaryOperation::Add(Span::fake()),
+                        int(1),
+                    ),
                 ),
                 create_assign(
                     ident("num"),
-                    create_binop(create_let_ref("num"), BinaryOperation::Substract, int(1)),
+                    create_binop(
+                        create_let_ref("num"),
+                        BinaryOperation::Substract(Span::fake()),
+                        int(1),
+                    ),
                 ),
                 create_assign(
                     ident("num"),
-                    create_binop(create_let_ref("num"), BinaryOperation::Multiply, int(1)),
+                    create_binop(
+                        create_let_ref("num"),
+                        BinaryOperation::Multiply(Span::fake()),
+                        int(1),
+                    ),
                 ),
                 create_assign(
                     ident("num"),
-                    create_binop(create_let_ref("num"), BinaryOperation::Divide, int(1)),
+                    create_binop(
+                        create_let_ref("num"),
+                        BinaryOperation::Divide(Span::fake()),
+                        int(1),
+                    ),
                 ),
             ],
         );
@@ -1789,10 +1804,10 @@ mod test {
             "1 + 2 * 3 / 2;",
             vec![create_binop(
                 int(1),
-                BinaryOperation::Add,
+                BinaryOperation::Add(Span::fake()),
                 create_binop(
-                    create_binop(int(2), BinaryOperation::Multiply, int(3)),
-                    BinaryOperation::Divide,
+                    create_binop(int(2), BinaryOperation::Multiply(Span::fake()), int(3)),
+                    BinaryOperation::Divide(Span::fake()),
                     int(2),
                 ),
             )],
@@ -1805,8 +1820,12 @@ mod test {
             "2 * (2 + 1);",
             vec![create_binop(
                 int(2),
-                BinaryOperation::Multiply,
-                create_grouping(create_binop(int(2), BinaryOperation::Add, int(1))),
+                BinaryOperation::Multiply(Span::fake()),
+                create_grouping(create_binop(
+                    int(2),
+                    BinaryOperation::Add(Span::fake()),
+                    int(1),
+                )),
             )],
         );
     }
@@ -1819,7 +1838,7 @@ mod test {
                 create_unaryop(UnaryOperation::Minus, int(1)),
                 create_binop(
                     int(1),
-                    BinaryOperation::Add,
+                    BinaryOperation::Add(Span::fake()),
                     create_unaryop(UnaryOperation::Minus, int(1)),
                 ),
                 create_unaryop(UnaryOperation::Not, int(1)),
@@ -1867,7 +1886,7 @@ mod test {
                     int(0),
                     create_binop(
                         create_index(create_let_ref("array"), int(0)),
-                        BinaryOperation::Add,
+                        BinaryOperation::Add(Span::fake()),
                         int(1),
                     ),
                 ),
@@ -1876,7 +1895,7 @@ mod test {
                     int(0),
                     create_binop(
                         create_index(create_let_ref("array"), int(0)),
-                        BinaryOperation::Substract,
+                        BinaryOperation::Substract(Span::fake()),
                         int(1),
                     ),
                 ),
@@ -1885,7 +1904,7 @@ mod test {
                     int(0),
                     create_binop(
                         create_index(create_let_ref("array"), int(0)),
-                        BinaryOperation::Multiply,
+                        BinaryOperation::Multiply(Span::fake()),
                         int(1),
                     ),
                 ),
@@ -1894,7 +1913,7 @@ mod test {
                     int(0),
                     create_binop(
                         create_index(create_let_ref("array"), int(0)),
-                        BinaryOperation::Divide,
+                        BinaryOperation::Divide(Span::fake()),
                         int(1),
                     ),
                 ),
@@ -2399,7 +2418,7 @@ mod test {
                     ident("age"),
                     create_binop(
                         create_get_property(create_let_ref("p"), ident("age"), false),
-                        BinaryOperation::Add,
+                        BinaryOperation::Add(Span::fake()),
                         int(1),
                     ),
                 ),
@@ -2408,7 +2427,7 @@ mod test {
                     ident("age"),
                     create_binop(
                         create_get_property(create_let_ref("p"), ident("age"), false),
-                        BinaryOperation::Substract,
+                        BinaryOperation::Substract(Span::fake()),
                         int(1),
                     ),
                 ),
@@ -2417,7 +2436,7 @@ mod test {
                     ident("age"),
                     create_binop(
                         create_get_property(create_let_ref("p"), ident("age"), false),
-                        BinaryOperation::Multiply,
+                        BinaryOperation::Multiply(Span::fake()),
                         int(1),
                     ),
                 ),
@@ -2426,7 +2445,7 @@ mod test {
                     ident("age"),
                     create_binop(
                         create_get_property(create_let_ref("p"), ident("age"), false),
-                        BinaryOperation::Divide,
+                        BinaryOperation::Divide(Span::fake()),
                         int(1),
                     ),
                 ),

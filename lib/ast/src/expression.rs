@@ -8,7 +8,7 @@ use span_util::{Span, WithSpan};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
-    BinOp(WithSpan<BinOp>),
+    BinOp(BinOp),
     Literal(WithSpan<Literal>),
     Assign(WithSpan<Assign>),
     Index(WithSpan<Index>),
@@ -98,14 +98,12 @@ impl Expression {
         right: Expression,
         span: Span,
     ) -> Expression {
-        Expression::BinOp(WithSpan(
-            BinOp {
-                left: Box::new(left),
-                op,
-                right: Box::new(right),
-            },
+        Expression::BinOp(BinOp {
+            left: Box::new(left),
+            op,
+            right: Box::new(right),
             span,
-        ))
+        })
     }
 
     pub fn create_literal(lit: Literal, span: Span) -> Expression {
@@ -351,7 +349,7 @@ impl Expression {
 
     pub fn get_span(&self) -> Span {
         match &self {
-            Expression::BinOp(s) => s.1.clone(),
+            Expression::BinOp(s) => s.span.clone(),
             Expression::Literal(s) => s.1.clone(),
             Expression::Assign(s) => s.1.clone(),
             Expression::Index(s) => s.1.clone(),

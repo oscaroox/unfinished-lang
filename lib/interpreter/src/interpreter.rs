@@ -108,7 +108,7 @@ impl Interpreter {
     fn expression(&mut self, expression: &Expression) -> InterpreterResult {
         match expression {
             Expression::Let(expr) => self.eval_let_expression(&expr.0),
-            Expression::BinOp(expr) => self.eval_binop(&expr.0),
+            Expression::BinOp(expr) => self.eval_binop(&expr),
             Expression::Literal(expr) => self.eval_literal(&expr.0),
             Expression::Assign(expr) => self.eval_assignment(&expr.0),
             Expression::LetRef(expr) => self.eval_let_reference(&expr.0),
@@ -557,20 +557,22 @@ impl Interpreter {
 
         let res = match (&left, &binop.op, &right) {
             // integer binop
-            (Value::Int(n1), BinaryOperation::Add, Value::Int(n2)) => Value::Int(n1 + n2),
-            (Value::Int(n1), BinaryOperation::Substract, Value::Int(n2)) => Value::Int(n1 - n2),
-            (Value::Int(n1), BinaryOperation::Multiply, Value::Int(n2)) => Value::Int(n1 * n2),
-            (Value::Int(n1), BinaryOperation::Divide, Value::Int(n2)) => Value::Int(n1 / n2),
+            (Value::Int(n1), BinaryOperation::Add(_), Value::Int(n2)) => Value::Int(n1 + n2),
+            (Value::Int(n1), BinaryOperation::Substract(_), Value::Int(n2)) => Value::Int(n1 - n2),
+            (Value::Int(n1), BinaryOperation::Multiply(_), Value::Int(n2)) => Value::Int(n1 * n2),
+            (Value::Int(n1), BinaryOperation::Divide(_), Value::Int(n2)) => Value::Int(n1 / n2),
 
             // float binop
-            (Value::Float(n1), BinaryOperation::Add, Value::Float(n2)) => Value::Float(n1 + n2),
-            (Value::Float(n1), BinaryOperation::Substract, Value::Float(n2)) => {
+            (Value::Float(n1), BinaryOperation::Add(_), Value::Float(n2)) => Value::Float(n1 + n2),
+            (Value::Float(n1), BinaryOperation::Substract(_), Value::Float(n2)) => {
                 Value::Float(n1 - n2)
             }
-            (Value::Float(n1), BinaryOperation::Multiply, Value::Float(n2)) => {
+            (Value::Float(n1), BinaryOperation::Multiply(_), Value::Float(n2)) => {
                 Value::Float(n1 * n2)
             }
-            (Value::Float(n1), BinaryOperation::Divide, Value::Float(n2)) => Value::Float(n1 / n2),
+            (Value::Float(n1), BinaryOperation::Divide(_), Value::Float(n2)) => {
+                Value::Float(n1 / n2)
+            }
             (Value::String(s1), BinaryOperation::ConcatInterpolation, Value::String(s2)) => {
                 Value::String(format!("{}{}", s1, s2))
             }
