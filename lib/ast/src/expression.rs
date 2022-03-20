@@ -1,7 +1,7 @@
 use crate::{
     Assign, BinOp, BinaryOperation, Block, BreakExpr, Call, ContinueExpr, DataStruct,
-    DataStructInstance, DataStructInstanceField, Function, GetProperty, Grouping, Identifier,
-    IfConditional, ImplicitReturn, Index, LetExpr, LetRef, Literal, Logic, LogicOperation,
+    DataStructInstance, DataStructInstanceField, Function, GetIndex, GetProperty, Grouping,
+    Identifier, IfConditional, ImplicitReturn, LetExpr, LetRef, Literal, Logic, LogicOperation,
     LoopExpr, ReturnExpr, SelfExpr, SetIndex, SetProperty, Type, UnaryOp, UnaryOperation,
 };
 use span_util::{Span, WithSpan};
@@ -11,8 +11,8 @@ pub enum Expression {
     BinOp(BinOp),
     Literal(WithSpan<Literal>),
     Assign(Assign),
-    Index(WithSpan<Index>),
-    SetIndex(WithSpan<SetIndex>),
+    GetIndex(GetIndex),
+    SetIndex(SetIndex),
     GetProperty(GetProperty),
     SetProperty(SetProperty),
     Let(WithSpan<LetExpr>),
@@ -150,13 +150,11 @@ impl Expression {
     }
 
     pub fn create_index(lhs: Expression, index: Expression, span: Span) -> Expression {
-        Expression::Index(WithSpan(
-            Index {
-                lhs: Box::new(lhs),
-                index: Box::new(index),
-            },
+        Expression::GetIndex(GetIndex {
+            lhs: Box::new(lhs),
+            index: Box::new(index),
             span,
-        ))
+        })
     }
 
     pub fn create_set_index(
@@ -165,14 +163,12 @@ impl Expression {
         value: Expression,
         span: Span,
     ) -> Expression {
-        Expression::SetIndex(WithSpan(
-            SetIndex {
-                lhs: Box::new(lhs),
-                index: Box::new(index),
-                value: Box::new(value),
-            },
+        Expression::SetIndex(SetIndex {
+            lhs: Box::new(lhs),
+            index: Box::new(index),
+            value: Box::new(value),
             span,
-        ))
+        })
     }
 
     pub fn create_get_property(
@@ -340,8 +336,8 @@ impl Expression {
             Expression::BinOp(s) => s.span.clone(),
             Expression::Literal(s) => s.1.clone(),
             Expression::Assign(s) => s.span.clone(),
-            Expression::Index(s) => s.1.clone(),
-            Expression::SetIndex(s) => s.1.clone(),
+            Expression::GetIndex(s) => s.span.clone(),
+            Expression::SetIndex(s) => s.span.clone(),
             Expression::GetProperty(s) => s.span.clone(),
             Expression::SetProperty(s) => s.span.clone(),
             Expression::Let(s) => s.1.clone(),

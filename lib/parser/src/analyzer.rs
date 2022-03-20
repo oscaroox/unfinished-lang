@@ -89,7 +89,7 @@ impl Analyzer {
                 | ast::Literal::Null => {}
             },
             Expression::Assign(_) => todo!(),
-            Expression::Index(_) => todo!(),
+            Expression::GetIndex(_) => todo!(),
             Expression::SetIndex(_) => todo!(),
             Expression::GetProperty(_) => todo!(),
             Expression::SetProperty(_) => todo!(),

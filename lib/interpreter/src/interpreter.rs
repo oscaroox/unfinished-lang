@@ -2,8 +2,8 @@ use std::{cell::RefCell, collections::HashMap, convert::TryInto, fmt::Debug, rc:
 
 use crate::{builtin::get_builtins, environment::Environment, Value};
 use ast::{
-    Assign, BinOp, BinaryOperation, Block, Call, DataStruct, Expression, Function, GetProperty,
-    IfConditional, ImplicitReturn, Index, LetExpr, Literal, Logic, LogicOperation, LoopExpr,
+    Assign, BinOp, BinaryOperation, Block, Call, DataStruct, Expression, Function, GetIndex,
+    GetProperty, IfConditional, ImplicitReturn, LetExpr, Literal, Logic, LogicOperation, LoopExpr,
     Program, ReturnExpr, SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation,
 };
 
@@ -119,8 +119,8 @@ impl Interpreter {
             Expression::Function(expr) => self.eval_function(&expr),
             Expression::Block(expr) => self.eval_block(&expr.0),
             Expression::If(expr) => self.eval_if_conditional(&expr),
-            Expression::Index(expr) => self.eval_index(&expr.0),
-            Expression::SetIndex(expr) => self.eval_set_index(&expr.0),
+            Expression::GetIndex(expr) => self.eval_index(&expr),
+            Expression::SetIndex(expr) => self.eval_set_index(&expr),
             Expression::Return(expr) => self.eval_return(&expr.0),
             Expression::ImplicitReturn(expr) => self.eval_implicit_return(&expr.0),
             Expression::DataStruct(expr) => self.eval_data_struct(&expr),
@@ -355,7 +355,7 @@ impl Interpreter {
         }
     }
 
-    fn eval_index(&mut self, index: &Index) -> InterpreterResult {
+    fn eval_index(&mut self, index: &GetIndex) -> InterpreterResult {
         let lhs = self.expression(&index.lhs)?;
         let idx = self.expression(&index.index)?;
 

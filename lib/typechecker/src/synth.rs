@@ -160,8 +160,7 @@ impl TypeChecker {
 
                 Ok(fn_type)
             }
-            Expression::Index(expr) => {
-                let expr = &expr.0;
+            Expression::GetIndex(expr) => {
                 let obj = self.synth(&expr.lhs, env)?;
                 let idx = self.synth(&expr.index, env)?;
 
@@ -175,7 +174,6 @@ impl TypeChecker {
                 }
             }
             Expression::SetIndex(expr) => {
-                let expr = &expr.0;
                 let obj = self.synth(&expr.lhs, env)?;
                 let idx = self.synth(&expr.index, env)?;
 

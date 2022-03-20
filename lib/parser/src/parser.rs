@@ -628,19 +628,19 @@ impl Parser {
                         ))
                     }
                 },
-                Expression::Index(idx) => match assignment_tok.token_type {
+                Expression::GetIndex(idx) => match assignment_tok.token_type {
                     TokenType::Assign => {
                         return Ok(Expression::create_set_index(
-                            *idx.0.lhs.clone(),
-                            *idx.0.index.clone(),
+                            *idx.lhs.clone(),
+                            *idx.index.clone(),
                             rhs,
                             full_span,
                         ))
                     }
                     _ => {
                         return Ok(Expression::create_set_index(
-                            *idx.0.lhs.clone(),
-                            *idx.0.index.clone(),
+                            *idx.lhs.clone(),
+                            *idx.index.clone(),
                             Expression::create_binop(
                                 expr,
                                 BinaryOperation::from_token(assignment_tok.clone()),
