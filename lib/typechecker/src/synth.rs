@@ -794,7 +794,7 @@ mod test {
     fn test_function_synth() {
         parse(
             "
-            let main = fun(x: int): int => x;
+            let main = fn(x: int): int => x;
             main;
         ",
         );
@@ -804,9 +804,9 @@ mod test {
     fn test_function_call_synth() {
         parse(
             r#"
-            let main = fun(): int => 1;
+            let main = fn(): int => 1;
             main();
-            let main = fun(x: int, y: int): int => x;
+            let main = fn(x: int, y: int): int => x;
             let y = 2;
             main(1, y);
         "#,
@@ -820,11 +820,11 @@ mod test {
         // TODO don't throw annotation needed error in parser
         parse(
             "
-            let main: Fun(cb: Fun(id: int)) = fun(cb) {
+            let main: fn(cb: fn(id: int)) = fn(cb) {
                 cb(1);
             };
 
-            main(fun(id) => { id == 1; });
+            main(fn(id) => { id == 1; });
         ",
         );
     }
@@ -868,7 +868,7 @@ mod test {
             let x = Person.is_valid;
             x;
             
-            let main = fun(p: Person): bool {
+            let main = fn(p: Person): bool {
                 p.is_valid
             };
             main(p);
@@ -886,7 +886,7 @@ mod test {
                 is_valid: bool,
             };
 
-            let gen_id = fun(): string {
+            let gen_id = fn(): string {
                 233
             };
             let person = Person {id: 1, name: "test", is_valid: true};
@@ -900,21 +900,21 @@ mod test {
         parse(
             r#"
             data Person { id: int } :: {
-                fun new: Person {
+                fn new: Person {
                     let p = Person { id: 1 };
                     p
                 }
 
-                fun get_int(self) {
+                fn get_int(self) {
         
                 }
             };
             
             let p = Person.new();
             p;
-            let main = fun(t: Person): int {
+            let main = fn(t: Person): int {
                 t.get_int(t);
-                let nn = fun(p: Person): int {
+                let nn = fn(p: Person): int {
                     p.get_int(p);
                     p.id
                 };

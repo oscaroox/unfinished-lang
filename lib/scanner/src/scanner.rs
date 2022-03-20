@@ -145,7 +145,7 @@ impl Scanner {
 
         match value.as_str() {
             "let" => Token::let_token(label),
-            "fun" => Token::fun_token(label),
+            "fn" => Token::fn_token(label),
             "if" => Token::if_token(label),
             "else" => Token::else_token(label),
             "true" => Token::true_token(label),
@@ -164,7 +164,6 @@ impl Scanner {
             "bool" => Token::bool(label),
             "string" => Token::string(label),
             "unit" => Token::unit(label),
-            "Fun" => Token::fun_type(label),
             _ => Token::identifier(value, label),
         }
     }
@@ -415,19 +414,19 @@ mod tests {
 
     #[test]
     fn backtracking() {
-        let src = "let fun hello;";
+        let src = "let fn hello;";
         let mut scanner = Scanner::new(src.to_string());
 
         let token = scanner.next_token();
         assert_eq!(token.token_type, TokenType::Let);
 
         let token = scanner.next_token();
-        assert_eq!(token.token_type, TokenType::Fun);
+        assert_eq!(token.token_type, TokenType::Fn);
 
         scanner.backtrack();
 
         let token = scanner.next_token();
-        assert_eq!(token.token_type, TokenType::Fun);
+        assert_eq!(token.token_type, TokenType::Fn);
 
         let token = scanner.next_token();
         assert_eq!(token.token_type, TokenType::Identifier);
@@ -728,10 +727,10 @@ this_is_a_identifier
     #[test]
     fn scan_keywords() {
         test_scan(
-            "let fun true false null if else return data self loop break continue in",
+            "let fn true false null if else return data self loop break continue in",
             vec![
                 (TokenType::Let, None),
-                (TokenType::Fun, None),
+                (TokenType::Fn, None),
                 (TokenType::True, None),
                 (TokenType::False, None),
                 (TokenType::Null, None),
@@ -753,7 +752,7 @@ this_is_a_identifier
     fn scan_types() {
         test_scan(
             "
-            int float string bool unit Fun
+            int float string bool unit fn
             ",
             vec![
                 (TokenType::Int, None),
@@ -761,7 +760,7 @@ this_is_a_identifier
                 (TokenType::String, None),
                 (TokenType::Bool, None),
                 (TokenType::Unit, None),
-                (TokenType::FunType, None),
+                (TokenType::Fn, None),
                 (TokenType::EOF, None),
             ],
         );

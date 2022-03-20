@@ -666,7 +666,7 @@ mod test {
 
         run(
             r#"
-            let main = fun(val: bool){
+            let main = fn(val: bool){
                 if val {
                     1
                 } else {
@@ -680,7 +680,7 @@ mod test {
 
         run(
             r#"
-            let main = fun(val: bool) {
+            let main = fn(val: bool) {
                 if val {
                     return 99;
                 };
@@ -693,7 +693,7 @@ mod test {
 
         run(
             r#"
-            let main = fun(val: bool){
+            let main = fn(val: bool){
                 if val {
                     99;
                 };
@@ -929,16 +929,16 @@ mod test {
 
     #[test]
     pub fn eval_function() {
-        run("fun (){ 1 }();", Value::Int(1));
-        run("let fn = fun (){1}; fn();", Value::Int(1));
-        run("let fn = fun (x: int){x}; fn(123);", Value::Int(123));
+        run("fn (){ 1 }();", Value::Int(1));
+        run("let f = fn (){1}; f();", Value::Int(1));
+        run("let f = fn (x: int){x}; f(123);", Value::Int(123));
     }
 
     #[test]
     pub fn eval_return() {
         run(
             "
-            let test = fun() {
+            let test = fn() {
                 let x = 23;
                 let y = 22;
                 y;
@@ -948,7 +948,7 @@ mod test {
             Value::Unit,
         );
         run(
-            "fun() {
+            "fn() {
                 if true {
                     return 233;
                 };
@@ -957,7 +957,7 @@ mod test {
             Value::Int(233),
         );
         run(
-            "fun() {
+            "fn() {
                 if false {
                     return 233;
                 };
@@ -966,7 +966,7 @@ mod test {
             Value::Int(123),
         );
         run(
-            "fun() {
+            "fn() {
                 if true {
                     return 233;
                 } else {
@@ -977,7 +977,7 @@ mod test {
         );
         run(
             "
-                let noop = fun () {
+                let noop = fn () {
                     if (1 < 2) {
                         return 1;
                     };
@@ -989,7 +989,7 @@ mod test {
 
         run(
             "
-                let noop = fun () {
+                let noop = fn () {
                     if (1 < 2) {
                         return;
                     };
@@ -1289,7 +1289,7 @@ mod test {
             "data Person {
                 id: int
             } :: {
-                fun new {
+                fn new {
                     Person { id: 1 }
                 }
             };
@@ -1306,11 +1306,11 @@ mod test {
             "data Person {
                 id: int
             } :: {
-                fun new {
+                fn new {
                     Person { id: 22 }
                 }
 
-                fun get_id(self) {
+                fn get_id(self) {
                     self.id
                 }
             };
@@ -1325,11 +1325,11 @@ mod test {
             "data Person {
                 id: int
             } :: {
-                fun new {
+                fn new {
                     Person { id: 22 }
                 }
 
-                fun id(self) {
+                fn id(self) {
                     self.id
                 }
             };
@@ -1346,15 +1346,15 @@ mod test {
             "data Person {
                 id: int
             } :: {
-                fun new {
+                fn new {
                     Person { id: 22 }
                 }
 
-                fun set_id(self, new_id: int) {
+                fn set_id(self, new_id: int) {
                     self.id = new_id;
                 }
 
-                fun get_id(self) {
+                fn get_id(self) {
                     self.id
                 }
             };

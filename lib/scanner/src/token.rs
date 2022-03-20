@@ -44,13 +44,12 @@ impl Token {
     impl_token!(string, String);
     impl_token!(bool, Bool);
     impl_token!(unit, Unit);
-    impl_token!(fun_type, FunType);
 
     impl_value_token!(illegal, Illegal);
     impl_value_token!(bad_token, BadToken);
 
     impl_token!(let_token, Let);
-    impl_token!(fun_token, Fun);
+    impl_token!(fn_token, Fn);
     impl_token!(true_token, True);
     impl_token!(false_token, False);
     impl_token!(if_token, If);

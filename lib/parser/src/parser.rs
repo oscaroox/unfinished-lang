@@ -9,7 +9,7 @@ use type_core::Type;
 
 const RECOVER_SET: [TokenType; 5] = [
     TokenType::Let,
-    TokenType::Fun,
+    TokenType::Fn,
     TokenType::Data,
     TokenType::Loop,
     TokenType::If,
@@ -217,7 +217,7 @@ impl Parser {
                 _ => unreachable!(),
             };
             Some(ttype)
-        } else if self.matches(vec![TokenType::FunType]) {
+        } else if self.matches(vec![TokenType::Fn]) {
             self.eat(TokenType::LeftParen, "Expected '('")?;
             let params = self.parse_parameters(TokenType::RightParen)?;
             self.eat(TokenType::RightParen, "Expected ')'")?;
@@ -440,7 +440,7 @@ impl Parser {
             self.eat(TokenType::LeftBrace, "Expected '{'")?;
 
             while !self.check(TokenType::RightBrace) && !self.is_end() {
-                self.eat(TokenType::Fun, "Expected 'fun'")?;
+                self.eat(TokenType::Fn, "Expected 'fun'")?;
                 methods.push(self.fun_expression(FunctionKind::Method(ident.value.clone()))?);
             }
 
@@ -918,7 +918,7 @@ impl Parser {
             ));
         }
 
-        if self.matches(vec![TokenType::Fun]) {
+        if self.matches(vec![TokenType::Fn]) {
             return self.fun_expression(FunctionKind::Function);
         }
 
@@ -1336,14 +1336,14 @@ mod test {
     fn parse_type_fun() {
         parse(
             "
-            let x: Fun(a: string);
-            let x: Fun();
-            let x: Fun(): unit;
-            let x: Fun(): string;
-            let x: Fun(a: string): int;
-            let x: Fun(a: string,): int[];
-            let x: (Fun(b: int): int)[];
-            let x: Fun(b: int)[];
+            let x: fn(a: string);
+            let x: fn();
+            let x: fn(): unit;
+            let x: fn(): string;
+            let x: fn(a: string): int;
+            let x: fn(a: string,): int[];
+            let x: (fn(b: int): int)[];
+            let x: fn(b: int)[];
         ",
             vec![
                 create_let_type(
@@ -1391,7 +1391,7 @@ mod test {
             r#"
         let joe: Person = Person {};
         let family: Person[] = [Person{}];
-        let x: Fun(x: Person);
+        let x: fn(x: Person);
         "#,
             vec![
                 create_let_type(
@@ -1453,11 +1453,11 @@ mod test {
     fn parse_type_error_fun() {
         parse_error(
             "
-        let x: Fun;
-        let x: Fun(;
-        let x: Fun): int = 2;
-        let x: Fun(): = 2;
-        let x: Fun(a: unit): int = 2;
+        let x: fn;
+        let x: fn(;
+        let x: fn): int = 2;
+        let x: fn(): = 2;
+        let x: fn(a: unit): int = 2;
         ",
             vec![
                 ParserError::ExpectedToken(
@@ -1482,9 +1482,9 @@ mod test {
     fn parse_function_error() {
         parse_error(
             "
-        fun(a): int {};
-        fun(a: 123) {};
-        fun(a: unit) {};
+        fn(a): int {};
+        fn(a: 123) {};
+        fn(a: unit) {};
         ",
             vec![
                 ParserError::InvalidType(Token::int_const("123".into(), Span::fake().into())),
@@ -1685,7 +1685,7 @@ mod test {
     #[test]
     fn parse_self_keyword() {
         parse(
-            "let main = fun { self; };",
+            "let main = fn { self; };",
             vec![create_let(
                 "main",
                 Some(create_function(
@@ -1944,7 +1944,7 @@ mod test {
         );
 
         parse(
-            "fun (){}();",
+            "fn (){}();",
             vec![create_call(
                 create_function(None, vec![], Type::unit(), true, create_block(vec![])),
                 vec![],
@@ -1956,11 +1956,11 @@ mod test {
     fn parse_return_expr() {
         parse(
             "
-                let main = fun(): int {
+                let main = fn(): int {
                     return; 
                     return 1;
                 };
-                let main = fun(): int => 1;
+                let main = fn(): int => 1;
             ",
             vec![
                 create_let(
@@ -1991,11 +1991,11 @@ mod test {
     fn parse_function_expr() {
         parse(
             "
-        fun {};
-        fun () {};
-        fun:string {};
-        fun (x: int, y: int) {};
-        fun (y: int, z: int) {
+        fn {};
+        fn () {};
+        fn:string {};
+        fn (x: int, y: int) {};
+        fn (y: int, z: int) {
             let name = 2;
             123;
         };
@@ -2169,10 +2169,10 @@ mod test {
             data Person {
                 first_name: string,
             } :: {
-                fun new {
+                fn new {
                 }
 
-                fun name(self) {
+                fn name(self) {
 
                 }
             };
@@ -2207,10 +2207,10 @@ mod test {
             data Person {
                 first_name: string,
             } :: {
-                fun name(self) {
+                fn name(self) {
                     self.first_name;
                 }
-                fun set_name(self, name: string) {
+                fn set_name(self, name: string) {
                     self.first_name = name;
                 }
             };

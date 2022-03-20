@@ -243,7 +243,7 @@ mod tests {
         );
         analyze_success(
             "
-        fun() {
+        fn() {
             return;
         };
         ",
@@ -254,15 +254,15 @@ mod tests {
             data Person {
 
             } :: {
-                fun new {
+                fn new {
                     return;
                 }
 
-                fun test(self) {
+                fn test(self) {
                     return;
                 }
-                fun nested() {
-                    let main = fun() {
+                fn nested() {
+                    let main = fn() {
                         return;
                     };
                 }
@@ -308,7 +308,7 @@ mod tests {
         analyze_error(
             "
         self;
-        let main = fun() {
+        let main = fn() {
             self;
         };
         ",
@@ -323,13 +323,13 @@ mod tests {
         data Person {
 
         } :: {
-            fun new {
+            fn new {
                 self;
             }
 
-            fun test(self) {
+            fn test(self) {
                 self;
-                let main = fun() {
+                let main = fn() {
                     self;
                 };
             }

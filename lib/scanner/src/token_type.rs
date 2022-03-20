@@ -11,11 +11,10 @@ pub enum TokenType {
     String,
     Bool,
     Unit,
-    FunType,
 
     // keywords
     Let,
-    Fun,
+    Fn,
     If,
     Else,
     True,
@@ -84,10 +83,9 @@ impl std::fmt::Display for TokenType {
             TokenType::String => write!(f, "string"),
             TokenType::Bool => write!(f, "bool"),
             TokenType::Unit => write!(f, "unit"),
-            TokenType::FunType => write!(f, "Fun"),
 
             TokenType::Let => write!(f, "let"),
-            TokenType::Fun => write!(f, "fun"),
+            TokenType::Fn => write!(f, "fn"),
             TokenType::If => write!(f, "if"),
             TokenType::Else => write!(f, "else"),
             TokenType::True => write!(f, "true"),
