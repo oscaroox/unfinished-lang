@@ -30,8 +30,8 @@ pub enum Expression {
     Return(WithSpan<ReturnExpr>),
     SelfExpr(WithSpan<SelfExpr>),
     LoopExpr(WithSpan<LoopExpr>),
-    BreakExpr(WithSpan<BreakExpr>),
-    ContinueExpr(WithSpan<ContinueExpr>),
+    BreakExpr(BreakExpr),
+    ContinueExpr(ContinueExpr),
 }
 
 impl Expression {
@@ -338,11 +338,11 @@ impl Expression {
     }
 
     pub fn create_break(span: Span) -> Expression {
-        Expression::BreakExpr(WithSpan(BreakExpr {}, span))
+        Expression::BreakExpr(BreakExpr { span })
     }
 
     pub fn create_continue(span: Span) -> Expression {
-        Expression::ContinueExpr(WithSpan(ContinueExpr {}, span))
+        Expression::ContinueExpr(ContinueExpr { span })
     }
 
     pub fn get_span(&self) -> Span {
@@ -369,8 +369,8 @@ impl Expression {
             Expression::Return(s) => s.1.clone(),
             Expression::SelfExpr(s) => s.1.clone(),
             Expression::LoopExpr(s) => s.1.clone(),
-            Expression::BreakExpr(s) => s.1.clone(),
-            Expression::ContinueExpr(s) => s.1.clone(),
+            Expression::BreakExpr(s) => s.span.clone(),
+            Expression::ContinueExpr(s) => s.span.clone(),
         }
     }
 }
