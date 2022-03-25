@@ -45,6 +45,9 @@ pub enum TypeError {
     #[error("Unknown property '{0}'")]
     UnknownProperty(String, Span),
 
+    #[error("Unknown method '{0}'")]
+    UnknownMethod(String, Span),
+
     #[error("Cannot access property from type '{0}'")]
     InvalidPropertyAccess(Type, Span),
 
@@ -86,6 +89,7 @@ impl TypeError {
             | TypeError::ExtraProperty(_, span)
             | TypeError::InvalidDataStructInstantiation(span)
             | TypeError::UnknownProperty(_, span)
+            | TypeError::UnknownMethod(_, span)
             | TypeError::InvalidPropertyAccess(_, span)
             | TypeError::Expected(_, _, span)
             | TypeError::ExpectedArguments(_, _, span)

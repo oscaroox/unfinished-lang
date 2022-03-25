@@ -45,7 +45,7 @@ impl TypeChecker {
         }
     }
 
-    fn resolve_type(&self, ttype: Type, env: &Rc<RefCell<Env>>) -> Type {
+    fn resolve_type(&mut self, ttype: Type, env: &Rc<RefCell<Env>>) -> Type {
         match ttype {
             Type::Identifier(identifier) => match env.borrow_mut().get(&identifier) {
                 Some(t) => match &t {
@@ -67,7 +67,7 @@ impl TypeChecker {
         }
     }
 
-    fn synth(&self, expr: &Expression, env: &Rc<RefCell<Env>>) -> Result<Type, TypeError> {
+    fn synth(&mut self, expr: &Expression, env: &Rc<RefCell<Env>>) -> Result<Type, TypeError> {
         match expr {
             Expression::Literal(lit) => Ok(match &lit.value {
                 ast::LiteralValue::Int(_) => Type::int(),
@@ -96,12 +96,14 @@ impl TypeChecker {
             Expression::Let(expr) => {
                 if let Some(ttype) = &expr.name.value_type {
                     let ttype = self.resolve_type(ttype.clone(), env);
+                    env.borrow_mut().set(&expr.name.value, ttype.clone());
                     if let Some(e) = &expr.value {
                         self.check(e, ttype.clone(), env)?;
                     }
-                    env.borrow_mut().set(&expr.name.value, ttype.clone());
                 } else if let Some(e) = &expr.value {
+                    env.borrow_mut().set(&expr.name.value, Type::Unit);
                     let ttype = self.synth(e, env)?;
+
                     env.borrow_mut().set(&expr.name.value, ttype);
                 } else {
                     env.borrow_mut().set(&expr.name.value, Type::Unknown);
@@ -154,6 +156,7 @@ impl TypeChecker {
             },
             Expression::Function(expr) => {
                 let fn_type = self.synth_function_signature(expr, &env)?;
+
                 let env = Rc::new(RefCell::new(Env::with_parent(Rc::clone(&env))));
 
                 let ret_type = match &fn_type {
@@ -166,7 +169,9 @@ impl TypeChecker {
                     _ => unreachable!(),
                 };
 
-                self.check(&expr.body, *ret_type.clone(), &env)?;
+                if let Err(e) = self.check(&expr.body, *ret_type.clone(), &env) {
+                    self.add_error(e);
+                };
 
                 Ok(fn_type)
             }
@@ -347,7 +352,7 @@ impl TypeChecker {
             }
             Expression::SelfExpr(expr) => match env.borrow_mut().get(&expr.name) {
                 Some(t) => Ok(t),
-                None => unreachable!(),
+                None => Ok(Type::Unit), // TODO merge analyzer in type_checker
             },
             Expression::GetProperty(expr) => {
                 let ttype = self.synth(&expr.object, env)?;
@@ -365,7 +370,12 @@ impl TypeChecker {
                                     }
                                     Some(t.ttype.clone())
                                 }
-                                None => todo!(),
+                                None => {
+                                    return Err(TypeError::UnknownMethod(
+                                        expr.name.value.to_string(),
+                                        expr.span.clone(),
+                                    ))
+                                }
                             },
                             false => match d.fields.iter().find(|e| e.name == expr.name.value) {
                                 Some(d) => Some(d.ttype.clone()),
@@ -416,15 +426,13 @@ impl TypeChecker {
             Expression::Grouping(expr) => self.synth(&expr.expr, env),
 
             Expression::BinOp(expr) => {
-                let binop = &expr;
+                let (lhs, rhs) = self.synth_left_and_right(&expr.left, &expr.right, env)?;
 
-                let (lhs, rhs) = self.synth_left_and_right(&binop.left, &binop.right, env)?;
-
-                match &binop.op {
-                    ast::BinaryOperation::Add(_)
-                    | ast::BinaryOperation::Subtract(_)
-                    | ast::BinaryOperation::Multiply(_)
-                    | ast::BinaryOperation::Divide(_) => match (&lhs, &rhs) {
+                match &expr.op {
+                    ast::BinaryOperation::Add(span)
+                    | ast::BinaryOperation::Subtract(span)
+                    | ast::BinaryOperation::Multiply(span)
+                    | ast::BinaryOperation::Divide(span) => match (&lhs, &rhs) {
                         (Type::Singleton(Singleton::Int), Type::Singleton(Singleton::Int)) => {
                             Ok(Type::int())
                         }
@@ -432,10 +440,10 @@ impl TypeChecker {
                             Ok(Type::float())
                         }
                         _ => Err(TypeError::InvalidBinaryOperation(
-                            binop.op.to_string(),
+                            expr.op.to_string(),
                             lhs,
                             rhs,
-                            expr.span.clone(),
+                            span.clone(),
                         )),
                     },
                     ast::BinaryOperation::ConcatInterpolation => todo!(),
@@ -602,7 +610,7 @@ impl TypeChecker {
      * Gather errors from Binary and Logical Expressions
      */
     fn synth_left_and_right(
-        &self,
+        &mut self,
         left: &Expression,
         right: &Expression,
         env: &Rc<RefCell<Env>>,
@@ -612,13 +620,13 @@ impl TypeChecker {
 
         match (lhs, rhs) {
             (Ok(r1), Ok(r2)) => Ok((r1, r2)),
-            (Ok(_), Err(e)) | (Err(e), Ok(_)) => Err(e),
             (Err(e1), Err(e2)) => Err(TypeError::LeftAndRight(Box::new(e1), Box::new(e2))),
+            (Ok(_), Err(e)) | (Err(e), Ok(_)) => Err(e),
         }
     }
 
     fn synth_function_signature(
-        &self,
+        &mut self,
         expr: &Function,
         env: &Rc<RefCell<Env>>,
     ) -> Result<Type, TypeError> {
@@ -638,7 +646,7 @@ impl TypeChecker {
     }
 
     fn check(
-        &self,
+        &mut self,
         expr: &Expression,
         ttype: Type,
         env: &Rc<RefCell<Env>>,
@@ -661,7 +669,7 @@ impl TypeChecker {
     }
 
     fn check_function(
-        &self,
+        &mut self,
         expr: &Expression,
         ttype: Type,
         env: &Rc<RefCell<Env>>,
@@ -709,7 +717,7 @@ impl TypeChecker {
     }
 
     fn check_array(
-        &self,
+        &mut self,
         expr: &Expression,
         ttype: Type,
         env: &Rc<RefCell<Env>>,
@@ -723,7 +731,9 @@ impl TypeChecker {
         };
 
         for e in arr {
-            self.check(e, ttype.clone(), env)?;
+            if let Err(e) = self.check(e, ttype.clone(), env) {
+                self.add_error(e.clone())
+            }
         }
 
         Ok(())

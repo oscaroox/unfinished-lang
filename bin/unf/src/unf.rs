@@ -3,7 +3,7 @@ use ariadne::Source;
 use ast::Program;
 use clap::Parser as CParser;
 use interpreter::{Environment, Interpreter};
-use parser::Parser;
+use parser::{Analyzer, Parser};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use scanner::Scanner;
@@ -91,19 +91,19 @@ impl Unf {
             return Err("Parser error".to_string());
         }
 
-        // let mut analyzer = Analyzer::new();
+        let mut analyzer = Analyzer::new();
 
-        // let errors = analyzer.analyze(&exprs);
+        let errors = analyzer.analyze(&exprs);
 
-        // if errors.len() > 0 {
-        //     for mut err in errors {
-        //         match err.into_report().print(Source::from(source.to_string())) {
-        //             Ok(_) => {}
-        //             Err(err) => println!("{}", err),
-        //         }
-        //     }
-        //     return Err("Analyzer error".to_string());
-        // }
+        if errors.len() > 0 {
+            for mut err in errors {
+                match err.into_report().print(Source::from(source.to_string())) {
+                    Ok(_) => {}
+                    Err(err) => println!("{}", err),
+                }
+            }
+            return Err("Analyzer error".to_string());
+        }
 
         let (_, type_errors) = type_checker.type_check(&exprs, None);
 
@@ -114,7 +114,7 @@ impl Unf {
                     Err(err) => println!("{}", err),
                 }
             }
-            return Err("Parser error".to_string());
+            return Err("Type check error".to_string());
         }
 
         Ok(exprs)
