@@ -24,16 +24,14 @@ pub struct Analyzer {
 
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum AnalyzerError {
-    #[error("{0}")]
-    Error(String),
     #[error("Cannot use return in top-level code")]
     NoTopLevelReturn(Span),
     #[error("Cannot use break outside loop expression")]
-    NoBreakOutsideLoop,
+    NoBreakOutsideLoop(Span),
     #[error("Cannot use continue outside loop expression")]
-    NoContinueOutsideLoop,
+    NoContinueOutsideLoop(Span),
     #[error("Cannot use self outside methods")]
-    NoSelfOutsideMethod,
+    NoSelfOutsideMethod(Span),
 }
 
 impl AnalyzerError {
@@ -41,16 +39,16 @@ impl AnalyzerError {
         let msg = self.to_string();
 
         match self {
-            Self::NoTopLevelReturn(span) => {
+            Self::NoBreakOutsideLoop(span)
+            | Self::NoContinueOutsideLoop(span)
+            | Self::NoSelfOutsideMethod(span)
+            | Self::NoTopLevelReturn(span) => {
                 let label = Label::new(span.to_range());
                 Report::build(ReportKind::Error, (), 99)
                     .with_message("Parser Error")
                     .with_label(label.with_message(msg))
                     .finish()
             }
-            _ => Report::build(ReportKind::Error, (), 99)
-                .with_message(format!("Parser Error: {}", msg))
-                .finish(),
         }
     }
 }
@@ -79,30 +77,11 @@ impl Analyzer {
 
     fn expression(&mut self, expression: &Expression) -> AnalyzerResult {
         match expression {
-            Expression::BinOp(_) => todo!(),
-            Expression::Literal(lit) => match lit.value {
-                ast::LiteralValue::Int(_)
-                | ast::LiteralValue::Float(_)
-                | ast::LiteralValue::Bool(_)
-                | ast::LiteralValue::String(_)
-                | ast::LiteralValue::Array(_)
-                | ast::LiteralValue::Null => {}
-            },
-            Expression::Assign(_) => todo!(),
-            Expression::GetIndex(_) => todo!(),
-            Expression::SetIndex(_) => todo!(),
-            Expression::GetProperty(_) => todo!(),
-            Expression::SetProperty(_) => todo!(),
             Expression::Let(expr) => {
                 if let Some(e) = &expr.value {
                     self.expression(e)?;
                 }
             }
-            Expression::LetRef(_) => todo!(),
-            Expression::UnaryOp(_) => todo!(),
-            Expression::Grouping(_) => todo!(),
-            Expression::Logic(_) => todo!(),
-            Expression::Call(_) => todo!(),
             Expression::Function(expr) => {
                 self.function_scopes.push(FunctionScope::Function);
                 self.expression(&expr.body)?;
@@ -115,14 +94,11 @@ impl Analyzer {
                     self.function_scopes.pop();
                 }
             }
-            Expression::DataStructInstance(_) => todo!(),
             Expression::Block(expr) => {
                 for e in &expr.exprs {
                     self.expression(e)?
                 }
             }
-            Expression::If(_) => todo!(),
-            Expression::ImplicitReturn(_) => todo!(),
             Expression::Return(expr) => {
                 if !self.is_in_function() {
                     if !self.is_in_method() {
@@ -133,9 +109,9 @@ impl Analyzer {
                     self.expression(e)?
                 }
             }
-            Expression::SelfExpr(_) => {
+            Expression::SelfExpr(expr) => {
                 if !self.is_in_method() {
-                    self.error(AnalyzerError::NoSelfOutsideMethod);
+                    self.error(AnalyzerError::NoSelfOutsideMethod(expr.span.clone()));
                 }
             }
             Expression::LoopExpr(expr) => {
@@ -144,16 +120,20 @@ impl Analyzer {
                 self.expression(&expr.body)?;
                 self.loop_scopes.pop();
             }
-            Expression::BreakExpr(_) => {
+            Expression::BreakExpr(expr) => {
                 if !self.is_in_loop() {
-                    self.error(AnalyzerError::NoBreakOutsideLoop)
+                    self.error(AnalyzerError::NoBreakOutsideLoop(expr.span.clone()))
                 }
             }
-            Expression::ContinueExpr(_) => {
+            Expression::ContinueExpr(expr) => {
                 if !self.is_in_loop() {
-                    self.error(AnalyzerError::NoContinueOutsideLoop)
+                    self.error(AnalyzerError::NoContinueOutsideLoop(expr.span.clone()))
                 }
             }
+            Expression::GetProperty(expr) => {
+                self.expression(&*expr.object)?;
+            }
+            _ => {}
         }
         Ok(())
     }
@@ -273,20 +253,26 @@ mod tests {
 
     #[test]
     fn analyze_continue_break_expr() {
-        analyze_error("break;", vec![AnalyzerError::NoBreakOutsideLoop]);
+        analyze_error(
+            "break;",
+            vec![AnalyzerError::NoBreakOutsideLoop(Span::fake())],
+        );
         analyze_error(
             "break;continue;",
             vec![
-                AnalyzerError::NoBreakOutsideLoop,
-                AnalyzerError::NoContinueOutsideLoop,
+                AnalyzerError::NoBreakOutsideLoop(Span::fake()),
+                AnalyzerError::NoContinueOutsideLoop(Span::fake()),
             ],
         );
-        analyze_error("continue;", vec![AnalyzerError::NoContinueOutsideLoop]);
+        analyze_error(
+            "continue;",
+            vec![AnalyzerError::NoContinueOutsideLoop(Span::fake())],
+        );
         analyze_error(
             "continue;break;",
             vec![
-                AnalyzerError::NoContinueOutsideLoop,
-                AnalyzerError::NoBreakOutsideLoop,
+                AnalyzerError::NoContinueOutsideLoop(Span::fake()),
+                AnalyzerError::NoBreakOutsideLoop(Span::fake()),
             ],
         );
 
@@ -304,7 +290,10 @@ mod tests {
 
     #[test]
     fn analyze_self_expr() {
-        analyze_error("self;", vec![AnalyzerError::NoSelfOutsideMethod]);
+        analyze_error(
+            "self;",
+            vec![AnalyzerError::NoSelfOutsideMethod(Span::fake())],
+        );
         analyze_error(
             "
         self;
@@ -313,8 +302,8 @@ mod tests {
         };
         ",
             vec![
-                AnalyzerError::NoSelfOutsideMethod,
-                AnalyzerError::NoSelfOutsideMethod,
+                AnalyzerError::NoSelfOutsideMethod(Span::fake()),
+                AnalyzerError::NoSelfOutsideMethod(Span::fake()),
             ],
         );
 
