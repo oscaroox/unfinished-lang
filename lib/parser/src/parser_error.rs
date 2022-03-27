@@ -28,7 +28,7 @@ pub enum ParserError {
     #[error("Invalid unary operation")]
     InvalidUnaryOperation(Token),
 
-    #[error("Invalid use of 'unit' type, cannot use 'unit' as type")]
+    #[error("Invalid use of 'unit' type, cannot use 'unit' here as type")]
     InvalidUseOfUnitType(Token),
 
     #[error("Invalid type '{0}'")]

@@ -7,12 +7,14 @@ use scanner::{Scanner, ScannerMode, Token, TokenType};
 use span_util::Span;
 use type_core::Type;
 
-const RECOVER_SET: [TokenType; 5] = [
+const RECOVER_SET: [TokenType; 6] = [
     TokenType::Let,
     TokenType::Fn,
     TokenType::Data,
     TokenType::Loop,
     TokenType::If,
+    // TokenType::Identifier,
+    TokenType::EOF,
 ];
 
 #[derive(Debug, PartialEq)]
@@ -54,22 +56,31 @@ impl Parser {
         (program, self.errors.clone())
     }
 
-    fn error_and_sync(&mut self, err: ParserError) {
-        self.sync();
+    fn add_error(&mut self, err: ParserError) {
         self.errors.push(err);
     }
 
-    fn sync(&mut self) {
-        self.advance();
+    fn error_and_sync(&mut self, err: ParserError) {
+        self.add_error(err);
+        self.sync();
+    }
 
+    fn sync(&mut self) {
         while !self.is_end() {
-            if self.prev_token.token_type == TokenType::SemiColon {
-                return;
-            }
+            // if self.prev_token.token_type == TokenType::SemiColon
+            //     && RECOVER_SET.contains(&self.curr_token.token_type)
+            // {
+            //     return;
+            // }
+
+            // if self.curr_token.token_type == TokenType::SemiColon {
+            //     return;
+            // }
 
             if RECOVER_SET.contains(&self.curr_token.token_type) {
                 return;
             }
+
             self.advance();
         }
     }
@@ -136,7 +147,9 @@ impl Parser {
     fn expression_statement(&mut self, require_semicolon: bool) -> ParserResult {
         let expr = self.expression()?;
         if require_semicolon {
-            self.eat_semi()?;
+            if let Err(e) = self.eat_semi() {
+                self.error_and_sync(e);
+            };
         }
         Ok(expr)
     }
@@ -163,8 +176,9 @@ impl Parser {
 
     fn parse_parameters(&mut self, token_end: TokenType) -> Result<Vec<Identifier>, ParserError> {
         let mut params = vec![];
+
         if self.curr_token.token_type != token_end {
-            loop {
+            while !self.is_end() {
                 if self.check(TokenType::SELF) {
                     return Err(ParserError::Error(
                         "Expected 'self' to be the first parameter in a method".to_string(),
@@ -181,7 +195,6 @@ impl Parser {
                     let ttype = self.parse_type(false)?;
                     Identifier::with_value_type(ident.value, Some(ttype), ident.span)
                 };
-                // let ttype = self.parse_type(false)?;
 
                 params.push(ident);
 
@@ -286,18 +299,19 @@ impl Parser {
                     ),
                     _ => expr,
                 },
-                Err(err) => match err {
-                    ParserError::UnexpectedToken(_) => {
-                        return Err(ParserError::ExpectedToken(
+
+                Err(err) => {
+                    return Err(match err {
+                        ParserError::UnexpectedToken(_) => ParserError::ExpectedToken(
                             format!(
                                 "Expected expression here, found '{}'",
                                 self.curr_token.clone()
                             ),
                             self.curr_token.clone(),
-                        ));
-                    }
-                    e => return Err(e),
-                },
+                        ),
+                        e => e,
+                    })
+                }
             };
             init = Some(expr);
         }
@@ -581,6 +595,7 @@ impl Parser {
         let left_paren = self.eat_optional(TokenType::LeftParen);
         let expr = self.expression()?;
         let expr_span = expr.get_span();
+
         if left_paren.is_some() {
             self.eat(TokenType::RightParen, "Expected ')'")?;
         };
@@ -794,8 +809,6 @@ impl Parser {
         let primary_span = expr.get_span();
         loop {
             if self.matches(vec![TokenType::LeftParen]) {
-                let paren = self.prev_token.clone();
-
                 let mut args = vec![];
 
                 if self.curr_token.token_type != TokenType::RightParen && !self.is_end() {
@@ -808,12 +821,11 @@ impl Parser {
                     }
                 }
 
-                match self.eat_optional(TokenType::RightParen) {
-                    Some(_) => {}
-                    None => {
-                        return Err(ParserError::UnterminatedFunctionCall(paren));
-                    }
-                }
+                self.eat(
+                    TokenType::RightParen,
+                    "unterminated function call expected either ',' or ')'",
+                )?;
+
                 let span: Span = primary_span.extend(self.prev_token.span.clone());
                 expr = Expression::create_call(expr, args, span);
             } else if self.matches(vec![TokenType::LeftBracket]) {
@@ -1096,6 +1108,18 @@ mod test {
         assert_eq!(res, expected);
     }
 
+    fn parse_recover(source: &str, expected: Program) {
+        let (res, err) = run_parser(source);
+
+        println!("errors:{} --------------", err.len());
+        for e in err {
+            println!("{}", e.to_string())
+        }
+        println!("errors:--------------");
+
+        assert_eq!(res, expected)
+    }
+
     fn parse_error(source: &str, expected_errors: Vec<ParserError>) {
         let (_, errors) = run_parser(source);
 
@@ -1285,6 +1309,24 @@ mod test {
         body: Expression,
     ) -> Expression {
         Expression::create_function(name, params, return_type, is_static, body, Span::fake())
+    }
+
+    #[test]
+    fn recover_missing_semi_expr() {
+        parse_recover(
+            r#"
+            let x = 1
+            let y = 2
+            let n = 33;
+            let bb = {}
+        "#,
+            vec![
+                create_let("x", Some(int(1))),
+                create_let("y", Some(int(2))),
+                create_let("n", Some(int(33))),
+                create_let("bb", Some(create_block(vec![]))),
+            ],
+        )
     }
 
     #[test]
