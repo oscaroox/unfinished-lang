@@ -1,7 +1,7 @@
 use crate::ParserError;
 use ast::{
     BinaryOperation, DataStructInstanceField, Expression, Identifier, LiteralValue, LogicOperation,
-    Program, UnaryOperation,
+    Program, UnaryOperation, CallArgs,
 };
 use scanner::{Scanner, ScannerMode, Token, TokenType};
 use span_util::Span;
@@ -440,29 +440,37 @@ impl Parser {
 
     fn data_struct_expression(&mut self) -> ParserResult {
         let ident_span = self.curr_token.span.clone();
-        let ident = self.eat(TokenType::Identifier, "Expected identifier")?;
-        self.eat(TokenType::LeftBrace, "Expected '{'")?;
+        let ident_token = self.eat(TokenType::Identifier, "Expected identifier")?;
+        let identifier = Identifier::new(ident_token.value.to_string(), ident_token.span);
 
-        let fields = self.parse_parameters(TokenType::RightBrace)?;
+        if !self.check(TokenType::LeftParen) {
+            return Ok(Expression::create_data_struct(
+                identifier, 
+                Vec::new(), 
+                Vec::new(), 
+                ident_span))
+        }
+
+        self.eat(TokenType::LeftParen, "Expected '(")?;
+
+        let fields = self.parse_parameters(TokenType::RightParen)?;
         let mut methods = vec![];
 
-        self.eat(TokenType::RightBrace, "Expected '}'")?;
+        self.eat(TokenType::RightParen, "Expected ')'")?;
 
-        let double_colon = self.eat_optional(TokenType::ColonColon);
+        let left_brace = self.eat_optional(TokenType::LeftBrace);
 
-        if double_colon.is_some() {
-            self.eat(TokenType::LeftBrace, "Expected '{'")?;
-
+        if left_brace.is_some() {
             while !self.check(TokenType::RightBrace) && !self.is_end() {
                 self.eat(TokenType::Fn, "Expected 'fun'")?;
-                methods.push(self.fun_expression(FunctionKind::Method(ident.value.clone()))?);
+                methods.push(self.fun_expression(FunctionKind::Method(ident_token.value.clone()))?);
             }
 
             self.eat(TokenType::RightBrace, "Expected '}'")?;
         }
 
         Ok(Expression::create_data_struct(
-            Identifier::new(ident.value.to_string(), ident.span),
+            identifier,
             fields,
             methods,
             ident_span,
@@ -808,14 +816,23 @@ impl Parser {
         let mut expr = self.primary()?;
         let primary_span = expr.get_span();
         loop {
+
             if self.matches(vec![TokenType::LeftParen]) {
                 let mut args = vec![];
 
                 if self.curr_token.token_type != TokenType::RightParen && !self.is_end() {
                     loop {
-                        args.push(self.expression()?);
+                        let mut ident: Option<Identifier> = None;
+                        if self.check(TokenType::Identifier) && self.check_peek(TokenType::Assign) {
+                            let token = self.eat(TokenType::Identifier, "Expected 'identifier'")?;
+                            self.eat(TokenType::Assign, "Expected '='")?;
+                            ident = Some(Identifier::new(token.value, token.span))
+                        }
 
-                        if !self.matches(vec![TokenType::Comma]) {
+                        args.push(CallArgs(ident, self.expression()?));
+
+                        if !self.matches(vec![TokenType::Comma]) || 
+                            self.curr_token.token_type == TokenType::RightParen {
                             break;
                         }
                     }
@@ -828,6 +845,7 @@ impl Parser {
 
                 let span: Span = primary_span.extend(self.prev_token.span.clone());
                 expr = Expression::create_call(expr, args, span);
+
             } else if self.matches(vec![TokenType::LeftBracket]) {
                 let idx = self.expression()?;
 
@@ -1076,6 +1094,8 @@ impl Parser {
 
         Ok(expr)
     }
+
+
 }
 
 #[cfg(test)]
@@ -1086,8 +1106,8 @@ mod test {
     use super::Parser;
 
     use ast::{
-        BinaryOperation, DataStructInstanceField, Expression, Identifier, LiteralValue,
-        LogicOperation, Program, UnaryOperation,
+        BinaryOperation, Expression, Identifier, LiteralValue,
+        LogicOperation, Program, UnaryOperation, CallArgs,
     };
     use scanner::{Scanner, Token, TokenType};
     use span_util::Span;
@@ -1146,6 +1166,14 @@ mod test {
 
     fn create_let_type(id: Identifier, value: Option<Expression>) -> Expression {
         Expression::create_let(id, value, Span::fake(), Span::fake())
+    }
+
+    fn arg(arg: Expression) -> CallArgs {
+        CallArgs(None, arg)
+    }
+
+    fn named_arg(name: Identifier, arg: Expression) -> CallArgs {
+        CallArgs(Some(name), arg)
     }
 
     fn int(val: i64) -> Expression {
@@ -1225,17 +1253,6 @@ mod test {
         )
     }
 
-    fn create_data_struct_instance(name: &str, fields: Vec<DataStructInstanceField>) -> Expression {
-        Expression::create_data_struct_instance(
-            Identifier::new(name.to_string(), Span::fake()),
-            fields,
-            Span::fake(),
-        )
-    }
-
-    fn data_struct_instance_field(name: &str, value: Expression) -> DataStructInstanceField {
-        DataStructInstanceField::new(Identifier::new(name.to_string(), Span::fake()), value)
-    }
 
     fn create_assign(name: Identifier, rhs: Expression) -> Expression {
         Expression::create_assign(name, rhs, Span::fake())
@@ -1257,7 +1274,7 @@ mod test {
         Expression::create_logic(lhs, op, rhs, Span::fake())
     }
 
-    fn create_call(callee: Expression, args: Vec<Expression>) -> Expression {
+    fn create_call(callee: Expression, args: Vec<ast::CallArgs>) -> Expression {
         Expression::create_call(callee, args, Span::fake())
     }
 
@@ -1431,21 +1448,18 @@ mod test {
     fn parse_type_user_type() {
         parse(
             r#"
-        let joe: Person = Person {};
-        let family: Person[] = [Person{}];
+        let joe: Person = Person();
+        let family: Person[] = [Person()];
         let x: fn(x: Person);
         "#,
             vec![
                 create_let_type(
                     ident_type("joe", Type::identifier("Person".to_string())),
-                    Some(create_data_struct_instance("Person".into(), vec![])),
+                    Some(create_call(create_let_ref("Person"), vec![])),
                 ),
                 create_let_type(
                     ident_type("family", Type::array(Type::Identifier("Person".into()))),
-                    Some(array(vec![create_data_struct_instance(
-                        "Person".into(),
-                        vec![],
-                    )])),
+                    Some(array(vec![create_call(create_let_ref("Person"), vec![])])),
                 ),
                 create_let_type(
                     ident_type(
@@ -1644,13 +1658,13 @@ mod test {
 
         parse(
             "
-        loop i in (Person {}) {};
+        loop i in (Person()) {};
         ",
             vec![create_loop(
                 create_let("i", None),
                 create_block(vec![]),
-                Some(create_grouping(create_data_struct_instance(
-                    "Person",
+                Some(create_grouping(create_call(
+                    create_let_ref("Person"),
                     vec![],
                 ))),
             )],
@@ -1980,7 +1994,11 @@ mod test {
                 create_call(create_let_ref("this_is_a_func"), vec![]),
                 create_call(
                     create_let_ref("fnc"),
-                    vec![int(1), create_let_ref("name"), bool_lit(true)],
+                    vec![
+                        arg(int(1)), 
+                        arg(create_let_ref("name")), 
+                        arg(bool_lit(true))
+                    ],
                 ),
             ],
         );
@@ -1992,6 +2010,24 @@ mod test {
                 vec![],
             )],
         );
+    }
+
+    #[test]
+    fn parse_function_call_named_args() {
+        parse(r#"
+        update_user(id=1, name = "John", "Doe");
+        save(1, drop=false);
+        "#, vec![
+            create_call(create_let_ref("update_user"), vec![
+                named_arg(ident("id"), int(1)),
+                named_arg(ident("name"), string_lit("John")),
+                arg(string_lit("Doe")),
+            ]),
+            create_call(create_let_ref("save"), vec![
+                arg(int(1)),
+                named_arg(ident("drop"), bool_lit(false)),
+            ])
+        ])
     }
 
     #[test]
@@ -2147,16 +2183,16 @@ mod test {
     fn parse_data_struct_expr() {
         parse(
             "
-            data Person {};
+            data Person;
         ",
             vec![create_data_struct("Person", vec![], vec![])],
         );
 
         parse(
             "
-            data Person {
+            data Person(
                 first_name: string,
-            };
+            );
         ",
             vec![create_data_struct(
                 "Person",
@@ -2167,11 +2203,11 @@ mod test {
 
         parse(
             "
-            data Person {
+            data Person(
                 first_name: string,
                 last_name: string,
                 age: int
-            };
+            );
         ",
             vec![create_data_struct(
                 "Person",
@@ -2186,11 +2222,11 @@ mod test {
 
         parse(
             "
-            data Person {
+            data Person(
                 first_name: string,
                 last_name: string,
                 age: int,
-            };
+            );
         ",
             vec![create_data_struct(
                 "Person",
@@ -2208,9 +2244,9 @@ mod test {
     fn parse_data_struct_methods_expr() {
         parse(
             "
-            data Person {
+            data Person (
                 first_name: string,
-            } :: {
+            ) {
                 fn new {
                 }
 
@@ -2246,9 +2282,9 @@ mod test {
     fn parse_data_struct_methods_self_expr() {
         parse(
             "
-            data Person {
+            data Person (
                 first_name: string,
-            } :: {
+            ) {
                 fn name(self) {
                     self.first_name;
                 }
@@ -2292,19 +2328,19 @@ mod test {
     fn parse_data_struct_instantiate_expr() {
         parse(
             "
-            data Person {};
-            Person {};
+            data Person;
+            Person();
         ",
             vec![
                 create_data_struct("Person", vec![], vec![]),
-                create_data_struct_instance("Person", vec![]),
+                create_call(create_let_ref("Person"), vec![]),
             ],
         );
 
         parse(
             r#"
-            data Person { first_name: string, last_name: string, age: int };
-            Person { first_name: "john", last_name: "doe", age: 23 };
+            data Person(first_name: string, last_name: string, age: int);
+            Person(first_name = "john", last_name = "doe", age = 23);
         "#,
             vec![
                 create_data_struct(
@@ -2316,23 +2352,25 @@ mod test {
                     ],
                     vec![],
                 ),
-                create_data_struct_instance(
-                    "Person",
+                create_call(
+                    create_let_ref("Person"),
                     vec![
-                        data_struct_instance_field("first_name", string_lit("john")),
-                        data_struct_instance_field("last_name", string_lit("doe")),
-                        data_struct_instance_field("age", int(23)),
+                        named_arg(ident("first_name"), string_lit("john")),
+                        named_arg(ident("last_name"), string_lit("doe")),
+                        named_arg(ident("age"), int(23)),
                     ],
                 ),
             ],
         );
 
         parse(
-            "Person {id: 1}.id;",
+            "Person(id = 1).id;",
             vec![create_get_property(
-                create_data_struct_instance(
-                    "Person",
-                    vec![data_struct_instance_field("id", int(1))],
+                create_call(
+                    create_let_ref("Person"),
+                    vec![
+                        named_arg(ident("id"), int(1))
+                    ],
                 ),
                 ident("id"),
                 false,
@@ -2344,20 +2382,20 @@ mod test {
     fn parse_data_struct_instantiate_shorthand_expr() {
         parse(
             r#"
-            data Person {
+            data Person(
                 id: int,
                 first_name: string,
-            };
+            );
             let id = 123;
             let first_name = "John";
-            Person {
+            Person(
                 id,
                 first_name,
-            };
-            Person {
+            );
+            Person(
                 id,
                 first_name
-            };
+            );
         "#,
             vec![
                 create_data_struct(
@@ -2367,18 +2405,18 @@ mod test {
                 ),
                 create_let("id", Some(int(123))),
                 create_let("first_name", Some(string_lit("John"))),
-                create_data_struct_instance(
-                    "Person",
+                create_call(
+                    create_let_ref("Person"),
                     vec![
-                        data_struct_instance_field("id", create_let_ref("id")),
-                        data_struct_instance_field("first_name", create_let_ref("first_name")),
+                        arg(create_let_ref("id")),
+                        arg(create_let_ref("first_name")),
                     ],
                 ),
-                create_data_struct_instance(
-                    "Person",
+                create_call(
+                    create_let_ref("Person"),
                     vec![
-                        data_struct_instance_field("id", create_let_ref("id")),
-                        data_struct_instance_field("first_name", create_let_ref("first_name")),
+                        arg(create_let_ref("id")),
+                        arg(create_let_ref("first_name")),
                     ],
                 ),
             ],
@@ -2389,12 +2427,12 @@ mod test {
     fn parse_get_property_expr() {
         parse(
             "
-            data Person {
+            data Person(
                 first_name: string,
                 last_name: string,
                 age: int,
-            };
-            let p = Person{};
+            );
+            let p = Person();
             p.first_name;
         ",
             vec![
@@ -2407,7 +2445,7 @@ mod test {
                     ],
                     vec![],
                 ),
-                create_let("p", Some(create_data_struct_instance("Person", vec![]))),
+                create_let("p", Some(create_call(create_let_ref("Person"), vec![]))),
                 create_get_property(create_let_ref("p"), ident("first_name"), false),
             ],
         );
@@ -2417,12 +2455,12 @@ mod test {
     fn parse_set_property_expr() {
         parse(
             r#"
-            data Person {
+            data Person(
                 first_name: string,
                 last_name: string,
                 age: int,
-            };
-            let p = Person{};
+            );
+            let p = Person();
             p.age = 1;
         "#,
             vec![
@@ -2435,18 +2473,18 @@ mod test {
                     ],
                     vec![],
                 ),
-                create_let("p", Some(create_data_struct_instance("Person", vec![]))),
+                create_let("p", Some(create_call(create_let_ref("Person"), vec![]))),
                 create_set_property(create_let_ref("p"), ident("age"), int(1)),
             ],
         );
         parse(
             r#"
-            data Person {
+            data Person(
                 first_name: string,
                 last_name: string,
                 age: int,
-            };
-            let p = Person{};
+            );
+            let p = Person();
             p.age += 1;
             p.age -= 1;
             p.age *= 1;
@@ -2462,7 +2500,7 @@ mod test {
                     ],
                     vec![],
                 ),
-                create_let("p", Some(create_data_struct_instance("Person", vec![]))),
+                create_let("p", Some(create_call(create_let_ref("Person"), vec![]))),
                 create_set_property(
                     create_let_ref("p"),
                     ident("age"),

@@ -2,7 +2,7 @@ use crate::{
     Assign, BinOp, BinaryOperation, Block, BreakExpr, Call, ContinueExpr, DataStruct,
     DataStructInstance, DataStructInstanceField, Function, GetIndex, GetProperty, Grouping,
     Identifier, IfConditional, ImplicitReturn, LetExpr, LetRef, Literal, LiteralValue, Logic,
-    LogicOperation, LoopExpr, ReturnExpr, SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation,
+    LogicOperation, LoopExpr, ReturnExpr, SelfExpr, SetIndex, SetProperty, UnaryOp, UnaryOperation, CallArgs,
 };
 use span_util::Span;
 use type_core::Type;
@@ -148,13 +148,14 @@ impl Expression {
         })
     }
 
-    pub fn create_call(callee: Expression, args: Vec<Expression>, span: Span) -> Expression {
+    pub fn create_call(callee: Expression, args: Vec<CallArgs>, span: Span) -> Expression {
         Expression::Call(Call {
             callee: Box::new(callee),
             arguments: args,
             span,
         })
     }
+
 
     pub fn create_index(lhs: Expression, index: Expression, span: Span) -> Expression {
         Expression::GetIndex(GetIndex {
