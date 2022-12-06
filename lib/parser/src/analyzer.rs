@@ -32,6 +32,8 @@ pub enum AnalyzerError {
     NoContinueOutsideLoop(Span),
     #[error("Cannot use self outside methods")]
     NoSelfOutsideMethod(Span),
+    #[error("Cannot use named arguments with positional arguments")]
+    NoUsePositionalWithNamedArgs(Span)
 }
 
 impl AnalyzerError {
@@ -42,6 +44,7 @@ impl AnalyzerError {
             Self::NoBreakOutsideLoop(span)
             | Self::NoContinueOutsideLoop(span)
             | Self::NoSelfOutsideMethod(span)
+            | Self::NoUsePositionalWithNamedArgs(span)
             | Self::NoTopLevelReturn(span) => {
                 let label = Label::new(span.to_range());
                 Report::build(ReportKind::Error, (), 99)
@@ -119,6 +122,18 @@ impl Analyzer {
                 self.expression(&expr.condition)?;
                 self.expression(&expr.body)?;
                 self.loop_scopes.pop();
+            }
+            Expression::Call(expr) => {
+                let is_named_call = match &expr.arguments.get(0) {
+                    Some(arg) => arg.is_named(),
+                    None => false,
+                };
+
+                for arg in &expr.arguments {
+                    if is_named_call && !arg.is_named() || !is_named_call && arg.is_named() {
+                        self.error(AnalyzerError::NoUsePositionalWithNamedArgs(arg.1.get_span()))
+                    }
+                }
             }
             Expression::BreakExpr(expr) => {
                 if !self.is_in_loop() {
@@ -231,9 +246,7 @@ mod tests {
 
         analyze_success(
             "
-            data Person {
-
-            } :: {
+            data Person() {
                 fn new {
                     return;
                 }
@@ -309,9 +322,7 @@ mod tests {
 
         analyze_success(
             "
-        data Person {
-
-        } :: {
+        data Person() {
             fn new {
                 self;
             }
@@ -325,5 +336,20 @@ mod tests {
         };
         ",
         );
+    }
+
+    #[test]
+    fn analyze_call_expr() {
+        analyze_error("
+            run(commit=true, 1);
+            run(1, commit=true);
+            run(1,3,4);
+            run(commit = true, id =1);
+            run(1, commit=true);
+        ", vec![
+            AnalyzerError::NoUsePositionalWithNamedArgs(Span::fake()),
+            AnalyzerError::NoUsePositionalWithNamedArgs(Span::fake()),
+            AnalyzerError::NoUsePositionalWithNamedArgs(Span::fake()),
+        ])
     }
 }
