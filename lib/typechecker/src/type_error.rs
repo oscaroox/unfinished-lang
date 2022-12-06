@@ -39,6 +39,12 @@ pub enum TypeError {
     #[error("Extra property '{0}'")]
     ExtraProperty(String, Span),
 
+    #[error("Duplicate named argument '{0}' provided")]
+    DuplicateNamedArgument(String, Span),
+
+    #[error("Unknown named argument '{0}' provided")]
+    UnknownNamedArgument(String, Span),
+
     #[error("Can only instantiate data struct")]
     InvalidDataStructInstantiation(Span),
 
@@ -90,6 +96,8 @@ impl TypeError {
             | TypeError::InvalidDataStructInstantiation(span)
             | TypeError::UnknownProperty(_, span)
             | TypeError::UnknownMethod(_, span)
+            | TypeError::DuplicateNamedArgument(_, span)
+            | TypeError::UnknownNamedArgument(_, span)
             | TypeError::InvalidPropertyAccess(_, span)
             | TypeError::Expected(_, _, span)
             | TypeError::ExpectedArguments(_, _, span)
