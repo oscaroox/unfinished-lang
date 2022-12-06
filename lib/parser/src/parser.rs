@@ -5,7 +5,7 @@ use ast::{
 };
 use scanner::{Scanner, ScannerMode, Token, TokenType};
 use span_util::Span;
-use type_core::Type;
+use type_core::{Type, FunctionParam};
 
 const RECOVER_SET: [TokenType; 6] = [
     TokenType::Let,
@@ -238,10 +238,17 @@ impl Parser {
             if self.eat_optional(TokenType::Colon).is_some() {
                 return_type = self.parse_type(true)?;
             }
-            let p: Vec<Type> = params
+
+            let p: Vec<FunctionParam> = params
                 .iter()
-                .map(|i| i.value_type.as_ref().unwrap().clone())
+                .map(|i| {
+                    FunctionParam { 
+                        name:  i.value.to_string(), 
+                        ttype: i.value_type.as_ref().unwrap().clone() 
+                    }
+                })
                 .collect();
+
             Some(Type::function(p, return_type))
         } else {
             None
@@ -1111,7 +1118,7 @@ mod test {
     };
     use scanner::{Scanner, Token, TokenType};
     use span_util::Span;
-    use type_core::Type;
+    use type_core::{Type, FunctionParam};
 
     fn run_parser(source: &str) -> (Program, Vec<ParserError>) {
         let scanner = Scanner::new(source.to_string());
@@ -1253,6 +1260,10 @@ mod test {
         )
     }
 
+
+    fn create_param_type(name: &str, ttype: Type) -> FunctionParam {
+        FunctionParam { name: name.to_string(), ttype }
+    }
 
     fn create_assign(name: Identifier, rhs: Expression) -> Expression {
         Expression::create_assign(name, rhs, Span::fake())
@@ -1406,7 +1417,9 @@ mod test {
         ",
             vec![
                 create_let_type(
-                    ident_type("x", Type::function(vec![Type::string()], Type::unit())),
+                    ident_type("x", Type::function(vec![
+                        create_param_type("a", Type::string())
+                    ], Type::unit())),
                     None,
                 ),
                 create_let_type(ident_type("x", Type::function(vec![], Type::unit())), None),
@@ -1416,27 +1429,35 @@ mod test {
                     None,
                 ),
                 create_let_type(
-                    ident_type("x", Type::function(vec![Type::string()], Type::int())),
+                    ident_type("x", Type::function(vec![
+                        create_param_type("a", Type::string())
+                    ], Type::int())),
                     None,
                 ),
                 create_let_type(
                     ident_type(
                         "x",
-                        Type::function(vec![Type::string()], Type::array(Type::int())),
+                        Type::function(vec![
+                            create_param_type("a", Type::string())
+                        ], Type::array(Type::int())),
                     ),
                     None,
                 ),
                 create_let_type(
                     ident_type(
                         "x",
-                        Type::array(Type::function(vec![Type::int()], Type::int())),
+                        Type::array(Type::function(vec![
+                            create_param_type("b", Type::int())
+                        ], Type::int())),
                     ),
                     None,
                 ),
                 create_let_type(
                     ident_type(
                         "x",
-                        Type::array(Type::function(vec![Type::int()], Type::unit())),
+                        Type::array(Type::function(vec![
+                            create_param_type("b", Type::int())
+                        ], Type::unit())),
                     ),
                     None,
                 ),
@@ -1464,7 +1485,12 @@ mod test {
                 create_let_type(
                     ident_type(
                         "x",
-                        Type::function(vec![Type::identifier("Person".to_string())], Type::unit()),
+                        Type::function(vec![
+                            FunctionParam {
+                                name: "x".to_string(),
+                                ttype: Type::identifier("Person".to_string())
+                            }
+                        ], Type::unit()),
                     ),
                     None,
                 ),

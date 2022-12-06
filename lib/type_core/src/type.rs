@@ -19,13 +19,25 @@ pub struct DataStruct {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct FunctionParam {
+    pub name: String,
+    pub ttype: Type
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Function {
+    pub params: Vec<FunctionParam>,
+    pub return_type: Box<Type>
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Singleton(Singleton),
     Unknown,
     Unit,
     Array(Box<Type>),
     Identifier(String),
-    Function(Vec<Type>, Box<Type>),
+    Function(Function),
     DataStruct(DataStruct),
     DataStructInstance(DataStruct),
 }
@@ -56,9 +68,13 @@ impl std::fmt::Display for Type {
             Type::Unknown => write!(f, "unknown"),
             Type::Unit => write!(f, "unit"),
             Type::Array(t) => write!(f, "{}", t),
-            Type::Function(params, ret) => {
-                let p: Vec<String> = params.into_iter().map(|e| e.to_string()).collect();
-                let out = format!("Fun({}): {}", p.join(", "), ret);
+            Type::Function(fun) => {
+                let p: Vec<String> = fun.params
+                .iter()
+                .map(|e| e.ttype.to_string())
+                .collect();
+                
+                let out = format!("Fun({}): {}", p.join(", "), fun.return_type);
                 write!(f, "{}", out)
             }
             Type::DataStruct(d) => {
@@ -103,8 +119,11 @@ impl Type {
         Type::Identifier(t)
     }
 
-    pub fn function(params: Vec<Type>, return_type: Type) -> Type {
-        Type::Function(params, Box::new(return_type))
+    pub fn function(params: Vec<FunctionParam>, return_type: Type) -> Type {
+        Type::Function(Function { 
+            params,
+            return_type: Box::new(return_type) 
+        })
     }
 
     pub fn data_struct(
@@ -140,7 +159,7 @@ impl Type {
     }
 
     pub fn is_function(&self) -> bool {
-        matches!(self, Type::Function(_, _))
+        matches!(self, Type::Function(_))
     }
 
     pub fn is_data_struct_instance(&self) -> bool {
@@ -155,7 +174,7 @@ impl Type {
             (Type::Singleton(Singleton::Bool), Type::Singleton(Singleton::Bool)) => true,
             (Type::Unit, Type::Unit) => true,
             (Type::Array(a1), Type::Array(a2)) => *a1 == a2,
-            (Type::Function(a1, ret1), Type::Function(a2, ret2)) => *a1 == a2 && *ret1 == ret2,
+            (Type::Function(fun1), Type::Function(fun2)) => *fun1 == fun2,
             (Type::Identifier(i1), Type::Identifier(i2)) => *i1 == i2,
             (Type::DataStruct(d1), Type::DataStruct(d2))
             | (Type::DataStructInstance(d1), Type::DataStructInstance(d2)) => {

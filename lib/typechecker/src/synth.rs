@@ -1,9 +1,9 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, collections::{HashMap, hash_map::Entry}};
 
 use crate::env::Env;
 use crate::type_error::TypeError;
-use ast::{Expression, Function};
-use type_core::{DataStructField, DataStructMethod, Singleton, Type};
+use ast::{Expression, Function, Identifier};
+use type_core::{DataStructField, DataStructMethod, Singleton, Type, FunctionParam};
 
 pub struct TypeChecker {
     errors: Vec<TypeError>,
@@ -55,13 +55,19 @@ impl TypeChecker {
                 None => panic!("Undefined type {}", identifier),
             },
             Type::Array(t) => self.resolve_type(*t, env),
-            Type::Function(params, ret) => {
-                let p: Vec<Type> = params
+            Type::Function(t) => {
+                let p: Vec<FunctionParam> = t.params
                     .iter()
-                    .map(|i| self.resolve_type(i.clone(), env))
+                    .map(|i| {
+                        FunctionParam {
+                            name: i.name.to_string(),
+                            ttype: self.resolve_type(i.ttype.clone(), env)
+                        }
+                        
+                    })
                     .collect();
-                let ret = self.resolve_type(*ret, env);
-                Type::Function(p, Box::new(ret))
+                let ret = self.resolve_type(*t.return_type, env);
+                Type::function(p, ret)
             }
             _ => ttype,
         }
@@ -156,15 +162,14 @@ impl TypeChecker {
             },
             Expression::Function(expr) => {
                 let fn_type = self.synth_function_signature(expr, &env)?;
-
                 let env = Rc::new(RefCell::new(Env::with_parent(Rc::clone(&env))));
 
                 let ret_type = match &fn_type {
-                    Type::Function(params, ret) => {
-                        for (e, ttype) in expr.params.iter().zip(params) {
-                            env.borrow_mut().set(&e.value, ttype.clone());
+                    Type::Function(fn_expr) => {
+                        for (e, param) in expr.params.iter().zip(&fn_expr.params) {
+                            env.borrow_mut().set(&e.value, param.ttype.clone());
                         }
-                        ret
+                        fn_expr.return_type.clone()
                     }
                     _ => unreachable!(),
                 };
@@ -208,19 +213,62 @@ impl TypeChecker {
                 let callee = self.synth(&expr.callee, env)?;
 
                 match callee {
-                    Type::Function(params, ret) => {
+                    Type::Function(fn_expr) => {
                         // TODO handle self param in methods
-                        if params.len() != expr.arguments.len() {
+                        if fn_expr.params.len() != expr.arguments.len() {
                             return Err(TypeError::ExpectedArguments(
-                                params.len(),
+                                fn_expr.params.len(),
                                 expr.arguments.len(),
                                 expr.span.clone(),
                             ));
+                        }   
+                        
+                        // check if this function uses named arguments
+                        // the rest of the arguments should also be named
+                        let is_named = match expr.arguments.get(0) {
+                            Some(e) => e.is_named(),
+                            None => false,
+                        };
+
+                        
+                        for (t, e) in fn_expr.params.iter().zip(expr.arguments.iter()) {
+                            if !is_named {
+                                self.check(&e.1, t.ttype.clone(), &env)?;
+                            }                  
                         }
-                        for (t, e) in params.iter().zip(expr.arguments.iter()) {
-                            self.check(e, t.clone(), &env)?;
+
+                        if !is_named {
+                            for (t, e) in fn_expr.params.iter().zip(expr.arguments.iter()) {
+                                    self.check(&e.1, t.ttype.clone(), &env)?;              
+                            }
+                        } else {
+
+                            let mut provided_args: HashMap<String, (&Identifier, &Expression)> = HashMap::new();
+
+                            for arg in expr.arguments.iter() {
+                                let arg_ident = arg.0.as_ref().unwrap();
+                                let arg_name = arg_ident.value.to_string();
+                                
+                                // Check if the named argument was already provided, 
+                                // if true true a duplicate named argument error
+                                if provided_args.contains_key(&arg_name) {
+                                    self.add_error(TypeError::DuplicateNamedArgument(arg_name, arg_ident.span.clone()));
+                                } else if !fn_expr.params.iter().any(|p| p.name == arg_name) {
+                                    // check if the argument provided exists in the function parameter list
+                                    // throw unknown argument error if it does not exists
+                                    self.add_error(TypeError::UnknownNamedArgument(arg_name, arg_ident.span.clone()));
+                                } else {
+                                    provided_args.insert(arg_name, (arg_ident, &arg.1));
+                                }
+                            }
+                            
+                            for t in fn_expr.params.iter() {
+                                if let Some(v) = provided_args.get(&t.name) {
+                                    self.check(v.1, t.ttype.clone(), env)?;
+                                }
+                            }
                         }
-                        Ok(*ret)
+                        Ok(*fn_expr.return_type)
                     }
                     _ => Err(TypeError::NotCallable(callee, expr.callee.get_span())),
                 }
@@ -630,18 +678,23 @@ impl TypeChecker {
         expr: &Function,
         env: &Rc<RefCell<Env>>,
     ) -> Result<Type, TypeError> {
-        let param_types: Vec<Type> = expr
+        let param_types: Vec<FunctionParam> = expr
             .params
             .iter()
             .map(|e| match &e.value_type {
-                Some(t) => self.resolve_type(t.clone(), env),
+                Some(t) => {
+                    FunctionParam { 
+                        name: e.value.to_string(), 
+                        ttype: self.resolve_type(t.clone(), env)
+                    }
+                },
                 None => panic!("Annotation type needed"),
             })
             .collect();
 
-        Ok(Type::Function(
+        Ok(Type::function(
             param_types,
-            Box::new(self.resolve_type(expr.return_type.clone(), env)),
+            self.resolve_type(expr.return_type.clone(), env),
         ))
     }
 
@@ -680,7 +733,7 @@ impl TypeChecker {
         };
 
         let fun_type = match &ttype {
-            Type::Function(p, r) => (p, r),
+            Type::Function(ttype) => (&ttype.params, &ttype.return_type),
             _ => unreachable!(),
         };
 
@@ -696,24 +749,24 @@ impl TypeChecker {
 
         let env = Rc::new(RefCell::new(Env::with_parent(Rc::clone(&env))));
 
-        let type_params: Vec<Type> = params
+        let type_params: Vec<FunctionParam> = params
             .into_iter()
             .zip(fun_type.0.into_iter())
             .map(|e| {
                 let ident = e.0;
-                let ttype = e.1;
+                let param = e.1;
 
-                env.borrow_mut().set(&ident.value, ttype.clone());
+                env.borrow_mut().set(&ident.value, param.ttype.clone());
 
                 match &ident.value_type {
-                    Some(v) => self.resolve_type(v.clone(), &env),
-                    None => ttype.clone(),
+                    Some(v) => FunctionParam { name: ident.value.to_string(), ttype: self.resolve_type(v.clone(), &env) },
+                    None => param.clone(),
                 }
             })
             .collect();
 
         let ret = self.synth(&fun.body, &env)?;
-        Ok(Type::Function(type_params, Box::new(ret)))
+        Ok(Type::function(type_params, ret))
     }
 
     fn check_array(
@@ -742,12 +795,13 @@ impl TypeChecker {
 
 #[cfg(test)]
 mod test {
-    use crate::TypeChecker;
-    use ariadne::Source;
+    use crate::{TypeChecker, type_error::TypeError};
     use parser::Parser;
     use scanner::Scanner;
+    use span_util::Span;
+    use type_core::{Type, FunctionParam};
 
-    fn parse(src: &str) {
+    fn check(src: &str) -> (Vec<Type>, Vec<TypeError>) {
         let scanner = Scanner::new(src.into());
         let mut parser = Parser::new(scanner);
 
@@ -756,38 +810,86 @@ mod test {
         if !errors.is_empty() {
             panic!("Parser emitted errors {:#?}", errors);
         }
+        // TODO use analyzer before typechecker
         let mut type_checker = TypeChecker::new();
-        let (res, errors) = type_checker.type_check(&exprs, None);
-
-        println!("res: {:#?}", res);
-
-        for mut err in errors.clone() {
-            match err.into_report().print(Source::from(src.to_string())) {
-                Err(err) => println!("{}", err),
-                _ => {}
-            }
-        }
-        // println!("errors: {:#?}", errors);
+        return type_checker.type_check(&exprs, None);
     }
+
+    fn run(src: &str, expected_types: Vec<Type>) {
+        let (types, errors) = check(src);
+        println!("{types:#?}");
+        if errors.len() > 0 {
+            panic!("typechecker emitted errors: {:#?}", errors);
+        }  
+
+        // ignore checking for types if array is empty
+        if expected_types.is_empty() {
+            return;
+        }
+
+        if types.len() != expected_types.len() {
+            panic!(
+                "typechecker emitted {} types, expected types has {} types",
+                types.len(),
+                expected_types.len()
+            );
+        }
+
+        for (ttype, expected) in types.iter().zip(expected_types) {
+            assert_eq!(*ttype, expected);
+        } 
+    }
+
+    fn run_error(src: &str,  expected_errors: Vec<TypeError>) {
+        let (_, errors) = check(src);
+
+        if errors.is_empty() {
+            panic!("analyzer did not emit errors");
+        };
+
+        if errors.len() != expected_errors.len() {
+            println!("{errors:#?}");
+            panic!(
+                "analyzer emitted {} errors, expected errors has {} errors",
+                errors.len(),
+                expected_errors.len()
+            );
+        }
+        for (err, expected) in errors.iter().zip(expected_errors) {
+            assert_eq!(*err, expected);
+        }
+    }
+
 
     #[test]
     fn test_synth() {
-        parse(r#"1; 2.2; "test"; true; false;"#);
+        run(r#"1; 2.2; "test"; true; false;"#, vec![
+            Type::int(),
+            Type::float(),
+            Type::string(),
+            Type::bool(),
+            Type::bool()
+        ]);
     }
 
     #[test]
     fn test_array_synth() {
-        parse(r#"[1];"#);
+        run(r#"[1];"#, vec![Type::array(Type::int())]);
     }
 
     #[test]
     fn test_let_synth() {
-        parse(r#"let x: string; x = "test"; let x = 1; x = 2;"#);
+        run(r#"let x: string; x = "test"; let x = 1; x = 2;"#, vec![
+            Type::unit(),
+            Type::string(),
+            Type::unit(),
+            Type::int()
+        ]);
     }
 
     #[test]
     fn test_block_synth() {
-        parse(
+        run(
             r#"
             let x = 1;
             { 
@@ -797,22 +899,31 @@ mod test {
             };
             x = 1;
         "#,
-        );
+        vec![
+            Type::unit(),
+            Type::unit(),
+            Type::int(),
+        ]);
     }
 
     #[test]
     fn test_function_synth() {
-        parse(
+        run(
             "
             let main = fn(x: int): int => x;
             main;
         ",
-        );
+        vec![
+            Type::unit(),
+            Type::function(vec![
+                FunctionParam { name: "x".into(), ttype: Type::int()}
+            ], Type::int())
+        ]);
     }
 
     #[test]
     fn test_function_call_synth() {
-        parse(
+        run(
             r#"
             let main = fn(): int => 1;
             main();
@@ -820,15 +931,44 @@ mod test {
             let y = 2;
             main(1, y);
         "#,
+        vec![
+            Type::unit(),
+            Type::int(),
+            Type::unit(),
+            Type::unit(),
+            Type::int(),
+        ]);
+    }
+    
+    #[test]
+    fn test_function_call_named_arguments() {
+        run(r#"
+            let main = fn(a: string, b: int) {};
+            main(b=1, a="test");
+            main(a="test", b=2);
+        "#, vec![
+            Type::unit(),
+            Type::unit(),
+            Type::unit(),
+        ]);
+
+        run_error(
+            r#"
+            let main = fn(a: string, b: int) {};
+            main(b=1, b = 1);
+            main(a="testing", c="testing");
+            "#,
+            vec![
+                TypeError::DuplicateNamedArgument("b".into(), Span::fake()),
+                TypeError::UnknownNamedArgument("c".into(), Span::fake()),
+            ]
         );
     }
 
     #[test]
     fn test_function_callback_synth() {
-        // let n: fn(x: usize) -> usize = |x: f64| 2;
-
         // TODO don't throw annotation needed error in parser
-        parse(
+        run(
             "
             let main: fn(cb: fn(id: int)) = fn(cb) {
                 cb(1);
@@ -836,21 +976,29 @@ mod test {
 
             main(fn(id) => { id == 1; });
         ",
-        );
+        vec![
+            Type::unit(),
+            Type::unit(),
+        ]);
     }
 
     #[test]
     fn test_index_synth() {
-        parse(
+        run(
             "
             let x = [1,2,3];
 
             let y = x[0];
             x;y;
         ",
-        );
+        vec![
+            Type::unit(),
+            Type::unit(),
+            Type::array(Type::int()),
+            Type::int()
+        ]);
 
-        parse(
+        run(
             r#"
             let x = ["test", "test2", "test3"];
             
@@ -858,22 +1006,26 @@ mod test {
 
             x;
         "#,
-        );
+        vec![
+            Type::unit(),
+            Type::string(),
+            Type::array(Type::string())
+        ]);
     }
 
     #[test]
     fn test_data_struct_synth() {
-        parse(
+        run(
             r#"
-            data Person {
+            data Person(
                 id: int,
                 name: string,
                 is_valid: bool,
-            };
+            );
 
-            // let Person = Person { id: 1, name: "test", is_valid: true };
+            // let Person = Person(id = 1, name = "test", is_valid = true);
             // Person;
-            let p = Person { id: 1, name: "test", is_valid: true };
+            let p = Person(id = 1, name = "test", is_valid = true);
             p;
             let x = Person.is_valid;
             x;
@@ -883,12 +1035,12 @@ mod test {
             };
             main(p);
         "#,
-        )
+        vec![]);
     }
 
     #[test]
     fn test_data_struct_set_synth() {
-        parse(
+        run(
             r#"
             data Person {
                 id: int,
@@ -902,12 +1054,12 @@ mod test {
             let person = Person {id: 1, name: "test", is_valid: true};
             person.id = gen_id();
             "#,
-        );
+            vec![]);
     }
 
     #[test]
     fn test_data_struct_methods_synth() {
-        parse(
+        run(
             r#"
             data Person { id: int } :: {
                 fn new: Person {
@@ -935,48 +1087,64 @@ mod test {
             main(p);
           
         "#,
-        );
+        vec![]);
     }
 
     #[test]
     fn test_grouping_expr_synth() {
-        parse(
+        run(
             r#"
             (123);
             (2.2);
             ("test");
             (true);
         "#,
-        );
+        vec![
+            Type::int(),
+            Type::float(),
+            Type::string(),
+            Type::bool()
+        ]);
     }
+
 
     #[test]
     fn test_binop_synth() {
-        parse(
+        run_error(
             "
             let x = 1;
             let y = 2.0;
             x / y;
-
         ",
-        );
+        vec![
+            TypeError::InvalidBinaryOperation(
+                "/".into(), 
+                Type::int(),
+                 Type::float(),
+                 Span::fake())
+            ]);
     }
 
     #[test]
     fn test_unary_synth() {
-        parse(
+        run(
             "
             -1;
             -2.0;
             !false;
             true;
         ",
-        );
+        vec![
+            Type::int(),
+            Type::float(),
+            Type::bool(),
+            Type::bool()
+        ]);
     }
 
     #[test]
     fn test_logic_synth() {
-        parse(
+        run(
             r#"
         true && true;
         true || true;
@@ -986,12 +1154,19 @@ mod test {
         2 <= 1;
         "test" == "test";
         "#,
-        );
+        vec![
+            Type::bool(),
+            Type::bool(),
+            Type::bool(),
+            Type::bool(),
+            Type::bool(),
+            Type::bool(),
+        ]);
     }
 
     #[test]
     fn test_if_synth() {
-        parse(
+        run(
             r#"
             if true {
                 1;
@@ -1011,14 +1186,17 @@ mod test {
                 2.0
             };
         "#,
-        );
+        vec![
+            Type::unit(),
+            Type::int(),
+            Type::unit(),
+            Type::float(),
+        ]);
     }
 
     #[test]
     fn test_loop_synth() {
-        // let x = vec![];
-
-        parse(
+        run(
             "
         let x = 1;
         loop x < 2 {
@@ -1034,6 +1212,6 @@ mod test {
         };
 
         ",
-        );
+        vec![]);
     }
 }
