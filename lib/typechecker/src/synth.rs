@@ -1037,7 +1037,6 @@ mod test {
         "#,
         vec![]);
     }
-
     #[test]
     fn test_data_struct_set_synth() {
         run(

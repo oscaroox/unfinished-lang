@@ -189,7 +189,6 @@ impl Parser {
                 let ident = self.eat(TokenType::Identifier, "Expected 'identifier'")?;
 
                 let ident = if self.eat_optional(TokenType::Colon).is_none() {
-                    // return Err(ParserError::TypeAnnotationNeeded(ident));
                     Identifier::new(ident.value, ident.span)
                 } else {
                     let ttype = self.parse_type(false)?;
@@ -1104,6 +1103,7 @@ impl Parser {
 
 
 }
+
 
 #[cfg(test)]
 mod test {
