@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use ast::{Expression, Identifier};
+use parser::ast::{Expression, Identifier};
 
 use crate::{builtin::Builtin, environment::Environment};
 

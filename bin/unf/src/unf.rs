@@ -1,12 +1,12 @@
 use crate::cli::{Cli, Commands};
 use ariadne::Source;
-use ast::Program;
+use parser::ast::Program;
+use parser::scanner::Scanner;
 use clap::Parser as CParser;
 use interpreter::{Environment, Interpreter};
 use parser::{Analyzer, Parser};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
-use scanner::Scanner;
 use std::{cell::RefCell, process, rc::Rc};
 use typechecker::TypeChecker;
 

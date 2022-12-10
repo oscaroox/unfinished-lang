@@ -7,8 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ast = { path="../ast" }
-scanner = { path="../scanner" }
 parser = { path="../parser" }
 span_util = { path="../span_util" }
 type_core = { path="../type_core" }

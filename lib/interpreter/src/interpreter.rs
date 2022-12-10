@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, convert::TryInto, fmt::Debug, rc::Rc};
 
 use crate::{builtin::get_builtins, environment::Environment, Value};
-use ast::{
+use parser::ast::{self,
     Assign, BinOp, BinaryOperation, Block, Call, DataStruct, Expression, Function, GetIndex,
     GetProperty, IfConditional, ImplicitReturn, LetExpr, Literal, LiteralValue, Logic,
     LogicOperation, LoopExpr, Program, ReturnExpr, SelfExpr, SetIndex, SetProperty, UnaryOp,
@@ -601,9 +601,9 @@ mod test {
     use std::collections::HashMap;
 
     use crate::{DataStruct, FunctionValue, Interpreter, Value};
-    use ast::Identifier;
+    use parser::ast::Identifier;
     use parser::Parser;
-    use scanner::Scanner;
+    use parser::scanner::Scanner;
     use span_util::Span;
     use type_core::Type;
 

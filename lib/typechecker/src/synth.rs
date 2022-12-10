@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc, collections::{HashMap, hash_map::Entry}};
 
 use crate::env::Env;
 use crate::type_error::TypeError;
-use ast::{Expression, Function, Identifier};
+use parser::ast::{self, Expression, Function, Identifier};
 use type_core::{DataStructField, DataStructMethod, Singleton, Type, FunctionParam};
 
 pub struct TypeChecker {
@@ -797,7 +797,7 @@ impl TypeChecker {
 mod test {
     use crate::{TypeChecker, type_error::TypeError};
     use parser::Parser;
-    use scanner::Scanner;
+    use parser::scanner::Scanner;
     use span_util::Span;
     use type_core::{Type, FunctionParam};
 

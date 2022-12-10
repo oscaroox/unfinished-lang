@@ -1,5 +1,5 @@
 use ariadne::{Label, Report, ReportKind};
-use scanner::Token;
+use crate::scanner::Token;
 use thiserror::Error;
 
 #[derive(Debug, Error, Clone, PartialEq)]

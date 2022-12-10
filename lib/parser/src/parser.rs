@@ -1,9 +1,9 @@
 use crate::ParserError;
-use ast::{
+use crate::ast::{
     BinaryOperation, DataStructInstanceField, Expression, Identifier, LiteralValue, LogicOperation,
     Program, UnaryOperation, CallArgs,
 };
-use scanner::{Scanner, ScannerMode, Token, TokenType};
+use crate::scanner::{Scanner, ScannerMode, Token, TokenType};
 use span_util::Span;
 use type_core::{Type, FunctionParam};
 
@@ -1112,11 +1112,11 @@ mod test {
 
     use super::Parser;
 
-    use ast::{
+    use super::{
         BinaryOperation, Expression, Identifier, LiteralValue,
         LogicOperation, Program, UnaryOperation, CallArgs,
     };
-    use scanner::{Scanner, Token, TokenType};
+    use crate::scanner::{Scanner, Token, TokenType};
     use span_util::Span;
     use type_core::{Type, FunctionParam};
 
@@ -1285,7 +1285,7 @@ mod test {
         Expression::create_logic(lhs, op, rhs, Span::fake())
     }
 
-    fn create_call(callee: Expression, args: Vec<ast::CallArgs>) -> Expression {
+    fn create_call(callee: Expression, args: Vec<CallArgs>) -> Expression {
         Expression::create_call(callee, args, Span::fake())
     }
 
