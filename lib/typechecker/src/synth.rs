@@ -796,21 +796,12 @@ impl TypeChecker {
 #[cfg(test)]
 mod test {
     use crate::{TypeChecker, type_error::TypeError};
-    use parser::Parser;
-    use parser::scanner::Scanner;
     use span_util::Span;
     use type_core::{Type, FunctionParam};
 
     fn check(src: &str) -> (Vec<Type>, Vec<TypeError>) {
-        let scanner = Scanner::new(src.into());
-        let mut parser = Parser::new(scanner);
+        let exprs = parser::parse_panic(src);
 
-        let (exprs, errors) = parser.parse();
-
-        if !errors.is_empty() {
-            panic!("Parser emitted errors {:#?}", errors);
-        }
-        // TODO use analyzer before typechecker
         let mut type_checker = TypeChecker::new();
         return type_checker.type_check(&exprs, None);
     }

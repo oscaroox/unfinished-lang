@@ -1,10 +1,8 @@
 mod passes;
+mod scanner;
 mod parser;
 mod parser_error;
 pub mod ast;
-
-// TODO make scanner private, only allow parser
-pub mod scanner;
 
 pub use crate::parser::*;
 use ast::Program;

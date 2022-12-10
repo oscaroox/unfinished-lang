@@ -602,22 +602,14 @@ mod test {
 
     use crate::{DataStruct, FunctionValue, Interpreter, Value};
     use parser::ast::Identifier;
-    use parser::Parser;
-    use parser::scanner::Scanner;
+
     use span_util::Span;
     use type_core::Type;
 
     pub fn run(src: &str, expected: Value) {
-        let scanner = Scanner::new(src.to_string());
-        let mut parser = Parser::new(scanner);
+        let exprs = parser::parse_panic(src);
 
-        let (exprs, errors) = parser.parse();
-
-        if errors.len() > 0 {
-            errors.into_iter().for_each(|e| println!("{}", e));
-            panic!("parser errors")
-        }
-
+        // TODO run typechecker before interpreter
         let mut interpreter = Interpreter::new();
         match interpreter.run(exprs) {
             Ok(val) => assert_eq!(val, expected),
