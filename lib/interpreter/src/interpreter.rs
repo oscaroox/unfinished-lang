@@ -371,11 +371,12 @@ impl Interpreter {
 
     fn eval_call(&mut self, call: &Call) -> InterpreterResult {
         let callee = self.expression(&call.callee)?;
-        let mut args = vec![];
-
+        let mut args: Vec<Value> = vec![];
+        unreachable!("TODO FIX NAMED ARGUMENTS@!!!");
         for arg in &call.arguments {
-            let val = self.expression(arg)?;
-            args.push(val);
+
+            // let val = self.expression(arg)?;
+            // args.push(val);
         }
 
         match callee {
