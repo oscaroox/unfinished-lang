@@ -1106,7 +1106,7 @@ impl Parser {
 
 
 #[cfg(test)]
-mod test {
+pub mod parser_tests {
 
     use crate::ParserError;
 
@@ -1167,7 +1167,7 @@ mod test {
         }
     }
 
-    fn create_let(id: &str, value: Option<Expression>) -> Expression {
+    pub fn create_let(id: &str, value: Option<Expression>) -> Expression {
         Expression::create_let(ident(id), value, Span::fake(), Span::fake())
     }
 
@@ -1183,39 +1183,39 @@ mod test {
         CallArgs(Some(name), arg)
     }
 
-    fn int(val: i64) -> Expression {
+    pub fn int(val: i64) -> Expression {
         Expression::create_literal(LiteralValue::Int(val), Span::fake())
     }
 
-    fn float(val: f64) -> Expression {
+    pub fn float(val: f64) -> Expression {
         Expression::create_literal(LiteralValue::Float(val), Span::fake())
     }
 
-    fn array(val: Vec<Expression>) -> Expression {
+    pub fn array(val: Vec<Expression>) -> Expression {
         Expression::create_literal(LiteralValue::Array(val), Span::fake())
     }
 
-    fn null() -> Expression {
+    pub fn null() -> Expression {
         Expression::create_literal(LiteralValue::Null, Span::fake())
     }
 
-    fn bool_lit(val: bool) -> Expression {
+    pub fn bool_lit(val: bool) -> Expression {
         Expression::create_literal(LiteralValue::Bool(val), Span::fake())
     }
 
-    fn string_lit(val: &str) -> Expression {
+    pub fn string_lit(val: &str) -> Expression {
         Expression::create_literal(LiteralValue::String(val.into()), Span::fake())
     }
 
-    fn ident(val: &str) -> Identifier {
+    pub fn ident(val: &str) -> Identifier {
         Identifier::new(val.to_string(), Span::fake())
     }
 
-    fn ident_type(val: &str, value_type: Type) -> Identifier {
+    pub fn ident_type(val: &str, value_type: Type) -> Identifier {
         Identifier::with_value_type(val.into(), Some(value_type), Span::fake())
     }
 
-    fn ident_self(r#type: &str) -> Identifier {
+    pub fn ident_self(r#type: &str) -> Identifier {
         Identifier {
             value: "self".to_string(),
             token_type: Some(TokenType::SELF),
@@ -1224,27 +1224,27 @@ mod test {
         }
     }
 
-    fn create_binop(left: Expression, op: BinaryOperation, right: Expression) -> Expression {
+    pub fn create_binop(left: Expression, op: BinaryOperation, right: Expression) -> Expression {
         Expression::create_binop(left, op, right, Span::fake())
     }
 
-    fn create_let_ref(val: &str) -> Expression {
+    pub fn create_let_ref(val: &str) -> Expression {
         Expression::create_let_ref(Identifier::new(val.to_string(), Span::fake()), Span::fake())
     }
 
-    fn create_block(exprs: Vec<Expression>) -> Expression {
+    pub fn create_block(exprs: Vec<Expression>) -> Expression {
         Expression::create_block(exprs, Span::fake())
     }
 
-    fn create_return(val: Option<Expression>) -> Expression {
+    pub fn create_return(val: Option<Expression>) -> Expression {
         Expression::create_return(val, Span::fake(), Span::fake())
     }
 
-    fn create_implicit_return(val: Expression) -> Expression {
+    pub fn create_implicit_return(val: Expression) -> Expression {
         Expression::create_implicit_return(val, Span::fake())
     }
 
-    fn create_data_struct(
+    pub fn create_data_struct(
         name: &str,
         fields: Vec<(&str, Type)>,
         methods: Vec<Expression>,
@@ -1261,47 +1261,47 @@ mod test {
     }
 
 
-    fn create_param_type(name: &str, ttype: Type) -> FunctionParam {
+    pub fn create_param_type(name: &str, ttype: Type) -> FunctionParam {
         FunctionParam { name: name.to_string(), ttype }
     }
 
-    fn create_assign(name: Identifier, rhs: Expression) -> Expression {
+    pub fn create_assign(name: Identifier, rhs: Expression) -> Expression {
         Expression::create_assign(name, rhs, Span::fake())
     }
 
-    fn create_index(lhs: Expression, index: Expression) -> Expression {
+    pub fn create_index(lhs: Expression, index: Expression) -> Expression {
         Expression::create_index(lhs, index, Span::fake())
     }
 
-    fn create_unaryop(op: UnaryOperation, rhs: Expression) -> Expression {
+    pub fn create_unaryop(op: UnaryOperation, rhs: Expression) -> Expression {
         Expression::create_unaryop(op, rhs, Span::fake())
     }
 
-    fn create_grouping(expr: Expression) -> Expression {
+    pub fn create_grouping(expr: Expression) -> Expression {
         Expression::create_grouping(expr, Span::fake())
     }
 
-    fn create_logic(lhs: Expression, op: LogicOperation, rhs: Expression) -> Expression {
+    pub fn create_logic(lhs: Expression, op: LogicOperation, rhs: Expression) -> Expression {
         Expression::create_logic(lhs, op, rhs, Span::fake())
     }
 
-    fn create_call(callee: Expression, args: Vec<CallArgs>) -> Expression {
+    pub fn create_call(callee: Expression, args: Vec<CallArgs>) -> Expression {
         Expression::create_call(callee, args, Span::fake())
     }
 
-    fn create_self(name: &str) -> Expression {
+    pub fn create_self(name: &str) -> Expression {
         Expression::create_self(name.into(), Span::fake())
     }
 
-    fn create_break() -> Expression {
+    pub fn create_break() -> Expression {
         Expression::create_break(Span::fake())
     }
 
-    fn create_continue() -> Expression {
+    pub fn create_continue() -> Expression {
         Expression::create_continue(Span::fake())
     }
 
-    fn create_loop(
+    pub fn create_loop(
         condition: Expression,
         body: Expression,
         iterator: Option<Expression>,
@@ -1309,7 +1309,7 @@ mod test {
         Expression::create_loop(condition, body, iterator, Span::fake(), Span::fake())
     }
 
-    fn create_if(
+    pub fn create_if(
         condition: Expression,
         then: Expression,
         not_then: Option<Expression>,
@@ -1317,19 +1317,19 @@ mod test {
         Expression::create_if(condition, then, not_then, Span::fake(), Span::fake())
     }
 
-    fn create_set_index(lhs: Expression, index: Expression, value: Expression) -> Expression {
+    pub fn create_set_index(lhs: Expression, index: Expression, value: Expression) -> Expression {
         Expression::create_set_index(lhs, index, value, Span::fake())
     }
 
-    fn create_get_property(object: Expression, name: Identifier, is_callable: bool) -> Expression {
+    pub fn create_get_property(object: Expression, name: Identifier, is_callable: bool) -> Expression {
         Expression::create_get_property(object, name, is_callable, Span::fake())
     }
 
-    fn create_set_property(object: Expression, name: Identifier, value: Expression) -> Expression {
+    pub fn create_set_property(object: Expression, name: Identifier, value: Expression) -> Expression {
         Expression::create_set_property(object, name, value, Span::fake())
     }
 
-    fn create_function(
+    pub fn create_function(
         name: Option<String>,
         params: Vec<Identifier>,
         return_type: Type,

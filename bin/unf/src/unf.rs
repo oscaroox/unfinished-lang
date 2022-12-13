@@ -1,10 +1,8 @@
 use crate::cli::{Cli, Commands};
 use ariadne::Source;
 use parser::ast::Program;
-use parser::scanner::Scanner;
 use clap::Parser as CParser;
 use interpreter::{Environment, Interpreter};
-use parser::{Analyzer, Parser};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use std::{cell::RefCell, process, rc::Rc};
@@ -74,35 +72,34 @@ impl Unf {
         }
     }
 
+    fn parser_errors_into_reports(&mut self, errors: parser::Error) -> Vec<ariadne::Report> {
+       match errors {
+            parser::Error::ParserError(e) => 
+                e.iter()
+                .map(|e| e.clone().into_report())
+                .collect(),
+            parser::Error::AnalyzerError(e) => 
+                e.iter()
+                .map(|e| e.clone().into_report())
+                .collect(),
+        }
+    }
+
     pub fn run_contents(&mut self, source: String) -> Result<Program, String> {
-        let scanner = Scanner::new(source.to_string());
         let mut type_checker = TypeChecker::new();
-        let mut parser = Parser::new(scanner);
-
-        let (exprs, errors) = parser.parse();
-
+        let (errors, exprs) = parser::parse(&source);
+        
         if !errors.is_empty() {
-            for mut err in errors.clone() {
-                match err.into_report().print(Source::from(source.to_string())) {
-                    Ok(_) => {}
-                    Err(err) => println!("{}", err),
+            for err in errors {
+                let reports = self.parser_errors_into_reports(err);
+                for report in reports {
+                    match report.print(Source::from(source.to_string())) {
+                        Ok(_) => {}
+                        Err(err) => println!("{}", err),
+                    }
                 }
             }
             return Err("Parser error".to_string());
-        }
-
-        let mut analyzer = Analyzer::new();
-
-        let errors = analyzer.analyze(&exprs);
-
-        if errors.len() > 0 {
-            for mut err in errors {
-                match err.into_report().print(Source::from(source.to_string())) {
-                    Ok(_) => {}
-                    Err(err) => println!("{}", err),
-                }
-            }
-            return Err("Analyzer error".to_string());
         }
 
         let (_, type_errors) = type_checker.type_check(&exprs, None);
