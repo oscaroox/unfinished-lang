@@ -1,1 +1,2 @@
-pub mod analyzer;
+pub mod semantic_analyzer;
+pub mod errors;
