@@ -10,6 +10,10 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    Run { file: String },
+    Run { 
+        file: String, 
+        #[arg(short, long)]
+        dump_ast: bool 
+    },
     Repl,
 }

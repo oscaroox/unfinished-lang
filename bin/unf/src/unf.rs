@@ -19,38 +19,49 @@ impl Unf {
         let cli = Cli::parse();
 
         match &cli.command {
-            Commands::Run { file } => self.run_file(file.to_string()),
-            Commands::Repl => self.run_repl(),
+            Commands::Run { file, dump_ast } => self.run_file(file.to_string(), *dump_ast),
+            Commands::Repl => match self.run_repl() {
+                Err(e) => println!("{}", e),
+                _ => {}
+            },
         }
     }
 
-    pub fn run_file(&mut self, file_path: String) {
+
+    pub fn run_file(&mut self, file_path: String, dump_ast: bool) {
         let source = match std::fs::read_to_string(file_path) {
             Ok(contents) => contents,
             Err(e) => panic!("{}", e),
         };
 
         let mut interpreter = Interpreter::new();
-        match self.run_contents(source) {
-            Ok(exprs) => match interpreter.run(exprs) {
-                Ok(_) => {}
-                Err(err) => {
-                    println!("{:#?}", err);
-                    process::exit(1);
+
+        match  self.run_contents(source) {
+            Ok(exprs) => {
+                if dump_ast {
+                    println!("{exprs:#?}");
+                    return;
+                }
+
+                match interpreter.run(exprs) {
+                    Ok(_) => {}
+                    Err(err) => {
+                        println!("{:#?}", err);
+                        process::exit(1);
+                    }
                 }
             },
             Err(_) => process::exit(1),
         }
     }
 
-    pub fn run_repl(&mut self) {
-        let mut rl = Editor::<()>::new();
+    pub fn run_repl(&mut self) -> rustyline::Result<()> {
+        let mut rl = Editor::<()>::new()?;
         let env = Rc::new(RefCell::new(Environment::new()));
         println!("Welcome to the unfinished language repl.");
         loop {
             let mut interpreter = Interpreter::with_env(env.clone());
-            let readline = rl.readline(">");
-            match readline {
+            match  rl.readline(">") {
                 Ok(line) => match self.run_contents(line) {
                     Ok(exprs) => match interpreter.run(exprs) {
                         Ok(val) => match val {
@@ -70,6 +81,7 @@ impl Unf {
                 }
             }
         }
+        rustyline::Result::Ok(())
     }
 
     fn parser_errors_into_reports(&mut self, errors: parser::Error) -> Vec<ariadne::Report> {
