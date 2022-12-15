@@ -182,7 +182,7 @@ impl Scanner {
 
     fn try_insert_semi_colon(&mut self, token_type: &TokenType) {
         match self.ch {
-            '\n' | '\t' | '\0' => match token_type {
+            '\n' | '\r' | '\0' => match token_type {
                 TokenType::IntConst |
                 TokenType::FloatConst |
                 TokenType::True |
