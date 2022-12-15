@@ -197,7 +197,7 @@ impl Parser {
 
                 params.push(ident);
 
-                if !self.matches(vec![TokenType::Comma]) || self.curr_token.token_type == token_end
+                if !self.matches(vec![TokenType::Comma, TokenType::SemiColon]) || self.curr_token.token_type == token_end
                 {
                     break;
                 }
@@ -470,6 +470,7 @@ impl Parser {
             while !self.check(TokenType::RightBrace) && !self.is_end() {
                 self.eat(TokenType::Fn, "Expected 'fun'")?;
                 methods.push(self.fun_expression(FunctionKind::Method(ident_token.value.clone()))?);
+                self.eat_optional(TokenType::SemiColon); // remove auto inserted semi colon
             }
 
             self.eat(TokenType::RightBrace, "Expected '}'")?;
