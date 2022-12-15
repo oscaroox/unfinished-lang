@@ -1,4 +1,4 @@
-use super::Token;
+use super::{Token, TokenType};
 
 
 
@@ -14,6 +14,7 @@ pub struct Scanner {
     mode: ScannerMode,
     line: usize,
     pos: usize,
+    last_token_type: TokenType,
     ch: char,
     checkpoint: usize,
 }
@@ -25,6 +26,7 @@ impl Scanner {
             mode: ScannerMode::Default,
             line: 0,
             pos: 0,
+            last_token_type: TokenType::EOF,
             ch: '\0',
             checkpoint: 0,
         };
@@ -97,14 +99,19 @@ impl Scanner {
         self.source[pos]
     }
 
-    fn skip_whitespace(&mut self) {
-        while !self.is_end() && self.is_whitespace(self.ch) || self.is_newline(self.ch) {
+
+
+    fn skip_whitespace(&mut self, skip_newline: bool) {
+        while !self.is_end() && 
+        self.is_whitespace(self.ch) || 
+        (skip_newline && self.is_newline(self.ch)) {
             if self.is_newline(self.ch) {
                 self.line += 1;
             }
             self.advance();
         }
     }
+
 
     fn read_digit(&mut self) -> Token {
         let mut res = vec![];
@@ -160,7 +167,6 @@ impl Scanner {
             "break" => Token::break_token(label),
             "continue" => Token::continue_token(label),
             "in" => Token::in_token(label),
-
             "int" => Token::int(label),
             "float" => Token::float(label),
             "bool" => Token::bool(label),
@@ -178,9 +184,40 @@ impl Scanner {
         }
     }
 
-    fn scan_normal(&mut self) -> Token {
-        self.skip_whitespace();
+    fn is_viable_terminator_statement(&mut self) -> bool {
+        match self.last_token_type {
+            TokenType::IntConst |
+            TokenType::FloatConst |
+            TokenType::True |
+            TokenType::False |
+            TokenType::Break |
+            TokenType::Continue |
+            TokenType::Return |
+            TokenType::RightParen |
+            TokenType::RightBrace |
+            TokenType::Identifier |
+            TokenType::DoubleQuote |
+            TokenType::RightBracket => true,
+            _ => false,
+        }
+    }
 
+    fn should_insert_semi_colon(&mut self) -> bool {
+        let insert = match self.ch {
+            '\n' | '\t' => self.is_viable_terminator_statement(),
+            _ => false
+        };
+
+        self.skip_whitespace(true);
+        insert
+    }
+
+    fn scan_normal(&mut self) -> Token {
+        if self.should_insert_semi_colon() {
+            self.last_token_type = TokenType::SemiColon;
+            return Token::auto_semi_colon();
+        }
+        
         let curr_ch = self.ch;
         let pos = self.pos;
 
@@ -236,8 +273,6 @@ impl Scanner {
                 } else if self.peek() == '*' {
                     while !self.is_end() {
                         self.advance();
-                        // let c = self.ch;
-                        // let peek = self.peek();
                         if self.ch == '*' && self.peek() == '/' {
                             break;
                         }
@@ -310,21 +345,36 @@ impl Scanner {
             ']' => Token::right_bracket(pos..self.pos),
             ',' => Token::comma(pos..self.pos),
             ';' => Token::semi_colon(pos..self.pos),
-            '\0' => Token::eof(pos..self.pos),
-            // '"' => self.read_string(),
+            '\0' => {
+                if self.is_viable_terminator_statement() {
+                    self.last_token_type = TokenType::EOF;
+                    return Token::auto_semi_colon();
+                } else {
+                    Token::eof(pos..self.pos)
+                }
+            },
             '"' => Token::double_quote(pos..self.pos),
             _ => {
-                if self.is_digit(curr_ch) {
-                    return self.read_digit();
+                let token = if self.is_digit(curr_ch) {
+                    self.read_digit()
                 } else if self.is_alpha(curr_ch) {
-                    return self.read_identifier();
+                    self.read_identifier()
                 } else {
                     Token::illegal(curr_ch.to_string(), pos..self.pos)
+                };
+
+                match token.token_type{
+                    TokenType::Illegal => token,
+                    _ => {
+                        self.last_token_type = token.token_type.clone();
+                        return token
+                    },
                 }
             }
         };
-
+        
         self.advance();
+        self.last_token_type = token.token_type.clone();
         token
     }
 
@@ -603,11 +653,7 @@ mod tests {
 
     #[test]
     fn scan_label() {
-        let src = r#"+
-let
-fun
-this_is_a_identifier
-1"#;
+        let src = r#"+ let fun this_is_a_identifier 1"#;
         let mut scanner = Scanner::new(src.to_string());
         let plus = scanner.next_token();
         let let_kw = scanner.next_token();
@@ -635,6 +681,7 @@ this_is_a_identifier
                 (TokenType::Minus, Some("-")),
                 (TokenType::IntConst, Some("1")),
                 (TokenType::IntConst, Some("1234567890")),
+                (TokenType::SemiColon, None),
                 (TokenType::EOF, None),
             ],
         );
@@ -672,23 +719,7 @@ this_is_a_identifier
             ],
         );
     }
-
-    // #[test]
-    // fn read_string() {
-    //     test_scan(
-    //         r#""this is a string" "";"#,
-    //         vec![
-    //             (TokenType::Quote, None),
-    //             (TokenType::StringConst, Some("this is a string")),
-    //             (TokenType::Quote, None),
-    //             (TokenType::StringConst, Some(" ")),
-    //             (TokenType::Quote, None),
-    //             (TokenType::Quote, None),
-    //             (TokenType::SemiColon, None),
-    //             (TokenType::EOF, None),
-    //         ],
-    //     );
-    // }
+    
 
     #[test]
     fn scan_identifiers() {
@@ -704,6 +735,7 @@ this_is_a_identifier
                 (TokenType::Identifier, Some("_test")),
                 (TokenType::Identifier, Some("abcdefghijklmnopqrstuvwxyz")),
                 (TokenType::Identifier, Some("ABCDEFGHIJKLMNOPQRSTUVWXYZ")),
+                (TokenType::SemiColon, None),
                 (TokenType::EOF, None),
             ],
         );
@@ -783,5 +815,130 @@ this_is_a_identifier
                 (TokenType::EOF, None),
             ],
         );
+    }
+
+    #[test]
+    fn scan_automatic_semi_insertion() {
+
+        test_scan("
+        1
+        2.0
+        true
+        false
+        break
+        continue
+        return
+        )
+        }
+        ]
+        ", vec![
+            (TokenType::IntConst, Some("1")),
+            (TokenType::SemiColon, None),
+            (TokenType::FloatConst, Some("2.0")),
+            (TokenType::SemiColon, None),
+            (TokenType::True, None),
+            (TokenType::SemiColon, None),
+            (TokenType::False, None),
+            (TokenType::SemiColon, None),
+            (TokenType::Break, None),
+            (TokenType::SemiColon, None),
+            (TokenType::Continue, None),
+            (TokenType::SemiColon, None),
+            (TokenType::Return, None),
+            (TokenType::SemiColon, None),
+            (TokenType::RightParen, None),
+            (TokenType::SemiColon, None),
+            (TokenType::RightBrace, None),
+            (TokenType::SemiColon, None),
+            (TokenType::RightBracket, None),
+            (TokenType::SemiColon, None),
+            (TokenType::EOF, None)
+        ]);
+
+        test_scan(
+        "
+        let x = 2
+        x
+        ", 
+        vec![
+            (TokenType::Let, None),
+            (TokenType::Identifier, Some("x")),
+            (TokenType::Assign, None),
+            (TokenType::IntConst, Some("2")),
+            (TokenType::SemiColon, None),
+            (TokenType::Identifier, Some("x")),
+            (TokenType::SemiColon, None),
+            (TokenType::EOF, None),
+        ])
+    }
+
+    #[test]
+    fn scan_autmatic_insertion_eof() {
+        test_scan("
+        let x = 1
+        x", vec![
+            (TokenType::Let, None),
+            (TokenType::Identifier, Some("x")),
+            (TokenType::Assign, None),
+            (TokenType::IntConst, Some("1")),
+            (TokenType::SemiColon, None),
+            (TokenType::Identifier, Some("x")),
+            (TokenType::SemiColon, None),
+            (TokenType::EOF, None),
+        ]);
+    }
+
+    #[test]
+    fn scan_automatic_semi_insertion_strings() {
+
+        let src = r#"
+        let x = "testing123"
+        x
+        "#;
+
+        let mut scanner = Scanner::new(src.to_string());
+
+        let tok = scanner.next_token(); // let
+        assert_eq!(tok.token_type, TokenType::Let);
+
+        let tok = scanner.next_token(); // x
+        assert_eq!(tok.token_type, TokenType::Identifier);
+
+
+        let tok = scanner.next_token(); // =
+        assert_eq!(tok.token_type, TokenType::Assign);
+
+
+        let tok = scanner.next_token(); // "
+        assert_eq!(tok.token_type, TokenType::DoubleQuote);
+
+        // set scanner mode to parse strings
+        if tok.token_type == TokenType::DoubleQuote {
+            scanner.set_mode(ScannerMode::String);
+        }
+
+        let tok = scanner.next_token();
+
+        assert_eq!(tok.token_type, TokenType::StringConst);
+        assert_eq!(tok.value, String::from("testing123"));
+
+        scanner.set_mode(ScannerMode::Default);
+
+        let tok = scanner.next_token(); // "
+        assert_eq!(tok.token_type, TokenType::DoubleQuote);
+
+        
+        let tok = scanner.next_token(); // auto insert semi
+        assert_eq!(tok.token_type, TokenType::SemiColon);
+
+        let tok = scanner.next_token(); // x
+        assert_eq!(tok.token_type, TokenType::Identifier);
+
+        let tok = scanner.next_token();
+        assert_eq!(tok.token_type, TokenType::SemiColon);
+
+        let tok = scanner.next_token();
+        assert_eq!(tok.token_type, TokenType::EOF);
+
     }
 }
