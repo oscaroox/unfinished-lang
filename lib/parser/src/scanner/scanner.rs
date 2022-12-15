@@ -12,9 +12,9 @@ pub enum ScannerMode {
 pub struct Scanner {
     source: Vec<char>,
     mode: ScannerMode,
+    insert_semi: bool,
     line: usize,
     pos: usize,
-    last_token_type: TokenType,
     ch: char,
     checkpoint: usize,
 }
@@ -24,9 +24,9 @@ impl Scanner {
         let mut scanner = Scanner {
             source: source.chars().collect(),
             mode: ScannerMode::Default,
+            insert_semi: false,
             line: 0,
             pos: 0,
-            last_token_type: TokenType::EOF,
             ch: '\0',
             checkpoint: 0,
         };
@@ -99,12 +99,8 @@ impl Scanner {
         self.source[pos]
     }
 
-
-
-    fn skip_whitespace(&mut self, skip_newline: bool) {
-        while !self.is_end() && 
-        self.is_whitespace(self.ch) || 
-        (skip_newline && self.is_newline(self.ch)) {
+    fn skip_whitespace(&mut self) {
+        while !self.is_end() && self.is_whitespace(self.ch) || self.is_newline(self.ch) {
             if self.is_newline(self.ch) {
                 self.line += 1;
             }
@@ -121,24 +117,24 @@ impl Scanner {
             self.advance();
         }
 
-        if self.ch == '.' {
-            res.push(self.ch);
-            self.advance();
-
-            while !self.is_end() && self.is_digit(self.ch) {
+        match self.ch {
+            '.' => {
                 res.push(self.ch);
                 self.advance();
-            }
-            if let Some(last) = res.last() {
-                if *last == '.' {
-                    res.push('0')
+    
+                while !self.is_end() && self.is_digit(self.ch) {
+                    res.push(self.ch);
+                    self.advance();
                 }
+                if let Some(last) = res.last() {
+                    if *last == '.' {
+                        res.push('0')
+                    }
+                }
+                Token::float_const(res.into_iter().collect(), pos..self.pos)
             }
-
-            return Token::float_const(res.into_iter().collect(), pos..self.pos);
+            _ => Token::int_const(res.into_iter().collect(), pos..self.pos)
         }
-
-        Token::int_const(res.into_iter().collect(), pos..self.pos)
     }
 
     fn read_identifier(&mut self) -> Token {
@@ -157,16 +153,16 @@ impl Scanner {
             "fn" => Token::fn_token(label),
             "if" => Token::if_token(label),
             "else" => Token::else_token(label),
-            "true" => Token::true_token(label),
-            "false" => Token::false_token(label),
-            "return" => Token::return_token(label),
             "data" => Token::data(label),
             "null" => Token::null(label),
             "self" => Token::self_token(label),
             "loop" => Token::loop_token(label),
+            "in" => Token::in_token(label),
+            "true" => Token::true_token(label),
+            "false" => Token::false_token(label),
+            "return" => Token::return_token(label),
             "break" => Token::break_token(label),
             "continue" => Token::continue_token(label),
-            "in" => Token::in_token(label),
             "int" => Token::int(label),
             "float" => Token::float(label),
             "bool" => Token::bool(label),
@@ -184,39 +180,39 @@ impl Scanner {
         }
     }
 
-    fn is_viable_terminator_statement(&mut self) -> bool {
-        match self.last_token_type {
-            TokenType::IntConst |
-            TokenType::FloatConst |
-            TokenType::True |
-            TokenType::False |
-            TokenType::Break |
-            TokenType::Continue |
-            TokenType::Return |
-            TokenType::RightParen |
-            TokenType::RightBrace |
-            TokenType::Identifier |
-            TokenType::DoubleQuote |
-            TokenType::RightBracket => true,
-            _ => false,
-        }
-    }
-
-    fn should_insert_semi_colon(&mut self) -> bool {
-        let insert = match self.ch {
-            '\n' | '\t' => self.is_viable_terminator_statement(),
-            _ => false
+    fn try_insert_semi_colon(&mut self, token_type: &TokenType) {
+        match self.ch {
+            '\n' | '\t' | '\0' => match token_type {
+                TokenType::IntConst |
+                TokenType::FloatConst |
+                TokenType::True |
+                TokenType::False |
+                TokenType::Break |
+                TokenType::Continue |
+                TokenType::Return |
+                TokenType::RightParen |
+                TokenType::RightBrace |
+                TokenType::Identifier |
+                TokenType::DoubleQuote |
+                TokenType::RightBracket|
+                TokenType::Int |
+                TokenType::Float |
+                TokenType::Bool |
+                TokenType::String |
+                TokenType::Unit => self.insert_semi = true,
+                _ => {},
+            },
+            _ => {}
         };
-
-        self.skip_whitespace(true);
-        insert
     }
 
     fn scan_normal(&mut self) -> Token {
-        if self.should_insert_semi_colon() {
-            self.last_token_type = TokenType::SemiColon;
+        if self.insert_semi {
+            self.insert_semi = false;
             return Token::auto_semi_colon();
         }
+
+        self.skip_whitespace();
         
         let curr_ch = self.ch;
         let pos = self.pos;
@@ -345,15 +341,10 @@ impl Scanner {
             ']' => Token::right_bracket(pos..self.pos),
             ',' => Token::comma(pos..self.pos),
             ';' => Token::semi_colon(pos..self.pos),
-            '\0' => {
-                if self.is_viable_terminator_statement() {
-                    self.last_token_type = TokenType::EOF;
-                    return Token::auto_semi_colon();
-                } else {
-                    Token::eof(pos..self.pos)
-                }
+            '\0' => Token::eof(pos..self.pos),
+            '"' => {
+                Token::double_quote(pos..self.pos)
             },
-            '"' => Token::double_quote(pos..self.pos),
             _ => {
                 let token = if self.is_digit(curr_ch) {
                     self.read_digit()
@@ -363,18 +354,20 @@ impl Scanner {
                     Token::illegal(curr_ch.to_string(), pos..self.pos)
                 };
 
-                match token.token_type{
+                match token.token_type {
                     TokenType::Illegal => token,
                     _ => {
-                        self.last_token_type = token.token_type.clone();
-                        return token
-                    },
+                        self.try_insert_semi_colon(&token.token_type);
+                        return token;
+                    }
                 }
             }
         };
         
         self.advance();
-        self.last_token_type = token.token_type.clone();
+
+        self.try_insert_semi_colon(&token.token_type);
+
         token
     }
 
@@ -466,7 +459,7 @@ mod tests {
     }
 
     #[test]
-    fn backtracking() {
+    fn scan_with_backtracking() {
         let src = "let fn hello;";
         let mut scanner = Scanner::new(src.to_string());
 
@@ -823,11 +816,17 @@ mod tests {
         test_scan("
         1
         2.0
+        x
         true
         false
         break
         continue
         return
+        int
+        float
+        bool
+        string
+        unit
         )
         }
         ]
@@ -835,6 +834,8 @@ mod tests {
             (TokenType::IntConst, Some("1")),
             (TokenType::SemiColon, None),
             (TokenType::FloatConst, Some("2.0")),
+            (TokenType::SemiColon, None),
+            (TokenType::Identifier, Some("x")),
             (TokenType::SemiColon, None),
             (TokenType::True, None),
             (TokenType::SemiColon, None),
@@ -845,6 +846,16 @@ mod tests {
             (TokenType::Continue, None),
             (TokenType::SemiColon, None),
             (TokenType::Return, None),
+            (TokenType::SemiColon, None),
+            (TokenType::Int, None),
+            (TokenType::SemiColon, None),
+            (TokenType::Float, None),
+            (TokenType::SemiColon, None),
+            (TokenType::Bool, None),
+            (TokenType::SemiColon, None),
+            (TokenType::String, None),
+            (TokenType::SemiColon, None),
+            (TokenType::Unit, None),
             (TokenType::SemiColon, None),
             (TokenType::RightParen, None),
             (TokenType::SemiColon, None),
@@ -873,7 +884,35 @@ mod tests {
     }
 
     #[test]
-    fn scan_autmatic_insertion_eof() {
+    fn scan_automatic_semi_insertion_types() {
+        test_scan("
+        let x: int
+        let y: int
+        let n: string
+        ", vec![
+            (TokenType::Let, None),
+            (TokenType::Identifier, Some("x")),
+            (TokenType::Colon, None),
+            (TokenType::Int, None),
+            (TokenType::SemiColon, None),
+
+            (TokenType::Let, None),
+            (TokenType::Identifier, Some("y")),
+            (TokenType::Colon, None),
+            (TokenType::Int, None),
+            (TokenType::SemiColon, None),
+
+            (TokenType::Let, None),
+            (TokenType::Identifier, Some("n")),
+            (TokenType::Colon, None),
+            (TokenType::String, None),
+            (TokenType::SemiColon, None),
+            (TokenType::EOF, None)
+        ])
+    }
+
+    #[test]
+    fn scan_automatic_insertion_eof() {
         test_scan("
         let x = 1
         x", vec![
