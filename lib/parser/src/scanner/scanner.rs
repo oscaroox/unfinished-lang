@@ -31,9 +31,9 @@ impl Scanner {
             checkpoint: 0,
         };
 
-        if scanner.source.len() > 0 {
-            scanner.ch = scanner.source[0];
-        }
+        scanner.ch = scanner.source.get(0)
+            .unwrap_or(&scanner.ch)
+            .to_owned();
         scanner
     }
 
