@@ -5,6 +5,7 @@ members = [
     "lib/typechecker",
     "lib/interpreter",
     "lib/parser",
+    "lib/parser_passes",
     "lib/span_util",
     "lib/type_core",
 ]

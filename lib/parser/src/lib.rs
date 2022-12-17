@@ -28,19 +28,19 @@ pub fn parse(source: &str) -> (Vec<Error>, Program) {
 
     let scanner = scanner::Scanner::new(source.to_string());
     let mut parser = parser::Parser::new(scanner);
-    let mut analyzer = SemanticAnalyzer::new();
+    // let mut analyzer = SemanticAnalyzer::new();
 
     let (ast, parser_errors) = parser.parse();
 
-    let analyzer_errors = analyzer.analyze(&ast);
+    // let analyzer_errors = analyzer.analyze(&ast);
 
     if !parser_errors.is_empty() {
         errors.push(Error::ParserError(parser_errors));
     }
 
-    if !analyzer_errors.is_empty() {
-        errors.push(Error::AnalyzerError(analyzer_errors));
-    }
+    // if !analyzer_errors.is_empty() {
+    //     errors.push(Error::AnalyzerError(analyzer_errors));
+    // }
 
     (errors, ast)
 }
