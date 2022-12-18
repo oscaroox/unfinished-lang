@@ -1,11 +1,11 @@
 use crate::ast;
 
-pub trait VisitableMut {
-    fn accept(&mut self, visitor: &mut impl VisitorMut);
+pub trait MutVisitable {
+    fn accept(&mut self, visitor: &mut impl MutVisitor);
 }
 
 
-pub trait VisitorMut {
+pub trait MutVisitor {
 
     fn visit_binop(&mut self, e: &mut ast::BinOp) {
         self.visit_expr(&mut e.left);

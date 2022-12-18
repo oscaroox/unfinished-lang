@@ -98,17 +98,11 @@ impl Visitor for SemanticAnalyzer {
 mod analyzer_test {
     use super::SemanticAnalyzer;
 
-
-    fn run(src: &str) -> SemanticAnalyzer {
+    fn analyze(src: &str, expected: Vec<&str>) {
         let mut ast = parser::parse_panic(src);
         let mut analyzer = SemanticAnalyzer::new();
         analyzer.run(&mut ast);
 
-        analyzer
-    }
-
-    fn analyze(src: &str, expected: Vec<&str>) {
-        let analyzer = run(src);
         let errors = analyzer.errors();
 
         if errors.len() != expected.len() {
