@@ -1,4 +1,5 @@
-use parser::ast::{self, Expression, Program};
+use parser::ast;
+use parser::visit::{Visitor, Visitable};
 
 #[derive(Debug, PartialEq)]
 enum Scope {
@@ -8,28 +9,25 @@ enum Scope {
     Method,
 }
 
-
 pub struct SemanticAnalyzer {
     errors: Vec<String>,
-    scopes: Vec<Scope>,
+    scopes: Vec<Scope>
 }
 
-
 impl SemanticAnalyzer {
-
     pub fn new() -> Self {
         SemanticAnalyzer { 
-            errors: vec![],
-            scopes: vec![],
+            errors: vec![], 
+            scopes: vec![Scope::TopLevel] 
         }
     }
 
-    pub fn run(&mut self, ast: &Program) {
-        for node in ast {
-            self.analyze(node)
+    pub fn run(&mut self, exprs: &mut ast::Program) {
+        for e in exprs {
+            e.accept(self)
         }
     }
-    
+
     fn add_error(&mut self, error: &str) {
         self.errors.push(error.into())
     }
@@ -37,59 +35,6 @@ impl SemanticAnalyzer {
     pub fn errors(&self) -> Vec<String> {
         self.errors.clone()
     } 
-
-    fn analyze(&mut self, expr: &Expression) {
-        match expr {
-            Expression::Block(expr) => {
-                self.run(&expr.exprs)
-            }
-            Expression::If(expr) => {
-                self.analyze(&expr.condition);
-                self.analyze(&expr.then);
-                if let Some(e) = &expr.not_then {
-                    self.analyze(e);
-                }
-            }
-            Expression::Function(expr) => {
-                self.scopes.push(Scope::Function);
-                self.analyze(&expr.body);
-                self.scopes.pop();
-            }
-            Expression::Let(expr) => {
-                if let Some(e) = &expr.value {
-                    self.analyze(e);
-                }
-            }
-            Expression::Grouping(expr) => {
-                self.analyze(&expr.expr);
-            }
-            Expression::Return(expr) => {
-                if let Some(e) = &*expr.value {
-                    self.analyze(e);
-                }
-
-                if !self.is_in_function_scope(vec![Scope::Function, Scope::Method]) {
-                    self.add_error("Cannot use return in top level")
-                } 
-            }
-            Expression::ContinueExpr(_) |
-            Expression::BreakExpr(_) => {
-                if !self.is_in_loop_scope(vec![Scope::Loop]) {
-                    self.add_error("Cannot use break and continue outside loop expression");
-                }
-            }
-            Expression::LoopExpr(expr) => {
-                self.analyze(&expr.condition);
-                if let Some(e) = &expr.iterator {
-                    self.analyze(e);
-                }
-                self.scopes.push(Scope::Loop);
-                self.analyze(&expr.body);
-                self.scopes.pop();
-            }
-            _ => {}
-        }
-    }
 
     fn is_in_function_scope(&self, scope: Vec<Scope>) -> bool {
         for s in self.scopes.iter().rev() {
@@ -100,15 +45,54 @@ impl SemanticAnalyzer {
         false
     }
 
-    fn is_in_loop_scope(&self, scope: Vec<Scope>) -> bool {
+    fn is_in_loop_scope(&self) -> bool {
         match self.scopes.len() {
             0 => false,
-            n => {
-                scope.contains(&self.scopes[n - 1])
-            }
+            n => self.scopes[n - 1] == Scope::Loop
         }
     }
 }
+
+impl Visitor for SemanticAnalyzer {
+    fn visit_function(&mut self, e: &ast::Function) {
+        self.scopes.push(Scope::Function);
+        self.visit_expr(&e.body);
+        self.scopes.pop();
+    }
+
+    fn visit_loop(&mut self, e: &ast::LoopExpr) {
+        self.scopes.push(Scope::Loop);
+        self.visit_expr(&e.condition);
+        self.visit_expr(&e.body);
+        if let Some(i) = &e.iterator {
+            self.visit_expr(i)
+        }
+        self.scopes.pop();
+    }
+
+    fn visit_break(&mut self, _e: &ast::BreakExpr) {
+        if !self.is_in_loop_scope() {
+            self.add_error("Cannot use break and continue outside loop expression")
+        }
+    }
+
+    fn visit_continue(&mut self, _e: &ast::ContinueExpr) {
+        if !self.is_in_loop_scope() {
+            self.add_error("Cannot use break and continue outside loop expression")
+        }
+    }
+
+    fn visit_return(&mut self, e: &ast::ReturnExpr) {
+        if !self.is_in_function_scope(vec![Scope::Function, Scope::Method]) {
+            self.add_error("Cannot use return in top level");
+        }
+
+        if let Some(e) = &*e.value {
+            self.visit_expr(e)
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod analyzer_test {
@@ -116,9 +100,9 @@ mod analyzer_test {
 
 
     fn run(src: &str) -> SemanticAnalyzer {
-        let ast = parser::parse_panic(src);
+        let mut ast = parser::parse_panic(src);
         let mut analyzer = SemanticAnalyzer::new();
-        analyzer.run(&ast);
+        analyzer.run(&mut ast);
 
         analyzer
     }
@@ -140,7 +124,6 @@ mod analyzer_test {
             assert_eq!(error, *expected_error)
         }
     }
-
 
     #[test]
     fn check_return() {
