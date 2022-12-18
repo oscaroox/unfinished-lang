@@ -2,20 +2,36 @@ mod passes;
 mod scanner;
 mod parser;
 mod parser_error;
+pub mod visit;
+pub mod visit_mut;
 pub mod ast;
 
 pub use crate::parser::*;
-use ast::Program;
+use ast::{Program, Expression};
 pub use passes::*;
 pub use parser_error::*;
 
 use semantic_analyzer::SemanticAnalyzer;
 use passes::errors::AnalyzerError;
+use visit::Visitable;
+use visit_mut::VisitableMut;
 
 
 pub enum Error {
     ParserError(Vec<ParserError>),
     AnalyzerError(Vec<AnalyzerError>),
+}
+
+impl Visitable for Expression {
+    fn accept(&mut self, visitor: &mut impl visit::Visitor) {
+        visitor.visit_expr(self)
+    }
+}
+
+impl VisitableMut for Expression {
+    fn accept(&mut self, visitor: &mut impl visit_mut::VisitorMut) {
+        visitor.visit_expr(self)
+    }
 }
 
 /**
