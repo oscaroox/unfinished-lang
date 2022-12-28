@@ -1,4 +1,4 @@
-use parser::ast;
+use ast;
 use parser::visit::*;
 
 use crate::errors::PassesError;

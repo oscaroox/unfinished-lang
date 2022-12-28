@@ -1,4 +1,3 @@
-use crate::scanner::{Token, TokenType};
 use span_util::Span;
 
 use super::Expression;
@@ -30,25 +29,6 @@ impl std::fmt::Display for LogicOperation {
     }
 }
 
-impl LogicOperation {
-    pub fn from_token(token: Token) -> LogicOperation {
-        match token.token_type {
-            TokenType::And => LogicOperation::And(token.span),
-            TokenType::Or => LogicOperation::Or(token.span),
-            TokenType::LessThan => LogicOperation::LessThan(token.span),
-            TokenType::LessThanEqual => LogicOperation::LessThanEqual(token.span),
-            TokenType::GreaterThan => LogicOperation::GreaterThan(token.span),
-            TokenType::GreaterThanEqual => LogicOperation::GreaterThanEqual(token.span),
-            TokenType::EqualEqual => LogicOperation::Equal(token.span),
-            TokenType::NotEqual => LogicOperation::NotEqual(token.span),
-
-            _ => panic!(
-                "Cannot convert from token type: {} to logic operation",
-                token.token_type
-            ),
-        }
-    }
-}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Logic {

@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc, collections::{HashMap, hash_map::Entry}};
 
 use crate::env::Env;
 use crate::type_error::TypeError;
-use parser::ast::{self, Expression, Function, Identifier};
+use ast::{self, Expression, Function, Identifier};
 use type_core::{DataStructField, DataStructMethod, Singleton, Type, FunctionParam};
 
 pub struct TypeChecker {

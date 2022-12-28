@@ -1,5 +1,5 @@
 use std::{collections::HashSet, hash::Hash};
-use parser::ast::Program;
+use ast::Program;
 use parser::mut_visit::{MutVisitor, MutVisitable, walk_block, walk_let, walk_assign};
 
 use crate::errors::PassesError;
@@ -36,12 +36,12 @@ impl NameResolver {
 
 impl MutVisitor for NameResolver {
 
-    fn visit_let(&mut self, e: &mut parser::ast::LetExpr) {
+    fn visit_let(&mut self, e: &mut ast::LetExpr) {
         self.scope_table.define(e.name.value.to_string());
         walk_let(self, e)
     }
 
-    fn visit_let_ref(&mut self, e: &mut parser::ast::LetRef) {
+    fn visit_let_ref(&mut self, e: &mut ast::LetRef) {
         let scope_distance = self.scope_table.resolve(&e.name.value);
         e.scope_distance = self.scope_table.resolve(&e.name.value);
 
@@ -50,12 +50,12 @@ impl MutVisitor for NameResolver {
         }
     }
 
-    fn visit_assign(&mut self, e: &mut parser::ast::Assign) {
+    fn visit_assign(&mut self, e: &mut ast::Assign) {
         walk_assign(self, e);
         e.scope_distance = self.scope_table.resolve(&e.name.value);
     }
 
-    fn visit_block(&mut self, e: &mut parser::ast::Block) {
+    fn visit_block(&mut self, e: &mut ast::Block) {
         self.scope_table.add_scope();
         walk_block(self, e);
         self.scope_table.pop_scope();
@@ -65,7 +65,7 @@ impl MutVisitor for NameResolver {
 
 #[cfg(test)]
 mod name_resolver_test {
-    use parser::ast::Program;
+    use ast::Program;
     use parser::test_utils::{create_let, int, create_function, unit_type, create_block, create_assign_with_scope, create_let_ref_with_scope};
     use pretty_assertions::assert_eq;
     use span_util::Span;

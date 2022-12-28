@@ -1,4 +1,5 @@
 use super::TokenType;
+use ast::{BinaryOperation, LogicOperation, UnaryOperation};
 use span_util::Span;
 use std::ops::Range;
 
@@ -136,6 +137,52 @@ impl Token {
 
     pub fn replace_span(&mut self, new_span: Span) {
         self.span = new_span;
+    }
+
+    pub fn to_binary_operator(&self) -> BinaryOperation {
+        let span = self.span.clone();
+        match self.token_type {
+            TokenType::Plus | TokenType::AssignPlus => BinaryOperation::Add(span),
+            TokenType::Minus | TokenType::AssignMinus => BinaryOperation::Subtract(span),
+            TokenType::Star | TokenType::AssignStar => BinaryOperation::Multiply(span),
+            TokenType::Slash | TokenType::AssignSlash => BinaryOperation::Divide(span),
+            _ => panic!(
+                "Cannot convert from token type: {} to binary operator",
+                self.token_type
+            ),
+        }
+    }
+
+    pub fn to_logic_operator(&self) -> LogicOperation {
+        let span = self.span.clone();
+        match self.token_type {
+            TokenType::And => LogicOperation::And(span),
+            TokenType::Or => LogicOperation::Or(span),
+            TokenType::LessThan => LogicOperation::LessThan(span),
+            TokenType::LessThanEqual => LogicOperation::LessThanEqual(span),
+            TokenType::GreaterThan => LogicOperation::GreaterThan(span),
+            TokenType::GreaterThanEqual => LogicOperation::GreaterThanEqual(span),
+            TokenType::EqualEqual => LogicOperation::Equal(span),
+            TokenType::NotEqual => LogicOperation::NotEqual(span),
+
+            _ => panic!(
+                "Cannot convert from token type: {} to logic operation",
+                self.token_type
+            ),
+        }
+    }
+
+    pub fn to_unary_operator(&self) -> UnaryOperation {
+        let span = self.span.clone();
+        match self.token_type {
+            TokenType::Plus => UnaryOperation::Plus(span),
+            TokenType::Minus => UnaryOperation::Minus(span),
+            TokenType::Bang => UnaryOperation::Not(span),
+            _ => panic!(
+                "Cannot convert from token type: {} to unary operation",
+                self.token_type
+            ),
+        }
     }
 }
 

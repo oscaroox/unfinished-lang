@@ -1,4 +1,4 @@
-use crate::ast;
+use ast;
 
 pub trait MutVisitable {
     fn accept(&mut self, visitor: &mut impl MutVisitor);

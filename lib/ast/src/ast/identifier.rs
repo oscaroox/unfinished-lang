@@ -1,4 +1,4 @@
-use crate::scanner::{TokenType};
+// use crate::scanner::{TokenType};
 
 use span_util::Span;
 
@@ -7,7 +7,7 @@ use type_core::Type;
 #[derive(Debug, PartialEq, Clone)]
 pub struct Identifier {
     pub value: String,
-    pub token_type: Option<TokenType>,
+    // pub token_type: Option<TokenType>,
     pub value_type: Option<Type>,
     pub span: Span,
 }
@@ -16,7 +16,7 @@ impl Identifier {
     pub fn new(value: String, span: Span) -> Identifier {
         Identifier {
             value,
-            token_type: None,
+            // token_type: None,
             value_type: None,
             span,
         }
@@ -24,23 +24,27 @@ impl Identifier {
 
     pub fn with_all(
         value: String,
-        token_type: TokenType,
+        // token_type: TokenType,
         value_type: Type,
         span: Span,
     ) -> Identifier {
         Identifier {
             value,
             value_type: Some(value_type),
-            token_type: Some(token_type),
+            // token_type: Some(token_type),
             span,
         }
     }
 
-    pub fn with_token_type(value: String, token_type: TokenType, span: Span) -> Identifier {
+    pub fn with_token_type(
+        value: String, 
+        // token_type: TokenType, 
+        span: Span
+    ) -> Identifier {
         Identifier {
             value,
             value_type: None,
-            token_type: Some(token_type),
+            // token_type: Some(token_type),
             span,
         }
     }
@@ -49,16 +53,17 @@ impl Identifier {
         Identifier {
             value,
             value_type,
-            token_type: None,
+            // token_type: None,
             span,
         }
     }
 
     pub fn is_self(&self) -> bool {
-        match &self.token_type {
-            Some(tt) => TokenType::SELF == *tt,
-            None => false,
-        }
+        self.value == "self"
+        // match &self.token_type {
+        //     Some(tt) => TokenType::SELF == *tt,
+        //     None => false,
+        // }
     }
 }
 

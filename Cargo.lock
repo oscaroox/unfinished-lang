@@ -14,6 +14,10 @@ dependencies = [
 [[package]]
 name = "ast"
 version = "0.1.0"
+dependencies = [
+ "span_util",
+ "type_core",
+]
 
 [[package]]
 name = "bitflags"
@@ -202,6 +206,7 @@ checksum = "25a2bc672d1148e28034f176e01fffebb08b35768468cc954630da77a1449005"
 name = "interpreter"
 version = "0.1.0"
 dependencies = [
+ "ast",
  "parser",
  "span_util",
  "type_core",
@@ -314,6 +319,7 @@ name = "parser"
 version = "0.1.0"
 dependencies = [
  "ariadne",
+ "ast",
  "span_util",
  "thiserror",
  "type_core",
@@ -324,6 +330,7 @@ name = "parser_passes"
 version = "0.1.0"
 dependencies = [
  "ariadne",
+ "ast",
  "id-arena",
  "parser",
  "pretty_assertions",
@@ -542,6 +549,7 @@ name = "typechecker"
 version = "0.1.0"
 dependencies = [
  "ariadne",
+ "ast",
  "parser",
  "span_util",
  "thiserror",

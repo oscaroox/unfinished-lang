@@ -14,6 +14,7 @@ test-utils = []
 thiserror = "1.0"
 ariadne = "0.1.5"
 
+ast = { path = "../ast" }
 span_util = { path = "../span_util" }
 type_core = { path = "../type_core" }
 

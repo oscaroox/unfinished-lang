@@ -1,7 +1,8 @@
 use span_util::Span;
 use type_core::{Type, FunctionParam};
 
-use crate::{ast::{Expression, Identifier, CallArgs, LiteralValue, BinaryOperation, UnaryOperation, LogicOperation}, scanner::TokenType};
+use crate::scanner::TokenType;
+use ast::{Expression, Identifier, CallArgs, LiteralValue, BinaryOperation, UnaryOperation, LogicOperation};
 
 pub fn create_let(id: &str, value: Option<Expression>) -> Expression {
     Expression::create_let(ident(id), value, Span::fake(), Span::fake())
@@ -58,7 +59,7 @@ pub fn ident_type(val: &str, value_type: Type) -> Identifier {
 pub fn ident_self(r#type: &str) -> Identifier {
     Identifier {
         value: "self".to_string(),
-        token_type: Some(TokenType::SELF),
+        // token_type: Some(TokenType::SELF),
         value_type: Some(Type::Identifier(r#type.into())),
         span: Span::fake(),
     }

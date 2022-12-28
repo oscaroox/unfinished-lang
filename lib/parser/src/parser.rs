@@ -1,5 +1,5 @@
 use crate::ParserError;
-use crate::ast::{
+use ast::{
     BinaryOperation, DataStructInstanceField, Expression, Identifier, LiteralValue, LogicOperation,
     Program, UnaryOperation, CallArgs,
 };
@@ -516,7 +516,7 @@ impl Parser {
                     is_static = false;
                     params.push(Identifier::with_all(
                         token.value,
-                        token.token_type,
+                        // token.token_type,
                         Type::Identifier(data_struct_identifier),
                         token.span,
                     ));
@@ -667,7 +667,7 @@ impl Parser {
                             let_ref.name.clone(),
                             Expression::create_binop(
                                 Expression::create_let_ref(let_ref.name.clone(), rhs_span.clone(), None),
-                                BinaryOperation::from_token(assignment_tok.clone()),
+                                assignment_tok.to_binary_operator(),
                                 rhs,
                                 rhs_span,
                             ),
@@ -691,7 +691,7 @@ impl Parser {
                             *idx.index.clone(),
                             Expression::create_binop(
                                 expr,
-                                BinaryOperation::from_token(assignment_tok.clone()),
+                                assignment_tok.to_binary_operator(),
                                 rhs,
                                 rhs_span,
                             ),
@@ -714,7 +714,7 @@ impl Parser {
                             get.name.clone(),
                             Expression::create_binop(
                                 expr,
-                                BinaryOperation::from_token(assignment_tok.clone()),
+                                assignment_tok.to_binary_operator(),
                                 rhs,
                                 rhs_span,
                             ),
@@ -735,7 +735,7 @@ impl Parser {
             let op = self.prev_token.clone();
             let rhs = self.and()?;
             let span = expr.get_span().extend(rhs.get_span());
-            expr = Expression::create_logic(expr, LogicOperation::from_token(op), rhs, span);
+            expr = Expression::create_logic(expr, op.to_logic_operator(), rhs, span);
         }
 
         Ok(expr)
@@ -747,7 +747,7 @@ impl Parser {
             let op = self.prev_token.clone();
             let rhs = self.equality()?;
             let span = expr.get_span().extend(rhs.get_span());
-            expr = Expression::create_logic(expr, LogicOperation::from_token(op), rhs, span);
+            expr = Expression::create_logic(expr, op.to_logic_operator(), rhs, span);
         }
 
         Ok(expr)
@@ -760,7 +760,7 @@ impl Parser {
             let rhs = self.comparison()?;
             let span = expr.get_span().extend(rhs.get_span());
 
-            expr = Expression::create_logic(expr, LogicOperation::from_token(op), rhs, span);
+            expr = Expression::create_logic(expr, op.to_logic_operator(), rhs, span);
         }
         Ok(expr)
     }
@@ -777,7 +777,7 @@ impl Parser {
             let rhs = self.term()?;
             let span = expr.get_span().extend(rhs.get_span());
 
-            expr = Expression::create_logic(expr, LogicOperation::from_token(op), rhs, span);
+            expr = Expression::create_logic(expr, op.to_logic_operator(), rhs, span);
         }
         Ok(expr)
     }
@@ -789,7 +789,7 @@ impl Parser {
             let rhs = self.factor()?;
             let span = expr.get_span().extend(rhs.get_span());
 
-            let op = BinaryOperation::from_token(tok);
+            let op = tok.to_binary_operator();
             expr = Expression::create_binop(expr, op, rhs, span)
         }
 
@@ -803,7 +803,7 @@ impl Parser {
             let tok = self.prev_token.clone();
             let rhs = self.unary()?;
             let span = expr.get_span().extend(rhs.get_span());
-            let op = BinaryOperation::from_token(tok);
+            let op = tok.to_binary_operator();
             expr = Expression::create_binop(expr, op, rhs, span)
         }
         Ok(expr)
@@ -814,7 +814,7 @@ impl Parser {
             let tok = self.prev_token.clone();
             let rhs = self.unary()?;
             let span: Span = tok.span.extend(rhs.get_span());
-            let op = UnaryOperation::from_token(tok);
+            let op = tok.to_unary_operator();
 
             return Ok(Expression::create_unaryop(op, rhs, span));
         }

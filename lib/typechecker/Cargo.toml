@@ -10,6 +10,7 @@ edition = "2018"
 parser = { path = "../parser" }
 span_util = { path = "../span_util" }
 type_core = { path = "../type_core" }
+ast = { path = "../ast" }
 
 thiserror = "1.0"
 ariadne = "0.1.5"

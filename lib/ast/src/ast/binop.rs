@@ -1,8 +1,5 @@
 
 use span_util::Span;
-
-use crate::scanner::{Token, TokenType};
-
 use super::Expression;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -27,20 +24,6 @@ impl std::fmt::Display for BinaryOperation {
     }
 }
 
-impl BinaryOperation {
-    pub fn from_token(token: Token) -> BinaryOperation {
-        match token.token_type {
-            TokenType::Plus | TokenType::AssignPlus => BinaryOperation::Add(token.span),
-            TokenType::Minus | TokenType::AssignMinus => BinaryOperation::Subtract(token.span),
-            TokenType::Star | TokenType::AssignStar => BinaryOperation::Multiply(token.span),
-            TokenType::Slash | TokenType::AssignSlash => BinaryOperation::Divide(token.span),
-            _ => panic!(
-                "Cannot convert from token type: {} to binary operation",
-                token.token_type
-            ),
-        }
-    }
-}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct BinOp {

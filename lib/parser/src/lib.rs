@@ -3,11 +3,12 @@ mod parser;
 mod parser_error;
 pub mod visit;
 pub mod mut_visit;
-pub mod ast;
+
 #[cfg(feature = "test-utils")]
 pub mod test_utils;
 
 pub use crate::parser::*;
+
 use ast::{Program, Expression};
 pub use parser_error::*;
 use visit::Visitable;
