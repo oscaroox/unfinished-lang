@@ -1,8 +1,7 @@
 mod scanner;
 mod parser;
 mod parser_error;
-pub mod visit;
-pub mod mut_visit;
+
 
 #[cfg(feature = "test-utils")]
 pub mod test_utils;
@@ -11,22 +10,7 @@ pub use crate::parser::*;
 
 use ast::{Program, Expression};
 pub use parser_error::*;
-use visit::Visitable;
-use mut_visit::MutVisitable;
 
-
-
-impl Visitable for Expression {
-    fn accept(&mut self, visitor: &mut impl visit::Visitor) {
-        visitor.visit_expr(self)
-    }
-}
-
-impl MutVisitable for Expression {
-    fn accept(&mut self, visitor: &mut impl mut_visit::MutVisitor) {
-        visitor.visit_expr(self)
-    }
-}
 
 /**
  * Parse the input string and returns a tuple with errors and AST

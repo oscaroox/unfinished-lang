@@ -1,6 +1,6 @@
 use std::{collections::HashSet, hash::Hash};
 use ast::Program;
-use parser::mut_visit::{MutVisitor, MutVisitable, walk_block, walk_let, walk_assign};
+use ast::mut_visit::{MutVisitor, MutVisitable, walk_block, walk_let, walk_assign};
 
 use crate::errors::PassesError;
 use crate::scope_table::ScopeTable;
