@@ -6,7 +6,7 @@ members = [
     "lib/ast",
     "lib/interpreter",
     "lib/parser",
-    "lib/parser_passes",
+    "lib/ast_passes",
     "lib/span_util",
     "lib/type_core",
 ]

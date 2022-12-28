@@ -20,6 +20,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ast_passes"
+version = "0.1.0"
+dependencies = [
+ "ariadne",
+ "ast",
+ "id-arena",
+ "parser",
+ "pretty_assertions",
+ "span_util",
+ "thiserror",
+]
+
+[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -323,19 +336,6 @@ dependencies = [
  "span_util",
  "thiserror",
  "type_core",
-]
-
-[[package]]
-name = "parser_passes"
-version = "0.1.0"
-dependencies = [
- "ariadne",
- "ast",
- "id-arena",
- "parser",
- "pretty_assertions",
- "span_util",
- "thiserror",
 ]
 
 [[package]]

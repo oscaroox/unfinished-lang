@@ -1,5 +1,5 @@
 [package]
-name = "parser_passes"
+name = "ast_passes"
 version = "0.1.0"
 edition = "2021"
 
