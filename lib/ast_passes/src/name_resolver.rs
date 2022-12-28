@@ -1,4 +1,3 @@
-use std::{collections::HashSet, hash::Hash};
 use ast::Program;
 use ast::mut_visit::{MutVisitor, MutVisitable, walk_block, walk_let, walk_assign};
 

@@ -1,7 +1,7 @@
 use crate::ParserError;
 use ast::{
-    BinaryOperation, DataStructInstanceField, Expression, Identifier, LiteralValue, LogicOperation,
-    Program, UnaryOperation, CallArgs,
+    BinaryOperation, DataStructInstanceField, Expression, Identifier, LiteralValue, 
+    Program, CallArgs,
 };
 use crate::scanner::{Scanner, ScannerMode, Token, TokenType};
 use span_util::Span;
@@ -1116,11 +1116,7 @@ pub mod parser_tests {
     use crate::ParserError;
     use crate::test_utils::*;
     use super::Parser;
-
-    use super::{
-        BinaryOperation,
-        LogicOperation, Program, UnaryOperation, 
-    };
+    use ast::{BinaryOperation, UnaryOperation, LogicOperation, Program};
     use crate::scanner::{Scanner, Token};
 
     

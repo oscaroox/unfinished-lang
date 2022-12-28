@@ -5,7 +5,7 @@ let Result = enum<T>(
 
 }
 
-let Person! = data<T>(
+let Person! = data[T](
     id: int,
     name!: string,
     last_name!: string,
@@ -24,15 +24,7 @@ let Person! = data<T>(
 }
 
 
-
-
-
-
-
-
-
 let get_count = fn: promise[int] => promise.from(1)
-
 
 let main = async fn: promise[unit]   {
     let count = await get_count()

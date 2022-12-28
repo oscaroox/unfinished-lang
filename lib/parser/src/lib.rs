@@ -8,7 +8,7 @@ pub mod test_utils;
 
 pub use crate::parser::*;
 
-use ast::{Program, Expression};
+use ast::Program;
 pub use parser_error::*;
 
 
