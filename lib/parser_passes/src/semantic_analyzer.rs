@@ -1,7 +1,7 @@
 use parser::ast;
 use parser::visit::*;
 
-use crate::symbol_table::SymbolTable;
+use crate::errors::PassesError;
 
 
 #[derive(Debug, PartialEq)]
@@ -13,20 +13,15 @@ enum Scope {
 }
 
 pub struct SemanticAnalyzer {
-    errors: Vec<String>,
+    errors: Vec<PassesError>,
     scopes: Vec<Scope>,
-    symbol_table: SymbolTable,
 }
 
 impl SemanticAnalyzer {
     pub fn new() -> Self {
-        let mut symbol_table = SymbolTable::new();
-        symbol_table.add_scope(vec![]); // add toplevel scope
-
         SemanticAnalyzer { 
             errors: vec![], 
             scopes: vec![Scope::TopLevel],
-            symbol_table,
         }
     }
 
@@ -36,17 +31,13 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn add_error(&mut self, error: &str) {
-        self.errors.push(error.into())
+    fn add_error(&mut self, error: PassesError) {
+        self.errors.push(error)
     }
 
-    pub fn errors(&self) -> Vec<String> {
+    pub fn errors(&self) -> Vec<PassesError> {
         self.errors.clone()
     } 
-
-    pub fn symbol_table(&self) -> SymbolTable {
-        self.symbol_table.clone()
-    }
 
     fn is_in_function_scope(&self, scope: Vec<Scope>) -> bool {
         for s in self.scopes.iter().rev() {
@@ -68,24 +59,8 @@ impl SemanticAnalyzer {
 impl Visitor for SemanticAnalyzer {
     fn visit_function(&mut self, e: &ast::Function) {
         self.scopes.push(Scope::Function);
-        let symbols: Vec<String> = e.params.iter()
-            .map(|i|  i.value.to_string())
-            .collect();
-        self.symbol_table.add_scope(symbols);
         walk_function(self, e);
-        self.symbol_table.pop_scope();
         self.scopes.pop();
-    }
-
-    fn visit_block(&mut self, e: &ast::Block) {
-        self.symbol_table.add_scope(vec![]);
-        walk_block(self, e);
-        self.symbol_table.pop_scope();        
-    }
-
-    fn visit_let(&mut self, e: &ast::LetExpr) {
-       self.symbol_table.define(e.name.value.to_string());
-       walk_let(self, e);
     }
 
     fn visit_loop(&mut self, e: &ast::LoopExpr) {
@@ -94,21 +69,21 @@ impl Visitor for SemanticAnalyzer {
         self.scopes.pop();
     }
 
-    fn visit_break(&mut self, _e: &ast::BreakExpr) {
+    fn visit_break(&mut self, e: &ast::BreakExpr) {
         if !self.is_in_loop_scope() {
-            self.add_error("Cannot use break and continue outside loop expression")
+            self.add_error(PassesError::NoBreakOutsideLoop(e.span.clone()))
         }
     }
 
-    fn visit_continue(&mut self, _e: &ast::ContinueExpr) {
+    fn visit_continue(&mut self, e: &ast::ContinueExpr) {
         if !self.is_in_loop_scope() {
-            self.add_error("Cannot use break and continue outside loop expression")
+            self.add_error(PassesError::NoContinueOutsideLoop(e.span.clone()))
         }
     }
 
     fn visit_return(&mut self, e: &ast::ReturnExpr) {
         if !self.is_in_function_scope(vec![Scope::Function, Scope::Method]) {
-            self.add_error("Cannot use return in top level");
+            self.add_error(PassesError::NoTopLevelReturn(e.span.clone()));
         }
         walk_return(self, e);
     }
@@ -117,9 +92,13 @@ impl Visitor for SemanticAnalyzer {
 
 #[cfg(test)]
 mod analyzer_test {
+    use span_util::Span;
+
+    use crate::errors::PassesError;
+
     use super::SemanticAnalyzer;
 
-    fn analyze(src: &str, expected: Vec<&str>) -> SemanticAnalyzer {
+    fn analyze(src: &str, expected: Vec<PassesError>) -> SemanticAnalyzer {
         let mut ast = parser::parse_panic(src);
         let mut analyzer = SemanticAnalyzer::new();
         analyzer.run(&mut ast);
@@ -150,7 +129,7 @@ mod analyzer_test {
             return
         }
         ", vec![
-            "Cannot use return in top level"
+            PassesError::NoTopLevelReturn(Span::fake())
         ]);
     }
 
@@ -166,8 +145,8 @@ mod analyzer_test {
             }
             
         ", vec![
-            "Cannot use break and continue outside loop expression",
-            "Cannot use break and continue outside loop expression"
+            PassesError::NoContinueOutsideLoop(Span::fake()),
+            PassesError::NoContinueOutsideLoop(Span::fake()),
         ]);
     }
 
@@ -183,20 +162,8 @@ mod analyzer_test {
         }
         
     ", vec![
-        "Cannot use break and continue outside loop expression",
-        "Cannot use break and continue outside loop expression"
+        PassesError::NoBreakOutsideLoop(Span::fake()),
+        PassesError::NoBreakOutsideLoop(Span::fake()),
     ]);    
-    }
-
-    #[test]
-    fn check_name_resolution() {
-        let analyzer = analyze("
-        let x = 1
-        let main = fn {
-            let y = 2
-        }
-        ", vec![]);
-
-        println!("{:#?}", analyzer.symbol_table());
     }
 }
