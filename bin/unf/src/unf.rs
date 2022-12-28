@@ -1,6 +1,6 @@
 use crate::cli::{Cli, Commands};
 use ariadne::Source;
-use parser::ast::Program;
+use ast::Program;
 use clap::Parser as CParser;
 use interpreter::{Environment, Interpreter};
 use rustyline::error::ReadlineError;

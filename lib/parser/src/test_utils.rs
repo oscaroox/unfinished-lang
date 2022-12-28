@@ -1,7 +1,5 @@
 use span_util::Span;
 use type_core::{Type, FunctionParam};
-
-use crate::scanner::TokenType;
 use ast::{Expression, Identifier, CallArgs, LiteralValue, BinaryOperation, UnaryOperation, LogicOperation};
 
 pub fn create_let(id: &str, value: Option<Expression>) -> Expression {
