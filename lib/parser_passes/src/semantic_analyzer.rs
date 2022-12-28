@@ -1,5 +1,8 @@
 use parser::ast;
-use parser::visit::{Visitor, Visitable};
+use parser::visit::*;
+
+use crate::symbol_table::SymbolTable;
+
 
 #[derive(Debug, PartialEq)]
 enum Scope {
@@ -11,14 +14,19 @@ enum Scope {
 
 pub struct SemanticAnalyzer {
     errors: Vec<String>,
-    scopes: Vec<Scope>
+    scopes: Vec<Scope>,
+    symbol_table: SymbolTable,
 }
 
 impl SemanticAnalyzer {
     pub fn new() -> Self {
+        let mut symbol_table = SymbolTable::new();
+        symbol_table.add_scope(vec![]); // add toplevel scope
+
         SemanticAnalyzer { 
             errors: vec![], 
-            scopes: vec![Scope::TopLevel] 
+            scopes: vec![Scope::TopLevel],
+            symbol_table,
         }
     }
 
@@ -35,6 +43,10 @@ impl SemanticAnalyzer {
     pub fn errors(&self) -> Vec<String> {
         self.errors.clone()
     } 
+
+    pub fn symbol_table(&self) -> SymbolTable {
+        self.symbol_table.clone()
+    }
 
     fn is_in_function_scope(&self, scope: Vec<Scope>) -> bool {
         for s in self.scopes.iter().rev() {
@@ -56,17 +68,29 @@ impl SemanticAnalyzer {
 impl Visitor for SemanticAnalyzer {
     fn visit_function(&mut self, e: &ast::Function) {
         self.scopes.push(Scope::Function);
-        self.visit_expr(&e.body);
+        let symbols: Vec<String> = e.params.iter()
+            .map(|i|  i.value.to_string())
+            .collect();
+        self.symbol_table.add_scope(symbols);
+        walk_function(self, e);
+        self.symbol_table.pop_scope();
         self.scopes.pop();
+    }
+
+    fn visit_block(&mut self, e: &ast::Block) {
+        self.symbol_table.add_scope(vec![]);
+        walk_block(self, e);
+        self.symbol_table.pop_scope();        
+    }
+
+    fn visit_let(&mut self, e: &ast::LetExpr) {
+       self.symbol_table.define(e.name.value.to_string());
+       walk_let(self, e);
     }
 
     fn visit_loop(&mut self, e: &ast::LoopExpr) {
         self.scopes.push(Scope::Loop);
-        self.visit_expr(&e.condition);
-        self.visit_expr(&e.body);
-        if let Some(i) = &e.iterator {
-            self.visit_expr(i)
-        }
+        walk_loop(self, e);
         self.scopes.pop();
     }
 
@@ -86,10 +110,7 @@ impl Visitor for SemanticAnalyzer {
         if !self.is_in_function_scope(vec![Scope::Function, Scope::Method]) {
             self.add_error("Cannot use return in top level");
         }
-
-        if let Some(e) = &*e.value {
-            self.visit_expr(e)
-        }
+        walk_return(self, e);
     }
 }
 
@@ -98,7 +119,7 @@ impl Visitor for SemanticAnalyzer {
 mod analyzer_test {
     use super::SemanticAnalyzer;
 
-    fn analyze(src: &str, expected: Vec<&str>) {
+    fn analyze(src: &str, expected: Vec<&str>) -> SemanticAnalyzer {
         let mut ast = parser::parse_panic(src);
         let mut analyzer = SemanticAnalyzer::new();
         analyzer.run(&mut ast);
@@ -117,6 +138,8 @@ mod analyzer_test {
         for (expected_error, error) in errors.iter().zip(expected) {
             assert_eq!(error, *expected_error)
         }
+
+        analyzer
     }
 
     #[test]
@@ -128,7 +151,7 @@ mod analyzer_test {
         }
         ", vec![
             "Cannot use return in top level"
-        ])
+        ]);
     }
 
     #[test]
@@ -145,7 +168,7 @@ mod analyzer_test {
         ", vec![
             "Cannot use break and continue outside loop expression",
             "Cannot use break and continue outside loop expression"
-        ])
+        ]);
     }
 
     #[test]
@@ -162,7 +185,18 @@ mod analyzer_test {
     ", vec![
         "Cannot use break and continue outside loop expression",
         "Cannot use break and continue outside loop expression"
-    ])    
+    ]);    
     }
 
+    #[test]
+    fn check_name_resolution() {
+        let analyzer = analyze("
+        let x = 1
+        let main = fn {
+            let y = 2
+        }
+        ", vec![]);
+
+        println!("{:#?}", analyzer.symbol_table());
+    }
 }
