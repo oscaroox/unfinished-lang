@@ -84,33 +84,23 @@ impl Unf {
         rustyline::Result::Ok(())
     }
 
-    fn parser_errors_into_reports(&mut self, errors: parser::Error) -> Vec<ariadne::Report> {
-       match errors {
-            parser::Error::ParserError(e) => 
-                e.iter()
-                .map(|e| e.clone().into_report())
-                .collect(),
-            parser::Error::AnalyzerError(e) => 
-                e.iter()
-                .map(|e| e.clone().into_report())
-                .collect(),
-        }
-    }
 
     pub fn run_contents(&mut self, source: String) -> Result<Program, String> {
         let mut type_checker = TypeChecker::new();
-        let (errors, exprs) = parser::parse(&source);
+        let (exprs, errors) = parser::parse(&source);
         
         if !errors.is_empty() {
-            for err in errors {
-                let reports = self.parser_errors_into_reports(err);
-                for report in reports {
-                    match report.print(Source::from(source.to_string())) {
-                        Ok(_) => {}
-                        Err(err) => println!("{}", err),
-                    }
+            let reports: Vec<ariadne::Report> = errors.iter()
+            .map(|e| e.clone().into_report())
+            .collect();
+                
+            for report in reports {
+                match report.print(Source::from(source.to_string())) {
+                    Ok(_) => {}
+                    Err(err) => println!("{}", err),
                 }
             }
+
             return Err("Parser error".to_string());
         }
 

@@ -1,0 +1,71 @@
+let Result = enum<T>(
+    Some(T)
+    None
+) impl Training {
+
+}
+
+let Person! = data<T>(
+    id: int,
+    name!: string,
+    last_name!: string,
+) impl Training, Person, Equal, Init where T: Person {
+
+    fn new!(fields: ...data(Person)): Person => 
+        Person(...fields)    
+
+    fn equal!(self, other: Person): bool {
+        self.id == other.id && self.name == other.name && self.last_name = other.last_name
+    }
+
+    fn init!() -> Person {
+        Person(id: 1, name: "", last_name: "")
+    }
+}
+
+
+
+
+
+
+
+
+
+let get_count = fn: promise[int] => promise.from(1)
+
+
+let main = async fn: promise[unit]   {
+    let count = await get_count()
+
+    let p: int;
+
+    let person: Person;
+
+    let sql = $sql(
+        SELECT * FROM table WHERE id = :id
+    );
+
+    $view(
+        <div>
+            { person.id }
+        </div>
+    )
+
+    $css(
+
+    )
+
+    let p1 = Person(name: "oscar", last_name: "druiventak")
+    let p2 = Person(name: "oscar", last_name: "druiventak")
+
+    p1 == p2
+}
+
+
+
+type Training = {
+    fn get_count(self) {
+
+    }
+}
+
