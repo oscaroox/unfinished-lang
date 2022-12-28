@@ -10,5 +10,11 @@
     "ttype",
     "typechecker",
     "unaryop"
-  ]
+  ],
+  "rust-analyzer.cargo.features": [
+    "parser/test-utils"
+  ],
+  "files.associations": {
+    "*.yaml": "home-assistant"
+  }
 }
