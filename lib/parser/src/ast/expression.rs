@@ -121,16 +121,17 @@ impl Expression {
         Expression::Literal(Literal { value, span })
     }
 
-    pub fn create_assign(name: Identifier, rhs: Expression, span: Span) -> Expression {
+    pub fn create_assign(name: Identifier, rhs: Expression, span: Span, scope_index: Option<usize>) -> Expression {
         Expression::Assign(Assign {
             name,
+            scope_distance: scope_index,
             rhs: Box::new(rhs),
             span,
         })
     }
 
-    pub fn create_let_ref(ident: Identifier, span: Span) -> Expression {
-        Expression::LetRef(LetRef { name: ident, span })
+    pub fn create_let_ref(ident: Identifier, span: Span, scope_index: Option<usize>) -> Expression {
+        Expression::LetRef(LetRef { name: ident, span, scope_distance: scope_index })
     }
 
     pub fn create_unaryop(op: UnaryOperation, rhs: Expression, span: Span) -> Expression {
@@ -261,7 +262,7 @@ impl Expression {
     }
 
     pub fn create_block(exprs: Vec<Expression>, span: Span) -> Expression {
-        Expression::Block(Block { exprs, span })
+        Expression::Block(Block { exprs, span, })
     }
 
     pub fn create_return(
@@ -363,7 +364,7 @@ impl Expression {
             Expression::SelfExpr(s) => s.span.clone(),
             Expression::LoopExpr(s) => s.span.clone(),
             Expression::BreakExpr(s) => s.span.clone(),
-            Expression::ContinueExpr(s) => s.span.clone(),
+            Expression::ContinueExpr(s) => s.span.clone()
         }
     }
 }
