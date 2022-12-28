@@ -280,7 +280,7 @@ impl Parser {
 
     fn let_expression(&mut self) -> ParserResult {
         let let_token = self.prev_token.clone();
-        let ident = self.curr_token.clone();
+        let _ident = self.curr_token.clone();
         let identifier = self.eat(TokenType::Identifier, "Expected identifier")?;
 
         let has_colon = self.eat_optional(TokenType::Colon);
@@ -320,10 +320,6 @@ impl Parser {
                 }
             };
             init = Some(expr);
-        }
-
-        if itype.is_none() && init.is_none() {
-            return Err(ParserError::TypeAnnotationNeeded(ident));
         }
 
         let span: Span = let_token.span.extend(self.curr_token.span.clone());
@@ -1343,7 +1339,6 @@ pub mod parser_tests {
     fn parse_type_error_let_expr() {
         parse_error(
             "
-            let name;
             let name: +;
             let name: 123 = 2;
             let name: @23432 = 2;
@@ -1352,10 +1347,6 @@ pub mod parser_tests {
             let name: int] ;
         ",
             vec![
-                ParserError::TypeAnnotationNeeded(Token::identifier(
-                    "name".into(),
-                    Span::fake().into(),
-                )),
                 ParserError::InvalidType(Token::plus(Span::fake().into())),
                 ParserError::InvalidType(Token::int_const("123".into(), Span::fake().into())),
                 ParserError::InvalidType(Token::illegal("@".into(), Span::fake().into())),

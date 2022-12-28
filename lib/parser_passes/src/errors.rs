@@ -7,12 +7,10 @@ use thiserror::Error;
 pub enum PassesError {
 
     // name resolver errors
-
     #[error("cannot find value '{0}'")]
     CannotFindValue(String, Span),
     
-
-    // analyzer errors
+    // semantic analyzer errors
     #[error("Cannot use return in top-level code")]
     NoTopLevelReturn(Span),
     #[error("Cannot use break outside loop expression")]
@@ -23,7 +21,8 @@ pub enum PassesError {
     NoSelfOutsideMethod(Span),
     #[error("Cannot use named arguments with positional arguments")]
     NoUsePositionalWithNamedArgs(Span),
-    
+    #[error("Type annotation needed")]
+    TypeAnnotationNeeded(Span),
 }
 
 impl PassesError {
@@ -35,7 +34,8 @@ impl PassesError {
             | Self::NoContinueOutsideLoop(span)
             | Self::NoSelfOutsideMethod(span)
             | Self::NoUsePositionalWithNamedArgs(span)
-            | Self::NoTopLevelReturn(span) => {
+            | Self::NoTopLevelReturn(span)
+            | Self::TypeAnnotationNeeded(span) => {
                 let label = Label::new(span.to_range());
                 Report::build(ReportKind::Error, (), 99)
                     .with_message("Parser Error")

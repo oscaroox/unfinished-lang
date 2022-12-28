@@ -33,9 +33,6 @@ pub enum ParserError {
 
     #[error("Invalid type '{0}'")]
     InvalidType(Token),
-
-    #[error("Type annotation needed")]
-    TypeAnnotationNeeded(Token),
 }
 
 impl ParserError {
@@ -51,7 +48,6 @@ impl ParserError {
             | ParserError::InvalidUnaryOperation(tok)
             | ParserError::InvalidUseOfUnitType(tok)
             | ParserError::InvalidType(tok)
-            | ParserError::TypeAnnotationNeeded(tok)
             | ParserError::UnterminatedString(tok) => {
                 let label = Label::new(tok.span.to_range());
                 Report::build(ReportKind::Error, (), 99)

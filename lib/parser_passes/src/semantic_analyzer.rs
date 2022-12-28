@@ -57,8 +57,23 @@ impl SemanticAnalyzer {
 }
 
 impl Visitor for SemanticAnalyzer {
+
+    fn visit_let(&mut self, e: &ast::LetExpr) {
+        if e.name.value_type.is_none() && e.value.is_none() {
+            self.add_error(PassesError::TypeAnnotationNeeded(e.span.clone()))
+        }
+        walk_let(self, e)        
+    }
+
     fn visit_function(&mut self, e: &ast::Function) {
         self.scopes.push(Scope::Function);
+
+        e.params
+            .iter()
+            .filter(|p| p.value_type.is_none() && !p.is_self()) // skip self parameter
+            .map(|p| p.span.clone())
+            .for_each(|s| self.add_error(PassesError::TypeAnnotationNeeded(s.clone())));
+            
         walk_function(self, e);
         self.scopes.pop();
     }
@@ -87,11 +102,41 @@ impl Visitor for SemanticAnalyzer {
         }
         walk_return(self, e);
     }
+
+    fn visit_self(&mut self, e: &ast::SelfExpr) {
+        if!self.is_in_function_scope(vec![Scope::Method]) {
+            self.add_error(PassesError::NoSelfOutsideMethod(e.span.clone()))
+        }
+    }
+
+    fn visit_data_struct(&mut self, e: &ast::DataStruct) {
+        for m in e.methods.iter() {
+            self.scopes.push(Scope::Method);
+            self.visit_expr(m);
+            self.scopes.pop();
+        }        
+    }
+
+    fn visit_call(&mut self, e: &ast::Call) {
+        let is_named_call = match &e.arguments.get(0) {
+            Some(arg) => arg.is_named(),
+            None => false,
+        };
+
+        for arg in &e.arguments {
+            if is_named_call && !arg.is_named() || !is_named_call && arg.is_named() {
+                self.add_error(PassesError::NoUsePositionalWithNamedArgs(arg.1.get_span()))
+            }
+        }
+
+        walk_call(self, e)
+    }
 }
 
 
 #[cfg(test)]
 mod analyzer_test {
+    use pretty_assertions::assert_eq;
     use span_util::Span;
 
     use crate::errors::PassesError;
@@ -148,6 +193,13 @@ mod analyzer_test {
             PassesError::NoContinueOutsideLoop(Span::fake()),
             PassesError::NoContinueOutsideLoop(Span::fake()),
         ]);
+
+        analyze("
+        loop {
+            continue
+        }
+        
+    ", vec![]);
     }
 
     #[test]
@@ -161,9 +213,95 @@ mod analyzer_test {
             }
         }
         
-    ", vec![
-        PassesError::NoBreakOutsideLoop(Span::fake()),
-        PassesError::NoBreakOutsideLoop(Span::fake()),
-    ]);    
+        ", vec![
+            PassesError::NoBreakOutsideLoop(Span::fake()),
+            PassesError::NoBreakOutsideLoop(Span::fake()),
+        ]);    
+    }
+
+    #[test]
+    fn check_function_annotation() {
+        analyze("
+            fn(a,x: int) {
+
+            }
+
+            let main = fn(a,b,c) {
+
+            }
+        ", vec![
+            PassesError::TypeAnnotationNeeded(Span::fake()),
+
+            PassesError::TypeAnnotationNeeded(Span::fake()),
+            PassesError::TypeAnnotationNeeded(Span::fake()),
+            PassesError::TypeAnnotationNeeded(Span::fake()),
+        ]);
+    }
+
+    #[test]
+    fn check_let_annotation() {
+        analyze("
+            let x;
+            fn {
+                let y;
+            }
+        ", vec![
+            PassesError::TypeAnnotationNeeded(Span::fake()),
+            PassesError::TypeAnnotationNeeded(Span::fake()),
+        ]);
+
+        analyze("let x = 1", vec![]);
+    }
+
+    #[test]
+    fn check_self_expr() {
+        analyze(
+            "self;",
+            vec![PassesError::NoSelfOutsideMethod(Span::fake())],
+        );
+        analyze(
+            "
+        self;
+        let main = fn() {
+            self;
+        };
+        ",
+            vec![
+                PassesError::NoSelfOutsideMethod(Span::fake()),
+                PassesError::NoSelfOutsideMethod(Span::fake()),
+            ],
+        );
+
+        analyze(
+            "
+        data Person() {
+            fn new {
+                self;
+            }
+
+            fn test(self) {
+                self;
+                let main = fn() {
+                    self;
+                };
+            }
+        };
+        ",
+        vec![]);
+    }
+
+    #[test]
+    fn analyze_call_expr() {
+        analyze("
+            run(commit=true, 1);
+            run(1, commit=true);
+            run(1,3,4);
+            run(commit = true, id =1);
+            run(1, commit=true);
+        ", vec![
+            PassesError::NoUsePositionalWithNamedArgs(Span::fake()),
+            PassesError::NoUsePositionalWithNamedArgs(Span::fake()),
+            PassesError::NoUsePositionalWithNamedArgs(Span::fake()),
+        ]);
     }
 }
