@@ -17,7 +17,7 @@ const RECOVER_SET: [TokenType; 6] = [
     TokenType::EOF,
 ];
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum FunctionKind {
     None,
     Function,
@@ -500,16 +500,17 @@ impl Parser {
         let mut name = None;
         let mut params = vec![];
         let mut is_static = true;
+        let mut return_type = Type::unit();
 
         if let FunctionKind::Method(_) = kind {
             let ident = self.eat(TokenType::Identifier, "Expected method identifier")?;
             name = Some(ident.value);
         }
 
-        let left_param = self.eat_optional(TokenType::LeftParen);
+        let left_paren = self.eat_optional(TokenType::LeftParen);
 
-        if let Some(_) = left_param {
-            match (kind, self.check(TokenType::SELF)) {
+        if let Some(_) = left_paren {
+            match (kind.clone(), self.check(TokenType::SELF)) {
                 (FunctionKind::Method(data_struct_identifier), true) => {
                     let token = self.eat(TokenType::SELF, "Expected 'self'")?;
                     self.eat_optional(TokenType::Comma);
@@ -533,12 +534,27 @@ impl Parser {
             params.append(&mut self.parse_parameters(TokenType::RightParen)?);
 
             self.eat(TokenType::RightParen, "Expected ')' after parameters")?;
+
+        } else if self.check(TokenType::Identifier) && matches!(kind, FunctionKind::Function) {
+            // Allow functions without parens to have one identifier e.g
+            // fn x => 1
+            // fn y { 2 }
+            // multiple identifiers require parens
+            let param = self.eat(TokenType::Identifier, "Expected 'identifier'")?;
+            params.push(Identifier::new(param.value, param.span))
         }
 
-        let return_type = match self.eat_optional(TokenType::Colon) {
-            Some(_) => self.parse_type(true)?,
-            None => Type::unit(),
-        };
+        // do not check for return type if parsing shorthand lambda function e.g
+        // fn x:int => 1; is invalid code
+        // if the function is declared as a method fn new:int => 1; is valid.
+        // since 'new' is used as the function name and 'int' as its return type. in the context of a method
+        if self.prev_token.token_type != TokenType::Identifier || !matches!(kind, FunctionKind::Function) {
+            return_type = match self.eat_optional(TokenType::Colon) {
+                Some(_) => self.parse_type(true)?,
+                None => Type::unit(),
+            };
+        }
+
 
         if self.matches(vec![TokenType::Arrow]) {
             let arrow_span: Span = self.prev_token.span.clone();
@@ -1952,6 +1968,15 @@ pub mod parser_tests {
                 ),
             ],
         )
+    }
+
+    #[test]
+    fn parse_shorthand_lambda_expr() {
+        parse("
+            fn x => 1
+        ", vec![
+            create_function(None, vec![ident("x")], Type::unit(), true, create_block(vec![create_implicit_return(int(1))]))
+        ])
     }
 
     #[test]
