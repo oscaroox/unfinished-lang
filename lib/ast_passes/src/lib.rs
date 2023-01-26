@@ -1,4 +1,4 @@
-mod semantic_analyzer;
+mod errors;
 mod name_resolver;
 mod scope_table;
-mod errors;
+mod semantic_analyzer;

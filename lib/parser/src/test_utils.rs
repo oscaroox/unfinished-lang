@@ -1,6 +1,8 @@
+use ast::{
+    BinaryOperation, CallArgs, Expression, Identifier, LiteralValue, LogicOperation, UnaryOperation,
+};
 use span_util::Span;
-use type_core::{Type, FunctionParam};
-use ast::{Expression, Identifier, CallArgs, LiteralValue, BinaryOperation, UnaryOperation, LogicOperation};
+use type_core::{FunctionParam, Type};
 
 pub fn create_let(id: &str, value: Option<Expression>) -> Expression {
     Expression::create_let(ident(id), value, Span::fake(), Span::fake())
@@ -103,9 +105,11 @@ pub fn create_data_struct(
     )
 }
 
-
 pub fn create_param_type(name: &str, ttype: Type) -> FunctionParam {
-    FunctionParam { name: name.to_string(), ttype }
+    FunctionParam {
+        name: name.to_string(),
+        ttype,
+    }
 }
 
 pub fn create_assign(name: &str, rhs: Expression) -> Expression {

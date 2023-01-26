@@ -104,10 +104,10 @@ impl Token {
     impl_token!(eof, EOF);
 
     pub fn auto_semi_colon() -> Token {
-        Token { 
-            token_type: TokenType::SemiColon, 
-            value: TokenType::SemiColon.to_string(), 
-            span: (0..0).into()
+        Token {
+            token_type: TokenType::SemiColon,
+            value: TokenType::SemiColon.to_string(),
+            span: (0..0).into(),
         }
     }
 

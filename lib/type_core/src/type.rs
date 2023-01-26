@@ -21,13 +21,13 @@ pub struct DataStruct {
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionParam {
     pub name: String,
-    pub ttype: Type
+    pub ttype: Type,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub params: Vec<FunctionParam>,
-    pub return_type: Box<Type>
+    pub return_type: Box<Type>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -69,11 +69,8 @@ impl std::fmt::Display for Type {
             Type::Unit => write!(f, "unit"),
             Type::Array(t) => write!(f, "{}", t),
             Type::Function(fun) => {
-                let p: Vec<String> = fun.params
-                .iter()
-                .map(|e| e.ttype.to_string())
-                .collect();
-                
+                let p: Vec<String> = fun.params.iter().map(|e| e.ttype.to_string()).collect();
+
                 let out = format!("Fun({}): {}", p.join(", "), fun.return_type);
                 write!(f, "{}", out)
             }
@@ -120,9 +117,9 @@ impl Type {
     }
 
     pub fn function(params: Vec<FunctionParam>, return_type: Type) -> Type {
-        Type::Function(Function { 
+        Type::Function(Function {
             params,
-            return_type: Box::new(return_type) 
+            return_type: Box::new(return_type),
         })
     }
 

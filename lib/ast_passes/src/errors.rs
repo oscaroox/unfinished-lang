@@ -2,14 +2,12 @@ use ariadne::{Label, Report, ReportKind};
 use span_util::Span;
 use thiserror::Error;
 
-
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum PassesError {
-
     // name resolver errors
     #[error("cannot find value '{0}'")]
     CannotFindValue(String, Span),
-    
+
     // semantic analyzer errors
     #[error("Cannot use return in top-level code")]
     NoTopLevelReturn(Span),
@@ -29,7 +27,7 @@ impl PassesError {
     pub fn into_report(&mut self) -> Report {
         let msg = self.to_string();
         match self {
-            Self::CannotFindValue(_, span) 
+            Self::CannotFindValue(_, span)
             | Self::NoBreakOutsideLoop(span)
             | Self::NoContinueOutsideLoop(span)
             | Self::NoSelfOutsideMethod(span)

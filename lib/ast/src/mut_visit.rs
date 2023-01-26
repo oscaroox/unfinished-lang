@@ -4,14 +4,12 @@ pub trait MutVisitable {
     fn accept(&mut self, visitor: &mut impl MutVisitor);
 }
 
-pub trait MutVisitor : Sized {
-
+pub trait MutVisitor: Sized {
     fn visit_binop(&mut self, e: &mut ast::BinOp) {
         walk_binop(self, e);
     }
 
-    fn visit_literal(&mut self, _e: &mut ast::Literal) {
-    }
+    fn visit_literal(&mut self, _e: &mut ast::Literal) {}
 
     fn visit_assign(&mut self, e: &mut ast::Assign) {
         walk_assign(self, e);
@@ -37,8 +35,7 @@ pub trait MutVisitor : Sized {
         walk_let(self, e);
     }
 
-    fn visit_let_ref(&mut self, _e: &mut ast::LetRef) {
-    }
+    fn visit_let_ref(&mut self, _e: &mut ast::LetRef) {}
 
     fn visit_unaryop(&mut self, e: &mut ast::UnaryOp) {
         walk_unaryop(self, e);
@@ -64,8 +61,7 @@ pub trait MutVisitor : Sized {
         walk_data_struct(self, e);
     }
 
-    fn visit_data_struct_instance(&mut self, _e: &mut ast::DataStructInstance) {
-    }
+    fn visit_data_struct_instance(&mut self, _e: &mut ast::DataStructInstance) {}
 
     fn visit_block(&mut self, e: &mut ast::Block) {
         walk_block(self, e);
@@ -83,23 +79,19 @@ pub trait MutVisitor : Sized {
         walk_return(self, e);
     }
 
-    fn visit_self(&mut self, _e: &mut ast::SelfExpr) {
-    }
+    fn visit_self(&mut self, _e: &mut ast::SelfExpr) {}
 
     fn visit_loop(&mut self, e: &mut ast::LoopExpr) {
         walk_loop(self, e);
     }
 
-    fn visit_break(&mut self, _e: &mut ast::BreakExpr) {
-    }
+    fn visit_break(&mut self, _e: &mut ast::BreakExpr) {}
 
-    fn visit_continue(&mut self, _e: &mut ast::ContinueExpr) {
-    }
+    fn visit_continue(&mut self, _e: &mut ast::ContinueExpr) {}
 
     fn visit_expr(&mut self, expr: &mut ast::Expression) {
         walk_expr(self, expr);
     }
-
 }
 
 pub fn walk_expr<V: MutVisitor>(vis: &mut V, expr: &mut ast::Expression) {
@@ -130,7 +122,6 @@ pub fn walk_expr<V: MutVisitor>(vis: &mut V, expr: &mut ast::Expression) {
         ast::Expression::ContinueExpr(e) => vis.visit_continue(e),
     }
 }
-
 
 pub fn walk_loop<V: MutVisitor>(vis: &mut V, e: &mut ast::LoopExpr) {
     vis.visit_expr(&mut e.condition);
@@ -221,9 +212,7 @@ pub fn walk_binop<V: MutVisitor>(vis: &mut V, e: &mut ast::BinOp) {
     vis.visit_expr(&mut e.right);
 }
 
-
 pub fn walk_logic<V: MutVisitor>(vis: &mut V, e: &mut ast::Logic) {
     vis.visit_expr(&mut e.lhs);
     vis.visit_expr(&mut e.rhs);
 }
-

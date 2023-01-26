@@ -1,8 +1,8 @@
 use std::{cell::RefCell, collections::HashMap, convert::TryInto, fmt::Debug, rc::Rc};
 
 use crate::{builtin::get_builtins, environment::Environment, Value};
-use ast::{self,
-    Assign, BinOp, BinaryOperation, Block, Call, DataStruct, Expression, Function, GetIndex,
+use ast::{
+    self, Assign, BinOp, BinaryOperation, Block, Call, DataStruct, Expression, Function, GetIndex,
     GetProperty, IfConditional, ImplicitReturn, LetExpr, Literal, LiteralValue, Logic,
     LogicOperation, LoopExpr, Program, ReturnExpr, SelfExpr, SetIndex, SetProperty, UnaryOp,
     UnaryOperation,

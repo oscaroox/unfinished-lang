@@ -4,15 +4,12 @@ pub trait Visitable {
     fn accept(&mut self, visitor: &mut impl Visitor);
 }
 
-
-pub trait Visitor : Sized {
-
+pub trait Visitor: Sized {
     fn visit_binop(&mut self, e: &ast::BinOp) {
         walk_binop(self, e);
     }
 
-    fn visit_literal(&mut self, _e: &ast::Literal) {
-    }
+    fn visit_literal(&mut self, _e: &ast::Literal) {}
 
     fn visit_assign(&mut self, e: &ast::Assign) {
         walk_assign(self, e);
@@ -38,8 +35,7 @@ pub trait Visitor : Sized {
         walk_let(self, e);
     }
 
-    fn visit_let_ref(&mut self, _e: &ast::LetRef) {
-    }
+    fn visit_let_ref(&mut self, _e: &ast::LetRef) {}
 
     fn visit_unaryop(&mut self, e: &ast::UnaryOp) {
         walk_unaryop(self, e);
@@ -65,8 +61,7 @@ pub trait Visitor : Sized {
         walk_data_struct(self, e);
     }
 
-    fn visit_data_struct_instance(&mut self, _e: &ast::DataStructInstance) {
-    }
+    fn visit_data_struct_instance(&mut self, _e: &ast::DataStructInstance) {}
 
     fn visit_block(&mut self, e: &ast::Block) {
         walk_block(self, e);
@@ -84,23 +79,19 @@ pub trait Visitor : Sized {
         walk_return(self, e);
     }
 
-    fn visit_self(&mut self, _e: &ast::SelfExpr) {
-    }
+    fn visit_self(&mut self, _e: &ast::SelfExpr) {}
 
     fn visit_loop(&mut self, e: &ast::LoopExpr) {
         walk_loop(self, e);
     }
 
-    fn visit_break(&mut self, _e: &ast::BreakExpr) {
-    }
+    fn visit_break(&mut self, _e: &ast::BreakExpr) {}
 
-    fn visit_continue(&mut self, _e: &ast::ContinueExpr) {
-    }
+    fn visit_continue(&mut self, _e: &ast::ContinueExpr) {}
 
     fn visit_expr(&mut self, expr: &ast::Expression) {
         walk_expr(self, expr);
     }
-
 }
 
 pub fn walk_expr<V: Visitor>(vis: &mut V, expr: &ast::Expression) {
@@ -221,9 +212,7 @@ pub fn walk_binop<V: Visitor>(vis: &mut V, e: &ast::BinOp) {
     vis.visit_expr(&e.right);
 }
 
-
 pub fn walk_logic<V: Visitor>(vis: &mut V, e: &ast::Logic) {
     vis.visit_expr(&e.lhs);
     vis.visit_expr(&e.rhs);
 }
-

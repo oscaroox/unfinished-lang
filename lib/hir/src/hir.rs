@@ -10,7 +10,6 @@ pub struct Ident {
     pub span: Span,
 }
 
-
 #[derive(Debug, Clone)]
 pub struct Let {
     pub ident: Ident,
@@ -38,7 +37,7 @@ pub enum LiteralKind {
     Float(f64),
     Bool(bool),
     String(String),
-    Array(Vec<Expression>)
+    Array(Vec<Expression>),
 }
 
 #[derive(Debug, Clone)]
@@ -77,7 +76,7 @@ pub enum UnaryOpKind {
 pub struct UnaryOp {
     pub op: UnaryOpKind,
     pub rhs: Box<Expression>,
-    pub span: Span
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]
@@ -110,9 +109,8 @@ pub struct LogicOp {
 pub struct Param {
     pub ident: String,
     pub ty: Type,
-    pub span: Span, 
+    pub span: Span,
 }
-
 
 #[derive(Debug, Clone)]
 pub enum ImpSelf {
@@ -126,7 +124,7 @@ pub struct Function {
     pub params: Vec<Param>,
     pub return_type: Type,
     pub body: Box<Expression>,
-    pub imp_self: ImpSelf, 
+    pub imp_self: ImpSelf,
     pub span: Span,
 }
 
@@ -171,7 +169,7 @@ pub struct SelfExpr {
 
 #[derive(Debug, Clone)]
 pub struct Continue {
-    pub span: Span
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]
@@ -185,7 +183,6 @@ pub struct GetIndex {
     pub idx: Box<Expression>,
     pub span: Span,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct SetIndex {
@@ -218,7 +215,6 @@ pub struct DataStructField {
     pub span: Span,
 }
 
-
 #[derive(Debug, Clone)]
 pub struct DataStruct {
     pub ident: Ident,
@@ -233,7 +229,6 @@ pub struct While {
     pub body: Program,
     pub kw_span: Span,
 }
-
 
 #[derive(Debug, Clone)]
 pub enum Expression {

@@ -2,7 +2,6 @@ use ast::visit::*;
 
 use crate::errors::PassesError;
 
-
 #[derive(Debug, PartialEq)]
 enum Scope {
     TopLevel,
@@ -18,8 +17,8 @@ pub struct SemanticAnalyzer {
 
 impl SemanticAnalyzer {
     pub fn new() -> Self {
-        SemanticAnalyzer { 
-            errors: vec![], 
+        SemanticAnalyzer {
+            errors: vec![],
             scopes: vec![Scope::TopLevel],
         }
     }
@@ -36,12 +35,12 @@ impl SemanticAnalyzer {
 
     pub fn errors(&self) -> Vec<PassesError> {
         self.errors.clone()
-    } 
+    }
 
     fn is_in_function_scope(&self, scope: Vec<Scope>) -> bool {
         for s in self.scopes.iter().rev() {
             if scope.contains(&s) {
-                return true
+                return true;
             }
         }
         false
@@ -50,18 +49,17 @@ impl SemanticAnalyzer {
     fn is_in_loop_scope(&self) -> bool {
         match self.scopes.len() {
             0 => false,
-            n => self.scopes[n - 1] == Scope::Loop
+            n => self.scopes[n - 1] == Scope::Loop,
         }
     }
 }
 
 impl Visitor for SemanticAnalyzer {
-
     fn visit_let(&mut self, e: &ast::LetExpr) {
         if e.name.value_type.is_none() && e.value.is_none() {
             self.add_error(PassesError::TypeAnnotationNeeded(e.span.clone()))
         }
-        walk_let(self, e)        
+        walk_let(self, e)
     }
 
     fn visit_function(&mut self, e: &ast::Function) {
@@ -72,7 +70,7 @@ impl Visitor for SemanticAnalyzer {
             .filter(|p| p.value_type.is_none() && !p.is_self()) // skip self parameter
             .map(|p| p.span.clone())
             .for_each(|s| self.add_error(PassesError::TypeAnnotationNeeded(s.clone())));
-            
+
         walk_function(self, e);
         self.scopes.pop();
     }
@@ -103,7 +101,7 @@ impl Visitor for SemanticAnalyzer {
     }
 
     fn visit_self(&mut self, e: &ast::SelfExpr) {
-        if!self.is_in_function_scope(vec![Scope::Method]) {
+        if !self.is_in_function_scope(vec![Scope::Method]) {
             self.add_error(PassesError::NoSelfOutsideMethod(e.span.clone()))
         }
     }
@@ -113,7 +111,7 @@ impl Visitor for SemanticAnalyzer {
             self.scopes.push(Scope::Method);
             self.visit_expr(m);
             self.scopes.pop();
-        }        
+        }
     }
 
     fn visit_call(&mut self, e: &ast::Call) {
@@ -131,7 +129,6 @@ impl Visitor for SemanticAnalyzer {
         walk_call(self, e)
     }
 }
-
 
 #[cfg(test)]
 mod analyzer_test {
@@ -167,19 +164,21 @@ mod analyzer_test {
 
     #[test]
     fn check_return() {
-        analyze("
+        analyze(
+            "
         return
         let x = fn {
             return
         }
-        ", vec![
-            PassesError::NoTopLevelReturn(Span::fake())
-        ]);
+        ",
+            vec![PassesError::NoTopLevelReturn(Span::fake())],
+        );
     }
 
     #[test]
     fn check_continue() {
-        analyze("
+        analyze(
+            "
             continue
             loop {
                 continue
@@ -188,22 +187,28 @@ mod analyzer_test {
                 }
             }
             
-        ", vec![
-            PassesError::NoContinueOutsideLoop(Span::fake()),
-            PassesError::NoContinueOutsideLoop(Span::fake()),
-        ]);
+        ",
+            vec![
+                PassesError::NoContinueOutsideLoop(Span::fake()),
+                PassesError::NoContinueOutsideLoop(Span::fake()),
+            ],
+        );
 
-        analyze("
+        analyze(
+            "
         loop {
             continue
         }
         
-    ", vec![]);
+    ",
+            vec![],
+        );
     }
 
     #[test]
     fn check_break() {
-        analyze("
+        analyze(
+            "
         break
         loop {
             continue
@@ -212,15 +217,18 @@ mod analyzer_test {
             }
         }
         
-        ", vec![
-            PassesError::NoBreakOutsideLoop(Span::fake()),
-            PassesError::NoBreakOutsideLoop(Span::fake()),
-        ]);    
+        ",
+            vec![
+                PassesError::NoBreakOutsideLoop(Span::fake()),
+                PassesError::NoBreakOutsideLoop(Span::fake()),
+            ],
+        );
     }
 
     #[test]
     fn check_function_annotation() {
-        analyze("
+        analyze(
+            "
             fn(a,x: int) {
 
             }
@@ -228,26 +236,30 @@ mod analyzer_test {
             let main = fn(a,b,c) {
 
             }
-        ", vec![
-            PassesError::TypeAnnotationNeeded(Span::fake()),
-
-            PassesError::TypeAnnotationNeeded(Span::fake()),
-            PassesError::TypeAnnotationNeeded(Span::fake()),
-            PassesError::TypeAnnotationNeeded(Span::fake()),
-        ]);
+        ",
+            vec![
+                PassesError::TypeAnnotationNeeded(Span::fake()),
+                PassesError::TypeAnnotationNeeded(Span::fake()),
+                PassesError::TypeAnnotationNeeded(Span::fake()),
+                PassesError::TypeAnnotationNeeded(Span::fake()),
+            ],
+        );
     }
 
     #[test]
     fn check_let_annotation() {
-        analyze("
+        analyze(
+            "
             let x;
             fn {
                 let y;
             }
-        ", vec![
-            PassesError::TypeAnnotationNeeded(Span::fake()),
-            PassesError::TypeAnnotationNeeded(Span::fake()),
-        ]);
+        ",
+            vec![
+                PassesError::TypeAnnotationNeeded(Span::fake()),
+                PassesError::TypeAnnotationNeeded(Span::fake()),
+            ],
+        );
 
         analyze("let x = 1", vec![]);
     }
@@ -286,21 +298,25 @@ mod analyzer_test {
             }
         };
         ",
-        vec![]);
+            vec![],
+        );
     }
 
     #[test]
     fn analyze_call_expr() {
-        analyze("
+        analyze(
+            "
             run(commit=true, 1);
             run(1, commit=true);
             run(1,3,4);
             run(commit = true, id =1);
             run(1, commit=true);
-        ", vec![
-            PassesError::NoUsePositionalWithNamedArgs(Span::fake()),
-            PassesError::NoUsePositionalWithNamedArgs(Span::fake()),
-            PassesError::NoUsePositionalWithNamedArgs(Span::fake()),
-        ]);
+        ",
+            vec![
+                PassesError::NoUsePositionalWithNamedArgs(Span::fake()),
+                PassesError::NoUsePositionalWithNamedArgs(Span::fake()),
+                PassesError::NoUsePositionalWithNamedArgs(Span::fake()),
+            ],
+        );
     }
 }

@@ -1,26 +1,24 @@
+use ast::mut_visit::{walk_assign, walk_block, walk_let, MutVisitable, MutVisitor};
 use ast::Program;
-use ast::mut_visit::{MutVisitor, MutVisitable, walk_block, walk_let, walk_assign};
 
 use crate::errors::PassesError;
 use crate::scope_table::ScopeTable;
 
 pub struct NameResolver {
     errors: Vec<PassesError>,
-    scope_table: ScopeTable
+    scope_table: ScopeTable,
 }
 
 impl NameResolver {
     pub fn new() -> Self {
-        Self { 
+        Self {
             errors: vec![],
-            scope_table: ScopeTable::with_global_scope()
+            scope_table: ScopeTable::with_global_scope(),
         }
     }
 
     pub fn run(&mut self, program: &mut Program) {
-        program
-            .iter_mut()
-            .for_each(|e| e.accept(self))
+        program.iter_mut().for_each(|e| e.accept(self))
     }
 
     pub fn errors(self) -> Vec<PassesError> {
@@ -32,9 +30,7 @@ impl NameResolver {
     }
 }
 
-
 impl MutVisitor for NameResolver {
-
     fn visit_let(&mut self, e: &mut ast::LetExpr) {
         self.scope_table.define(e.name.value.to_string());
         walk_let(self, e)
@@ -45,7 +41,10 @@ impl MutVisitor for NameResolver {
         e.scope_distance = self.scope_table.resolve(&e.name.value);
 
         if scope_distance.is_none() {
-            self.add_error(PassesError::CannotFindValue(e.name.value.to_string(), e.name.span.clone()))
+            self.add_error(PassesError::CannotFindValue(
+                e.name.value.to_string(),
+                e.name.span.clone(),
+            ))
         }
     }
 
@@ -61,14 +60,16 @@ impl MutVisitor for NameResolver {
     }
 }
 
-
 #[cfg(test)]
 mod name_resolver_test {
+    use crate::errors::PassesError;
     use ast::Program;
-    use parser::test_utils::{create_let, int, create_function, unit_type, create_block, create_assign_with_scope, create_let_ref_with_scope};
+    use parser::test_utils::{
+        create_assign_with_scope, create_block, create_function, create_let,
+        create_let_ref_with_scope, int, unit_type,
+    };
     use pretty_assertions::assert_eq;
     use span_util::Span;
-    use crate::errors::PassesError;
 
     use super::NameResolver;
 
@@ -83,7 +84,7 @@ mod name_resolver_test {
         let (ast, _) = analyze(src);
         assert_eq!(ast, expected);
     }
-    
+
     fn analyze_error(src: &str, expected: Vec<PassesError>) {
         let (_, name_resolver) = analyze(src);
         assert_eq!(name_resolver.errors(), expected);
@@ -91,34 +92,39 @@ mod name_resolver_test {
 
     #[test]
     fn resolve_assign() {
-        analyze_ok("
+        analyze_ok(
+            "
             let x = 2;
             let y = 3;
             let main = fn {
                 y = x;
             }
-        ", vec![
-            create_let("x", Some(int(2))),
-            create_let("y", Some(int(3))),
-            create_let("main", Some(create_function(
-                Some("main".to_string()), 
-                vec![], 
-                unit_type(), 
-                true, 
-                create_block(vec![
-                    create_assign_with_scope(
-                        "y", 
-                        create_let_ref_with_scope("x", Some(1)),
-                         Some(1)
-                    )
-                ]))
-            ))
-        ]);   
+        ",
+            vec![
+                create_let("x", Some(int(2))),
+                create_let("y", Some(int(3))),
+                create_let(
+                    "main",
+                    Some(create_function(
+                        Some("main".to_string()),
+                        vec![],
+                        unit_type(),
+                        true,
+                        create_block(vec![create_assign_with_scope(
+                            "y",
+                            create_let_ref_with_scope("x", Some(1)),
+                            Some(1),
+                        )]),
+                    )),
+                ),
+            ],
+        );
     }
 
     #[test]
     fn resolve_let_ref() {
-        analyze_ok("
+        analyze_ok(
+            "
         let x = 2;
         fn {
             {
@@ -127,30 +133,27 @@ mod name_resolver_test {
                 }
             }
         }
-        ", vec![
-            create_let("x", Some(int(2))),
-            create_function(
-                None, 
-                vec![], 
-                unit_type(), 
-                true, 
-                create_block(vec![
-                    create_block(vec![
-                        create_block(vec![
-                            create_let(
-                                "y", 
-                                Some(create_let_ref_with_scope("x", Some(3)))
-                            )
-                        ])
-                    ])
-                ])
-            )
-        ])
+        ",
+            vec![
+                create_let("x", Some(int(2))),
+                create_function(
+                    None,
+                    vec![],
+                    unit_type(),
+                    true,
+                    create_block(vec![create_block(vec![create_block(vec![create_let(
+                        "y",
+                        Some(create_let_ref_with_scope("x", Some(3))),
+                    )])])]),
+                ),
+            ],
+        )
     }
 
     #[test]
     fn resolve_correct_scope_distance() {
-        analyze_ok("
+        analyze_ok(
+            "
         let x = 2;
         {
             {
@@ -161,23 +164,28 @@ mod name_resolver_test {
                 let y = x;
             }
         }
-        ", vec![
-            create_let("x", Some(int(2))),
-            create_block(vec![
+        ",
+            vec![
+                create_let("x", Some(int(2))),
                 create_block(vec![
-                    create_let("y", Some(create_let_ref_with_scope("x", Some(2))))
+                    create_block(vec![create_let(
+                        "y",
+                        Some(create_let_ref_with_scope("x", Some(2))),
+                    )]),
+                    create_let("x", Some(int(3))),
+                    create_block(vec![create_let(
+                        "y",
+                        Some(create_let_ref_with_scope("x", Some(1))),
+                    )]),
                 ]),
-                create_let("x", Some(int(3))),
-                create_block(vec![
-                    create_let("y", Some(create_let_ref_with_scope("x", Some(1))))
-                ])
-            ])
-        ])
+            ],
+        )
     }
 
     #[test]
     fn resolve_unknown_reference() {
-        analyze_error("
+        analyze_error(
+            "
         let x = 2;
         let y = t;
         {
@@ -189,10 +197,12 @@ mod name_resolver_test {
             }
             let i = 2;
         }
-        ", vec![
-            PassesError::CannotFindValue("t".to_string(), Span::fake()),
-            PassesError::CannotFindValue("i".to_string(), Span::fake()),
-            PassesError::CannotFindValue("z".to_string(), Span::fake()),
-        ])
+        ",
+            vec![
+                PassesError::CannotFindValue("t".to_string(), Span::fake()),
+                PassesError::CannotFindValue("i".to_string(), Span::fake()),
+                PassesError::CannotFindValue("z".to_string(), Span::fake()),
+            ],
+        )
     }
 }

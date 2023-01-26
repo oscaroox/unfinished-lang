@@ -3,7 +3,6 @@ use type_core::Type;
 
 pub type Program = Vec<Expression>;
 
-
 #[derive(Debug, PartialEq, Clone)]
 pub struct Identifier {
     pub value: String,
@@ -37,9 +36,9 @@ impl Identifier {
     }
 
     pub fn with_token_type(
-        value: String, 
-        // token_type: TokenType, 
-        span: Span
+        value: String,
+        // token_type: TokenType,
+        span: Span,
     ) -> Identifier {
         Identifier {
             value,
@@ -103,7 +102,6 @@ impl std::fmt::Display for BinaryOperation {
     }
 }
 
-
 #[derive(Debug, PartialEq, Clone)]
 pub struct BinOp {
     pub left: Box<Expression>,
@@ -136,8 +134,6 @@ pub struct UnaryOp {
     pub span: Span,
 }
 
-
-
 #[derive(Debug, PartialEq, Clone)]
 pub struct Block {
     pub exprs: Vec<Expression>,
@@ -149,14 +145,12 @@ pub struct BreakExpr {
     pub span: Span,
 }
 
-
 #[derive(Debug, PartialEq, Clone)]
 pub struct Call {
     pub callee: Box<Expression>,
     pub arguments: Vec<CallArgs>,
     pub span: Span,
 }
-
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct CallArgs(pub Option<Identifier>, pub Expression);
@@ -165,7 +159,7 @@ impl CallArgs {
     pub fn is_named(&self) -> bool {
         match self.0 {
             Some(_) => true,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -174,7 +168,6 @@ impl CallArgs {
 pub struct ContinueExpr {
     pub span: Span,
 }
-
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct DataStructInstanceField {
@@ -204,7 +197,6 @@ pub struct DataStruct {
     pub span: Span,
 }
 
-
 #[derive(Debug, PartialEq, Clone)]
 pub struct Function {
     pub name: Option<String>,
@@ -221,7 +213,6 @@ pub struct GetIndex {
     pub index: Box<Expression>,
     pub span: Span,
 }
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GetProperty {
@@ -258,7 +249,6 @@ pub struct ReturnExpr {
     pub return_token: Span,
     pub span: Span,
 }
-
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct LetExpr {
@@ -318,7 +308,6 @@ impl std::fmt::Display for LogicOperation {
     }
 }
 
-
 #[derive(Debug, PartialEq, Clone)]
 pub struct Logic {
     pub lhs: Box<Expression>,
@@ -326,7 +315,6 @@ pub struct Logic {
     pub rhs: Box<Expression>,
     pub span: Span,
 }
-
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct LoopExpr {
@@ -347,7 +335,6 @@ pub struct SelfExpr {
     pub span: Span,
 }
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct SetIndex {
     pub lhs: Box<Expression>,
@@ -356,7 +343,6 @@ pub struct SetIndex {
     pub span: Span,
 }
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct SetProperty {
     pub object: Box<Expression>,
@@ -364,7 +350,6 @@ pub struct SetProperty {
     pub value: Box<Expression>,
     pub span: Span,
 }
-
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
@@ -480,7 +465,12 @@ impl Expression {
         Expression::Literal(Literal { value, span })
     }
 
-    pub fn create_assign(name: Identifier, rhs: Expression, span: Span, scope_index: Option<usize>) -> Expression {
+    pub fn create_assign(
+        name: Identifier,
+        rhs: Expression,
+        span: Span,
+        scope_index: Option<usize>,
+    ) -> Expression {
         Expression::Assign(Assign {
             name,
             scope_distance: scope_index,
@@ -490,7 +480,11 @@ impl Expression {
     }
 
     pub fn create_let_ref(ident: Identifier, span: Span, scope_index: Option<usize>) -> Expression {
-        Expression::LetRef(LetRef { name: ident, span, scope_distance: scope_index })
+        Expression::LetRef(LetRef {
+            name: ident,
+            span,
+            scope_distance: scope_index,
+        })
     }
 
     pub fn create_unaryop(op: UnaryOperation, rhs: Expression, span: Span) -> Expression {
@@ -515,7 +509,6 @@ impl Expression {
             span,
         })
     }
-
 
     pub fn create_index(lhs: Expression, index: Expression, span: Span) -> Expression {
         Expression::GetIndex(GetIndex {
@@ -621,7 +614,7 @@ impl Expression {
     }
 
     pub fn create_block(exprs: Vec<Expression>, span: Span) -> Expression {
-        Expression::Block(Block { exprs, span, })
+        Expression::Block(Block { exprs, span })
     }
 
     pub fn create_return(
@@ -723,7 +716,7 @@ impl Expression {
             Expression::SelfExpr(s) => s.span.clone(),
             Expression::LoopExpr(s) => s.span.clone(),
             Expression::BreakExpr(s) => s.span.clone(),
-            Expression::ContinueExpr(s) => s.span.clone()
+            Expression::ContinueExpr(s) => s.span.clone(),
         }
     }
 }

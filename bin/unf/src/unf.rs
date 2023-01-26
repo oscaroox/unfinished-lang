@@ -27,7 +27,6 @@ impl Unf {
         }
     }
 
-
     pub fn run_file(&mut self, file_path: String, dump_ast: bool) {
         let source = match std::fs::read_to_string(file_path) {
             Ok(contents) => contents,
@@ -36,7 +35,7 @@ impl Unf {
 
         let mut interpreter = Interpreter::new();
 
-        match  self.run_contents(source) {
+        match self.run_contents(source) {
             Ok(exprs) => {
                 if dump_ast {
                     println!("{exprs:#?}");
@@ -50,7 +49,7 @@ impl Unf {
                         process::exit(1);
                     }
                 }
-            },
+            }
             Err(_) => process::exit(1),
         }
     }
@@ -61,7 +60,7 @@ impl Unf {
         println!("Welcome to the unfinished language repl.");
         loop {
             let mut interpreter = Interpreter::with_env(env.clone());
-            match  rl.readline(">") {
+            match rl.readline(">") {
                 Ok(line) => match self.run_contents(line) {
                     Ok(exprs) => match interpreter.run(exprs) {
                         Ok(val) => match val {
@@ -84,16 +83,14 @@ impl Unf {
         rustyline::Result::Ok(())
     }
 
-
     pub fn run_contents(&mut self, source: String) -> Result<Program, String> {
         let mut type_checker = TypeChecker::new();
         let (exprs, errors) = parser::parse(&source);
-        
+
         if !errors.is_empty() {
-            let reports: Vec<ariadne::Report> = errors.iter()
-            .map(|e| e.clone().into_report())
-            .collect();
-                
+            let reports: Vec<ariadne::Report> =
+                errors.iter().map(|e| e.clone().into_report()).collect();
+
             for report in reports {
                 match report.print(Source::from(source.to_string())) {
                     Ok(_) => {}

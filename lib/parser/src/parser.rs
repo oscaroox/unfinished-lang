@@ -1,11 +1,11 @@
+use crate::scanner::{Scanner, ScannerMode, Token, TokenType};
 use crate::ParserError;
 use ast::{
-    BinaryOperation, DataStructInstanceField, Expression, Identifier, LiteralValue, 
-    Program, CallArgs,
+    BinaryOperation, CallArgs, DataStructInstanceField, Expression, Identifier, LiteralValue,
+    Program,
 };
-use crate::scanner::{Scanner, ScannerMode, Token, TokenType};
 use span_util::Span;
-use type_core::{Type, FunctionParam};
+use type_core::{FunctionParam, Type};
 
 const RECOVER_SET: [TokenType; 6] = [
     TokenType::Let,
@@ -197,7 +197,8 @@ impl Parser {
 
                 params.push(ident);
 
-                if !self.matches(vec![TokenType::Comma, TokenType::SemiColon]) || self.curr_token.token_type == token_end
+                if !self.matches(vec![TokenType::Comma, TokenType::SemiColon])
+                    || self.curr_token.token_type == token_end
                 {
                     break;
                 }
@@ -240,11 +241,9 @@ impl Parser {
 
             let p: Vec<FunctionParam> = params
                 .iter()
-                .map(|i| {
-                    FunctionParam { 
-                        name:  i.value.to_string(), 
-                        ttype: i.value_type.as_ref().unwrap().clone() 
-                    }
+                .map(|i| FunctionParam {
+                    name: i.value.to_string(),
+                    ttype: i.value_type.as_ref().unwrap().clone(),
                 })
                 .collect();
 
@@ -447,10 +446,11 @@ impl Parser {
 
         if !self.check(TokenType::LeftParen) {
             return Ok(Expression::create_data_struct(
-                identifier, 
-                Vec::new(), 
-                Vec::new(), 
-                ident_span))
+                identifier,
+                Vec::new(),
+                Vec::new(),
+                ident_span,
+            ));
         }
 
         self.eat(TokenType::LeftParen, "Expected '(")?;
@@ -473,10 +473,7 @@ impl Parser {
         }
 
         Ok(Expression::create_data_struct(
-            identifier,
-            fields,
-            methods,
-            ident_span,
+            identifier, fields, methods, ident_span,
         ))
     }
 
@@ -534,7 +531,6 @@ impl Parser {
             params.append(&mut self.parse_parameters(TokenType::RightParen)?);
 
             self.eat(TokenType::RightParen, "Expected ')' after parameters")?;
-
         } else if self.check(TokenType::Identifier) && matches!(kind, FunctionKind::Function) {
             // Allow functions without parens to have one identifier e.g
             // fn x => 1
@@ -548,13 +544,14 @@ impl Parser {
         // fn x:int => 1; is invalid code
         // if the function is declared as a method fn new:int => 1; is valid.
         // since 'new' is used as the function name and 'int' as its return type. in the context of a method
-        if self.prev_token.token_type != TokenType::Identifier || !matches!(kind, FunctionKind::Function) {
+        if self.prev_token.token_type != TokenType::Identifier
+            || !matches!(kind, FunctionKind::Function)
+        {
             return_type = match self.eat_optional(TokenType::Colon) {
                 Some(_) => self.parse_type(true)?,
                 None => Type::unit(),
             };
         }
-
 
         if self.matches(vec![TokenType::Arrow]) {
             let arrow_span: Span = self.prev_token.span.clone();
@@ -610,11 +607,11 @@ impl Parser {
         if !exprs.is_empty() && !self.prev_token.is_semi_colon() {
             let expr = exprs.pop().unwrap();
             // if !expr.is_scope() {
-                let span = expr.get_span();
-                exprs.push(Expression::create_implicit_return(expr, span));
+            let span = expr.get_span();
+            exprs.push(Expression::create_implicit_return(expr, span));
             // } else {
             //     exprs.push(expr);
-            // } 
+            // }
         }
 
         self.eat(TokenType::RightBrace, "Expected '}'")?;
@@ -682,7 +679,11 @@ impl Parser {
                         return Ok(Expression::create_assign(
                             let_ref.name.clone(),
                             Expression::create_binop(
-                                Expression::create_let_ref(let_ref.name.clone(), rhs_span.clone(), None),
+                                Expression::create_let_ref(
+                                    let_ref.name.clone(),
+                                    rhs_span.clone(),
+                                    None,
+                                ),
                                 assignment_tok.to_binary_operator(),
                                 rhs,
                                 rhs_span,
@@ -841,7 +842,6 @@ impl Parser {
         let mut expr = self.primary()?;
         let primary_span = expr.get_span();
         loop {
-
             if self.matches(vec![TokenType::LeftParen]) {
                 let mut args = vec![];
 
@@ -856,8 +856,9 @@ impl Parser {
 
                         args.push(CallArgs(ident, self.expression()?));
 
-                        if !self.matches(vec![TokenType::Comma]) || 
-                            self.curr_token.token_type == TokenType::RightParen {
+                        if !self.matches(vec![TokenType::Comma])
+                            || self.curr_token.token_type == TokenType::RightParen
+                        {
                             break;
                         }
                     }
@@ -870,7 +871,6 @@ impl Parser {
 
                 let span: Span = primary_span.extend(self.prev_token.span.clone());
                 expr = Expression::create_call(expr, args, span);
-
             } else if self.matches(vec![TokenType::LeftBracket]) {
                 let idx = self.expression()?;
 
@@ -1120,25 +1120,19 @@ impl Parser {
 
         Ok(expr)
     }
-
-
 }
-
-
 
 #[cfg(test)]
 pub mod parser_tests {
-    
-    use crate::ParserError;
-    use crate::test_utils::*;
-    use super::Parser;
-    use ast::{BinaryOperation, UnaryOperation, LogicOperation, Program};
-    use crate::scanner::{Scanner, Token};
 
-    
+    use super::Parser;
+    use crate::scanner::{Scanner, Token};
+    use crate::test_utils::*;
+    use crate::ParserError;
+    use ast::{BinaryOperation, LogicOperation, Program, UnaryOperation};
 
     use span_util::Span;
-    use type_core::{Type, FunctionParam};
+    use type_core::{FunctionParam, Type};
 
     fn run_parser(source: &str) -> (Program, Vec<ParserError>) {
         let scanner = Scanner::new(source.to_string());
@@ -1186,7 +1180,6 @@ pub mod parser_tests {
             assert_eq!(*err, expected);
         }
     }
-
 
     #[test]
     fn recover_missing_semi_expr() {
@@ -1266,9 +1259,10 @@ pub mod parser_tests {
         ",
             vec![
                 create_let_type(
-                    ident_type("x", Type::function(vec![
-                        create_param_type("a", Type::string())
-                    ], Type::unit())),
+                    ident_type(
+                        "x",
+                        Type::function(vec![create_param_type("a", Type::string())], Type::unit()),
+                    ),
                     None,
                 ),
                 create_let_type(ident_type("x", Type::function(vec![], Type::unit())), None),
@@ -1278,35 +1272,39 @@ pub mod parser_tests {
                     None,
                 ),
                 create_let_type(
-                    ident_type("x", Type::function(vec![
-                        create_param_type("a", Type::string())
-                    ], Type::int())),
-                    None,
-                ),
-                create_let_type(
                     ident_type(
                         "x",
-                        Type::function(vec![
-                            create_param_type("a", Type::string())
-                        ], Type::array(Type::int())),
+                        Type::function(vec![create_param_type("a", Type::string())], Type::int()),
                     ),
                     None,
                 ),
                 create_let_type(
                     ident_type(
                         "x",
-                        Type::array(Type::function(vec![
-                            create_param_type("b", Type::int())
-                        ], Type::int())),
+                        Type::function(
+                            vec![create_param_type("a", Type::string())],
+                            Type::array(Type::int()),
+                        ),
                     ),
                     None,
                 ),
                 create_let_type(
                     ident_type(
                         "x",
-                        Type::array(Type::function(vec![
-                            create_param_type("b", Type::int())
-                        ], Type::unit())),
+                        Type::array(Type::function(
+                            vec![create_param_type("b", Type::int())],
+                            Type::int(),
+                        )),
+                    ),
+                    None,
+                ),
+                create_let_type(
+                    ident_type(
+                        "x",
+                        Type::array(Type::function(
+                            vec![create_param_type("b", Type::int())],
+                            Type::unit(),
+                        )),
                     ),
                     None,
                 ),
@@ -1334,12 +1332,13 @@ pub mod parser_tests {
                 create_let_type(
                     ident_type(
                         "x",
-                        Type::function(vec![
-                            FunctionParam {
+                        Type::function(
+                            vec![FunctionParam {
                                 name: "x".to_string(),
-                                ttype: Type::identifier("Person".to_string())
-                            }
-                        ], Type::unit()),
+                                ttype: Type::identifier("Person".to_string()),
+                            }],
+                            Type::unit(),
+                        ),
                     ),
                     None,
                 ),
@@ -1865,9 +1864,9 @@ pub mod parser_tests {
                 create_call(
                     create_let_ref("fnc"),
                     vec![
-                        arg(int(1)), 
-                        arg(create_let_ref("name")), 
-                        arg(bool_lit(true))
+                        arg(int(1)),
+                        arg(create_let_ref("name")),
+                        arg(bool_lit(true)),
                     ],
                 ),
             ],
@@ -1884,20 +1883,26 @@ pub mod parser_tests {
 
     #[test]
     fn parse_function_call_named_args() {
-        parse(r#"
+        parse(
+            r#"
         update_user(id=1, name = "John", "Doe");
         save(1, drop=false);
-        "#, vec![
-            create_call(create_let_ref("update_user"), vec![
-                named_arg(ident("id"), int(1)),
-                named_arg(ident("name"), string_lit("John")),
-                arg(string_lit("Doe")),
-            ]),
-            create_call(create_let_ref("save"), vec![
-                arg(int(1)),
-                named_arg(ident("drop"), bool_lit(false)),
-            ])
-        ])
+        "#,
+            vec![
+                create_call(
+                    create_let_ref("update_user"),
+                    vec![
+                        named_arg(ident("id"), int(1)),
+                        named_arg(ident("name"), string_lit("John")),
+                        arg(string_lit("Doe")),
+                    ],
+                ),
+                create_call(
+                    create_let_ref("save"),
+                    vec![arg(int(1)), named_arg(ident("drop"), bool_lit(false))],
+                ),
+            ],
+        )
     }
 
     #[test]
@@ -1972,11 +1977,18 @@ pub mod parser_tests {
 
     #[test]
     fn parse_shorthand_lambda_expr() {
-        parse("
+        parse(
+            "
             fn x => 1
-        ", vec![
-            create_function(None, vec![ident("x")], Type::unit(), true, create_block(vec![create_implicit_return(int(1))]))
-        ])
+        ",
+            vec![create_function(
+                None,
+                vec![ident("x")],
+                Type::unit(),
+                true,
+                create_block(vec![create_implicit_return(int(1))]),
+            )],
+        )
     }
 
     #[test]
@@ -2012,10 +2024,7 @@ pub mod parser_tests {
                 ),
                 create_if(
                     bool_lit(false),
-                    create_block(vec![create_implicit_return(create_assign(
-                        "x",
-                        int(1),
-                    ))]),
+                    create_block(vec![create_implicit_return(create_assign("x", int(1)))]),
                     Some(create_block(vec![create_implicit_return(create_assign(
                         "x",
                         int(2),
@@ -2247,9 +2256,7 @@ pub mod parser_tests {
             vec![create_get_property(
                 create_call(
                     create_let_ref("Person"),
-                    vec![
-                        named_arg(ident("id"), int(1))
-                    ],
+                    vec![named_arg(ident("id"), int(1))],
                 ),
                 ident("id"),
                 false,
@@ -2286,17 +2293,11 @@ pub mod parser_tests {
                 create_let("first_name", Some(string_lit("John"))),
                 create_call(
                     create_let_ref("Person"),
-                    vec![
-                        arg(create_let_ref("id")),
-                        arg(create_let_ref("first_name")),
-                    ],
+                    vec![arg(create_let_ref("id")), arg(create_let_ref("first_name"))],
                 ),
                 create_call(
                     create_let_ref("Person"),
-                    vec![
-                        arg(create_let_ref("id")),
-                        arg(create_let_ref("first_name")),
-                    ],
+                    vec![arg(create_let_ref("id")), arg(create_let_ref("first_name"))],
                 ),
             ],
         );
