@@ -210,6 +210,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hir"
+version = "0.1.0"
+dependencies = [
+ "span_util",
+ "type_core",
+]
+
+[[package]]
 name = "id-arena"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
