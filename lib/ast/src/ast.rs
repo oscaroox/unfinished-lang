@@ -318,15 +318,25 @@ pub struct Logic {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct LoopExpr {
+    pub body: Box<Expression>,
+    pub loop_token: Span,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct WhileExpr {
     pub condition: Box<Expression>,
     pub body: Box<Expression>,
     pub span: Span,
-    pub loop_token: Span,
+    pub while_token: Span,
+}
 
-    // this field is used for the 3 part for loop
-    // e.g loop i = 0; i < 10; i += 1; {}
-    // the 'i += 1' is important when using the continue expr in this kind of loop
-    pub iterator: Option<Box<Expression>>,
+#[derive(Debug, PartialEq, Clone)]
+pub struct ForExpr {
+    pub identifier: Identifier,
+    pub iterator: Box<Expression>,
+    pub body: Box<Expression>,
+    pub span: Span,
+    pub for_token: Span,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -375,6 +385,8 @@ pub enum Expression {
     Return(ReturnExpr),
     SelfExpr(SelfExpr),
     LoopExpr(LoopExpr),
+    WhileExpr(WhileExpr),
+    ForExpr(ForExpr),
     BreakExpr(BreakExpr),
     ContinueExpr(ContinueExpr),
 }
@@ -662,24 +674,39 @@ impl Expression {
         Expression::SelfExpr(SelfExpr { name, span })
     }
 
-    pub fn create_loop(
-        condition: Expression,
-        body: Expression,
-        iterator: Option<Expression>,
-        span: Span,
-        loop_token_span: Span,
-    ) -> Expression {
-        let iterator = if let Some(e) = iterator {
-            Some(Box::new(e))
-        } else {
-            None
-        };
+    pub fn create_loop(body: Expression, loop_token_span: Span) -> Expression {
         Expression::LoopExpr(LoopExpr {
             body: Box::new(body),
-            condition: Box::new(condition),
-            iterator,
-            span,
             loop_token: loop_token_span,
+        })
+    }
+
+    pub fn create_while(
+        condition: Expression,
+        body: Expression,
+        while_token_span: Span,
+    ) -> Expression {
+        Expression::WhileExpr(WhileExpr {
+            condition: Box::new(condition),
+            body: Box::new(body),
+            span: while_token_span.clone(),
+            while_token: while_token_span,
+        })
+    }
+
+    pub fn create_for(
+        identifier: Identifier,
+        iterator: Expression,
+        body: Expression,
+        span: Span,
+        for_token_span: Span,
+    ) -> Expression {
+        Expression::ForExpr(ForExpr {
+            identifier,
+            body: Box::new(body),
+            iterator: Box::new(iterator),
+            span: span,
+            for_token: for_token_span,
         })
     }
 
@@ -714,7 +741,9 @@ impl Expression {
             Expression::ImplicitReturn(s) => s.span.clone(),
             Expression::Return(s) => s.span.clone(),
             Expression::SelfExpr(s) => s.span.clone(),
-            Expression::LoopExpr(s) => s.span.clone(),
+            Expression::LoopExpr(s) => s.loop_token.clone(),
+            Expression::WhileExpr(s) => s.span.clone(),
+            Expression::ForExpr(s) => s.span.clone(),
             Expression::BreakExpr(s) => s.span.clone(),
             Expression::ContinueExpr(s) => s.span.clone(),
         }

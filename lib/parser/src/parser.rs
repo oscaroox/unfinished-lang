@@ -167,6 +167,10 @@ impl Parser {
             return self.data_struct_expression();
         } else if self.matches(vec![TokenType::Loop]) {
             return self.loop_expression();
+        } else if self.matches(vec![TokenType::For]) {
+            return self.for_expression();
+        } else if self.matches(vec![TokenType::While]) {
+            return self.while_expression();
         } else if self.matches(vec![TokenType::Break, TokenType::Continue]) {
             return self.continue_break_expression();
         }
@@ -339,54 +343,52 @@ impl Parser {
         })
     }
 
+    fn while_expression(&mut self) -> ParserResult {
+        let while_token = self.prev_token.clone();
+        let left_paren = self.eat_optional(TokenType::LeftParen);
+        let condition = self.expression()?;
+
+        if let Some(_) = left_paren {
+            self.eat(TokenType::RightParen, "Expected ')'")?;
+        }
+
+        let body = self.expression()?;
+
+        Ok(Expression::create_while(condition, body, while_token.span))
+    }
+
+    fn for_expression(&mut self) -> ParserResult {
+        let for_token = self.prev_token.clone();
+        let left_paren = self.eat_optional(TokenType::LeftParen);
+        let ident = self.eat(TokenType::Identifier, "Expected 'identifier'")?;
+
+        self.eat(TokenType::In, "Expected 'in'")?;
+
+        let iterator = self.expression()?;
+
+        if let Some(_) = left_paren {
+            self.eat(TokenType::RightParen, "Expected ')'")?;
+        }
+
+        let body = self.expression()?;
+
+        Ok(Expression::create_for(
+            Identifier::new(ident.value, ident.span),
+            iterator,
+            body,
+            for_token.span.clone(),
+            for_token.span,
+        ))
+    }
+
     fn loop_expression(&mut self) -> ParserResult {
         let loop_token = self.prev_token.clone();
-        let token = self.curr_token.clone();
-        let condition = if !self.check(TokenType::LeftBrace) {
-            self.expression()?
-        } else {
-            Expression::create_literal(LiteralValue::Bool(true), loop_token.span.clone())
-        };
-
-        let iterator = if self.matches(vec![TokenType::In]) {
-            Some(self.expression()?)
-        } else {
-            None
-        };
 
         self.eat(TokenType::LeftBrace, "Expected '{'")?;
 
         let body = self.block_expression()?;
 
-        if let Some(iter) = iterator {
-            return match &condition {
-                Expression::LetRef(let_ref) => Ok(Expression::create_loop(
-                    Expression::create_let(
-                        let_ref.name.clone(),
-                        None,
-                        let_ref.span.clone(),
-                        let_ref.span.clone(),
-                    ),
-                    body,
-                    Some(iter.clone()),
-                    loop_token.span.extend(iter.get_span()),
-                    loop_token.span.clone(),
-                )),
-                _ => Err(ParserError::ExpectedToken(
-                    "Expected variable".to_string(),
-                    token,
-                )),
-            };
-        }
-
-        let span = loop_token.span.extend(condition.get_span());
-        Ok(Expression::create_loop(
-            condition,
-            body,
-            None,
-            span,
-            loop_token.span,
-        ))
+        Ok(Expression::create_loop(body, loop_token.span))
     }
 
     fn data_struct_instantiate(&mut self) -> ParserResult {
@@ -1513,31 +1515,66 @@ pub mod parser_tests {
     }
 
     #[test]
-    fn parse_loop_for_expr() {
+    fn parse_for_loop_expr() {
         parse(
             "
-        loop i in name {};
+        for i in name {};
+        for (i in name) {};
         ",
-            vec![create_loop(
-                create_let("i", None),
-                create_block(vec![]),
-                Some(create_let_ref("name")),
-            )],
+            vec![
+                create_for(ident("i"), create_let_ref("name"), create_block(vec![])),
+                create_for(ident("i"), create_let_ref("name"), create_block(vec![])),
+            ],
         );
 
         parse(
             "
-        loop i in (Person()) {};
+        for i in (Person()) {};
         ",
-            vec![create_loop(
-                create_let("i", None),
+            vec![create_for(
+                ident("i"),
+                create_grouping(create_call(create_let_ref("Person"), vec![])),
                 create_block(vec![]),
-                Some(create_grouping(create_call(
-                    create_let_ref("Person"),
-                    vec![],
-                ))),
             )],
         );
+    }
+
+    #[test]
+    fn parse_while_loop_expr() {
+        parse(
+            "
+        while true {};
+        while (true) {};
+        ",
+            vec![
+                create_while(bool_lit(true), create_block(vec![])),
+                create_while(bool_lit(true), create_block(vec![])),
+            ],
+        );
+
+        parse(
+            "
+        while (Person()) {};
+        ",
+            vec![create_while(
+                create_call(create_let_ref("Person"), vec![]),
+                create_block(vec![]),
+            )],
+        );
+    }
+
+    #[test]
+    fn parse_break_continue_expr() {
+        parse(
+            "
+        loop { break; }; 
+        loop { continue; }; 
+        ",
+            vec![
+                create_loop(create_block(vec![create_break()])),
+                create_loop(create_block(vec![create_continue()])),
+            ],
+        )
     }
 
     #[test]
@@ -2419,39 +2456,5 @@ pub mod parser_tests {
                 ),
             ],
         );
-    }
-
-    #[test]
-    fn parse_loop_expr() {
-        parse(
-            "
-            loop {}; 
-            loop true {}; 
-            loop 1 < 2 {};
-            ",
-            vec![
-                create_loop(bool_lit(true), create_block(vec![]), None),
-                create_loop(bool_lit(true), create_block(vec![]), None),
-                create_loop(
-                    create_logic(int(1), LogicOperation::LessThan(Span::fake()), int(2)),
-                    create_block(vec![]),
-                    None,
-                ),
-            ],
-        )
-    }
-
-    #[test]
-    fn parse_break_continue_expr() {
-        parse(
-            "
-        loop { break; }; 
-        loop { continue; }; 
-        ",
-            vec![
-                create_loop(bool_lit(true), create_block(vec![create_break()]), None),
-                create_loop(bool_lit(true), create_block(vec![create_continue()]), None),
-            ],
-        )
     }
 }

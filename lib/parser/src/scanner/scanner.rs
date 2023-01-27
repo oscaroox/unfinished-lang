@@ -152,6 +152,8 @@ impl Scanner {
             "null" => Token::null(label),
             "self" => Token::self_token(label),
             "loop" => Token::loop_token(label),
+            "while" => Token::while_token(label),
+            "for" => Token::for_token(label),
             "in" => Token::in_token(label),
             "true" => Token::true_token(label),
             "false" => Token::false_token(label),
@@ -747,7 +749,7 @@ mod tests {
     #[test]
     fn scan_keywords() {
         test_scan(
-            "let fn true false null if else return data self loop break continue in",
+            "let fn true false null if else return data self loop for while break continue in",
             vec![
                 (TokenType::Let, None),
                 (TokenType::Fn, None),
@@ -760,6 +762,8 @@ mod tests {
                 (TokenType::Data, None),
                 (TokenType::SELF, None),
                 (TokenType::Loop, None),
+                (TokenType::For, None),
+                (TokenType::While, None),
                 (TokenType::Break, None),
                 (TokenType::Continue, None),
                 (TokenType::In, None),

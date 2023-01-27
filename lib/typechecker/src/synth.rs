@@ -658,6 +658,8 @@ impl TypeChecker {
 
                 Ok(Type::Unit)
             }
+            Expression::ForExpr(_) => todo!(),
+            Expression::WhileExpr(_) => todo!(),
         }
     }
 

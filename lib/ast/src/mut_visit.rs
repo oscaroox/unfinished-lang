@@ -85,6 +85,13 @@ pub trait MutVisitor: Sized {
         walk_loop(self, e);
     }
 
+    fn visit_while(&mut self, e: &mut ast::WhileExpr) {
+        walk_while(self, e);
+    }
+    fn visit_for(&mut self, e: &mut ast::ForExpr) {
+        walk_for(self, e);
+    }
+
     fn visit_break(&mut self, _e: &mut ast::BreakExpr) {}
 
     fn visit_continue(&mut self, _e: &mut ast::ContinueExpr) {}
@@ -118,16 +125,24 @@ pub fn walk_expr<V: MutVisitor>(vis: &mut V, expr: &mut ast::Expression) {
         ast::Expression::Return(e) => vis.visit_return(e),
         ast::Expression::SelfExpr(e) => vis.visit_self(e),
         ast::Expression::LoopExpr(e) => vis.visit_loop(e),
+        ast::Expression::WhileExpr(e) => vis.visit_while(e),
+        ast::Expression::ForExpr(e) => vis.visit_for(e),
         ast::Expression::BreakExpr(e) => vis.visit_break(e),
         ast::Expression::ContinueExpr(e) => vis.visit_continue(e),
     }
 }
 
-pub fn walk_loop<V: MutVisitor>(vis: &mut V, e: &mut ast::LoopExpr) {
+pub fn walk_for<V: MutVisitor>(vis: &mut V, e: &mut ast::ForExpr) {
+    vis.visit_expr(&mut e.iterator);
+    vis.visit_expr(&mut e.body);
+}
+
+pub fn walk_while<V: MutVisitor>(vis: &mut V, e: &mut ast::WhileExpr) {
     vis.visit_expr(&mut e.condition);
-    if let Some(i) = &mut e.iterator {
-        vis.visit_expr(i)
-    }
+    vis.visit_expr(&mut e.body);
+}
+
+pub fn walk_loop<V: MutVisitor>(vis: &mut V, e: &mut ast::LoopExpr) {
     vis.visit_expr(&mut e.body);
 }
 

@@ -152,12 +152,16 @@ pub fn create_continue() -> Expression {
     Expression::create_continue(Span::fake())
 }
 
-pub fn create_loop(
-    condition: Expression,
-    body: Expression,
-    iterator: Option<Expression>,
-) -> Expression {
-    Expression::create_loop(condition, body, iterator, Span::fake(), Span::fake())
+pub fn create_loop(body: Expression) -> Expression {
+    Expression::create_loop(body, Span::fake())
+}
+
+pub fn create_for(ident: Identifier, iterator: Expression, body: Expression) -> Expression {
+    Expression::create_for(ident, iterator, body, Span::fake(), Span::fake())
+}
+
+pub fn create_while(condition: Expression, body: Expression) -> Expression {
+    Expression::create_while(condition, body, Span::fake())
 }
 
 pub fn create_if(
