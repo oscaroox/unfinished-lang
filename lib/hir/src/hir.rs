@@ -226,7 +226,7 @@ pub struct DataStruct {
 #[derive(Debug, Clone)]
 pub struct While {
     pub condition: Box<Expression>,
-    pub body: Program,
+    pub body: Box<Expression>,
     pub kw_span: Span,
 }
 
