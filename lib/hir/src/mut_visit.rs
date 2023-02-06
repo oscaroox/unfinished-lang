@@ -170,17 +170,17 @@ pub fn walk_let<V: MutVisitor>(vis: &mut V, e: &mut hir::Let) {
 
 pub fn walk_set_property<V: MutVisitor>(vis: &mut V, e: &mut hir::SetProperty) {
     vis.visit_expr(&mut e.lhs);
-    vis.visit_expr(&mut e.value);
+    vis.visit_expr(&mut e.rhs);
 }
 
 pub fn walk_get_property<V: MutVisitor>(vis: &mut V, e: &mut hir::GetProperty) {
-    vis.visit_expr(&mut e.object);
+    vis.visit_expr(&mut e.lhs);
 }
 
 pub fn walk_set_index<V: MutVisitor>(vis: &mut V, e: &mut hir::SetIndex) {
     vis.visit_expr(&mut e.lhs);
     vis.visit_expr(&mut e.idx);
-    vis.visit_expr(&mut e.value);
+    vis.visit_expr(&mut e.rhs);
 }
 
 pub fn walk_get_index<V: MutVisitor>(vis: &mut V, e: &mut hir::GetIndex) {

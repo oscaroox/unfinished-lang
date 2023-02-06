@@ -15,7 +15,7 @@ pub struct Let {
     pub ident: Ident,
     pub init: Option<Box<Expression>>,
     pub span: Span,
-    pub let_span: Span,
+    pub kw_span: Span,
 }
 
 #[derive(Debug, Clone)]
@@ -33,7 +33,7 @@ pub struct Literal {
 
 #[derive(Debug, Clone)]
 pub enum LiteralKind {
-    Int(u64),
+    Int(i64),
     Float(f64),
     Bool(bool),
     String(String),
@@ -108,7 +108,7 @@ pub struct LogicOp {
 #[derive(Debug, Clone)]
 pub struct Param {
     pub ident: String,
-    pub ty: Type,
+    pub ty: Option<Type>,
     pub span: Span,
 }
 
@@ -129,7 +129,7 @@ pub struct Function {
 }
 
 #[derive(Debug, Clone)]
-pub struct Arg(Expression);
+pub struct Arg(pub Option<Ident>, pub Expression);
 
 #[derive(Debug, Clone)]
 pub struct Call {
@@ -188,13 +188,13 @@ pub struct GetIndex {
 pub struct SetIndex {
     pub lhs: Box<Expression>,
     pub idx: Box<Expression>,
-    pub value: Box<Expression>,
+    pub rhs: Box<Expression>,
     pub span: Span,
 }
 
 #[derive(Debug, Clone)]
 pub struct GetProperty {
-    pub object: Box<Expression>,
+    pub lhs: Box<Expression>,
     pub ident: Ident,
     pub is_callable: bool,
     pub span: Span,
@@ -204,14 +204,14 @@ pub struct GetProperty {
 pub struct SetProperty {
     pub lhs: Box<Expression>,
     pub ident: Ident,
-    pub value: Box<Expression>,
+    pub rhs: Box<Expression>,
     pub span: Span,
 }
 
 #[derive(Debug, Clone)]
 pub struct DataStructField {
     pub name: String,
-    pub ty: Type,
+    pub ty: Option<Type>,
     pub span: Span,
 }
 

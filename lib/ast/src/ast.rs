@@ -245,7 +245,7 @@ pub struct ImplicitReturn {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ReturnExpr {
-    pub value: Box<Option<Expression>>,
+    pub value: Option<Box<Expression>>,
     pub return_token: Span,
     pub span: Span,
 }
@@ -635,7 +635,7 @@ impl Expression {
         return_token_span: Span,
     ) -> Expression {
         Expression::Return(ReturnExpr {
-            value: Box::new(value),
+            value: value.and_then(|e| Some(Box::new(e))),
             span,
             return_token: return_token_span,
         })

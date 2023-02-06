@@ -148,7 +148,7 @@ pub fn walk_for<V: Visitor>(vis: &mut V, e: &ast::ForExpr) {
 }
 
 pub fn walk_return<V: Visitor>(vis: &mut V, e: &ast::ReturnExpr) {
-    if let Some(e) = &*e.value {
+    if let Some(e) = &e.value {
         vis.visit_expr(e)
     }
 }

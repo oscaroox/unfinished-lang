@@ -4,6 +4,7 @@ members = [
     "bin/unf",
     "lib/typechecker",
     "lib/hir",
+    "lib/ast_hir",
     "lib/ast",
     "lib/interpreter",
     "lib/parser",

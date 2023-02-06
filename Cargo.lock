@@ -20,6 +20,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ast_hir"
+version = "0.1.0"
+dependencies = [
+ "ast",
+ "hir",
+ "span_util",
+]
+
+[[package]]
 name = "ast_passes"
 version = "0.1.0"
 dependencies = [

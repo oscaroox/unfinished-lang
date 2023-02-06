@@ -147,7 +147,7 @@ pub fn walk_loop<V: MutVisitor>(vis: &mut V, e: &mut ast::LoopExpr) {
 }
 
 pub fn walk_return<V: MutVisitor>(vis: &mut V, e: &mut ast::ReturnExpr) {
-    if let Some(e) = &mut *e.value {
+    if let Some(e) = &mut e.value {
         vis.visit_expr(e)
     }
 }
