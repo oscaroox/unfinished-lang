@@ -608,12 +608,8 @@ impl Parser {
 
         if !exprs.is_empty() && !self.prev_token.is_semi_colon() {
             let expr = exprs.pop().unwrap();
-            // if !expr.is_scope() {
             let span = expr.get_span();
             exprs.push(Expression::create_implicit_return(expr, span));
-            // } else {
-            //     exprs.push(expr);
-            // }
         }
 
         self.eat(TokenType::RightBrace, "Expected '}'")?;
