@@ -82,6 +82,7 @@ impl TypeChecker {
                 ast::LiteralValue::Float(_) => Type::float(),
                 ast::LiteralValue::Bool(_) => Type::bool(),
                 ast::LiteralValue::String(_) => Type::string(),
+                ast::LiteralValue::Tuple(_) => todo!(),
                 ast::LiteralValue::Array(arr) => match arr.is_empty() {
                     false => {
                         let first = self.synth(&arr[0], env)?;
@@ -158,7 +159,7 @@ impl TypeChecker {
                 Ok(ret_type)
             }
             Expression::ImplicitReturn(expr) => self.synth(&expr.value, &env),
-            Expression::Return(expr) => match &*expr.value {
+            Expression::Return(expr) => match &expr.value {
                 Some(e) => self.synth(e, env),
                 None => Ok(Type::Unit),
             },
