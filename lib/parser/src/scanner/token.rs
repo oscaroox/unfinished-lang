@@ -93,6 +93,7 @@ impl Token {
     impl_token!(colon, Colon);
     impl_token!(colon_colon, ColonColon);
     impl_token!(dot, Dot);
+    impl_token!(pipe, Pipe);
 
     impl_token!(assign, Assign);
     impl_token!(assign_colon, AssignColon);

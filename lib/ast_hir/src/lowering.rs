@@ -35,7 +35,8 @@ fn lower_literal(lit: ast::LiteralValue) -> hir::LiteralKind {
         ast::LiteralValue::Float(l) => hir::LiteralKind::Float(l),
         ast::LiteralValue::Bool(l) => hir::LiteralKind::Bool(l),
         ast::LiteralValue::String(l) => hir::LiteralKind::String(l),
-        ast::LiteralValue::Array(l) => hir::LiteralKind::Array(l.iter().map(|e| lower_expression(e)).collect()),
+        ast::LiteralValue::Array(l) | ast::LiteralValue::Tuple(l)  
+        => hir::LiteralKind::Array(l.iter().map(|e| lower_expression(e)).collect()),
         ast::LiteralValue::Null => todo!("Remove nulls"),
     }
 }

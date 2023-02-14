@@ -1,5 +1,6 @@
 use crate::scanner::Token;
 use ariadne::{Label, Report, ReportKind};
+use span_util::Span;
 use thiserror::Error;
 
 #[derive(Debug, Error, Clone, PartialEq)]
@@ -15,6 +16,9 @@ pub enum ParserError {
 
     #[error("Unterminated string")]
     UnterminatedString(Token),
+
+    #[error("Expected parameter")]
+    ExpectedParameter(Span),
 
     #[error("Unterminated string interpolation")]
     UnterminatedInterpolation(Token),
@@ -49,12 +53,22 @@ impl ParserError {
             | ParserError::InvalidUseOfUnitType(tok)
             | ParserError::InvalidType(tok)
             | ParserError::UnterminatedString(tok) => {
-                let label = Label::new(tok.span.to_range());
-                Report::build(ReportKind::Error, (), 99)
-                    .with_message("Parser Error")
-                    .with_label(label.with_message(msg))
-                    .finish()
+                let label = Label::new(tok.span.to_range())
+                    .with_message(msg);
+                self.build_report(label)
+            },
+            ParserError::ExpectedParameter(span) => {
+                let label = Label::new(span.to_range())
+                    .with_message(msg);
+                self.build_report(label)
             }
         }
+    }
+
+    fn build_report(&mut self, label: Label) -> Report {
+        Report::build(ReportKind::Error, (), 99)
+        .with_message("Parser Error")
+        .with_label(label)
+        .finish()
     }
 }

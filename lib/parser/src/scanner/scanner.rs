@@ -291,7 +291,7 @@ impl Scanner {
                     self.advance();
                     return Token::or(pos..self.pos);
                 }
-                Token::illegal(curr_ch.to_string(), pos..self.pos)
+                Token::pipe(pos..self.pos)
             }
             '>' => {
                 if self.peek() == '=' {
@@ -572,7 +572,7 @@ mod tests {
     #[test]
     fn scan_other_tokens() {
         test_scan(
-            "{},;()[]! =>:.::",
+            "{},;()[]! =>:.::|",
             vec![
                 (TokenType::LeftBrace, None),
                 (TokenType::RightBrace, None),
@@ -587,6 +587,7 @@ mod tests {
                 (TokenType::Colon, None),
                 (TokenType::Dot, None),
                 (TokenType::ColonColon, None),
+                (TokenType::Pipe, None),
                 (TokenType::EOF, None),
             ],
         );

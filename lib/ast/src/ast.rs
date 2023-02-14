@@ -272,6 +272,7 @@ pub enum LiteralValue {
     Bool(bool),
     String(String),
     Array(Vec<Expression>),
+    Tuple(Vec<Expression>),
     Null,
 }
 

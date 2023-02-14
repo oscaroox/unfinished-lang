@@ -64,6 +64,7 @@ pub enum TokenType {
     Colon,
     ColonColon,
     Dot,
+    Pipe, // |
 
     DoubleQuote, // "
     DollarSign,
@@ -133,6 +134,7 @@ impl std::fmt::Display for TokenType {
             TokenType::Colon => write!(f, ":"),
             TokenType::ColonColon => write!(f, "::"),
             TokenType::Dot => write!(f, "."),
+            TokenType::Pipe => write!(f, "|"),
 
             TokenType::DoubleQuote => write!(f, "\""),
             TokenType::DollarSign => write!(f, "$"),

@@ -32,6 +32,10 @@ pub fn array(val: Vec<Expression>) -> Expression {
     Expression::create_literal(LiteralValue::Array(val), Span::fake())
 }
 
+pub fn tuple(val: Vec<Expression>) -> Expression {
+    Expression::create_literal(LiteralValue::Tuple(val), Span::fake())
+}
+
 pub fn null() -> Expression {
     Expression::create_literal(LiteralValue::Null, Span::fake())
 }
@@ -75,6 +79,10 @@ pub fn create_let_ref(val: &str) -> Expression {
 
 pub fn create_let_ref_with_scope(val: &str, scope: Option<usize>) -> Expression {
     Expression::create_let_ref(ident(val), Span::fake(), scope)
+}
+
+pub fn create_let_ref_with_ident(val: Identifier) -> Expression {
+    Expression::create_let_ref(val, Span::fake(), None)
 }
 
 pub fn create_block(exprs: Vec<Expression>) -> Expression {
@@ -192,4 +200,9 @@ pub fn create_function(
     body: Expression,
 ) -> Expression {
     Expression::create_function(name, params, return_type, is_static, body, Span::fake())
+}
+
+
+pub fn create_function_with_body(body: Expression) -> Expression {
+    Expression::create_function(None, vec![], Type::unit(), true, body, Span::fake())
 }

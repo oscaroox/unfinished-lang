@@ -1,8 +1,8 @@
 use crate::scanner::{Scanner, ScannerMode, Token, TokenType};
 use crate::ParserError;
 use ast::{
-    BinaryOperation, CallArgs, DataStructInstanceField, Expression, Identifier, LiteralValue,
-    Program,
+    BinaryOperation, CallArgs, Expression, Identifier, LiteralValue,
+    Program, 
 };
 use span_util::Span;
 use type_core::{FunctionParam, Type};
@@ -32,6 +32,7 @@ pub struct Parser {
     prev_token: Token,
     curr_token: Token,
     errors: Vec<ParserError>,
+    parsing_loop_cond: bool,
 }
 
 impl Parser {
@@ -42,6 +43,7 @@ impl Parser {
             prev_token: Token::eof(0..0),
             curr_token,
             errors: vec![],
+            parsing_loop_cond: false,
         }
     }
 
@@ -102,7 +104,10 @@ impl Parser {
     fn check_peek(&mut self, token_type: TokenType) -> bool {
         self.peek().token_type == token_type
     }
-
+    /**
+     * Limit the use of peek since the parser only knows the current token, 
+     * peeking ahead requires the scanner to backtrack.
+     */
     fn peek(&mut self) -> Token {
         let token = self.scanner.next_token();
         self.scanner.backtrack();
@@ -160,7 +165,7 @@ impl Parser {
         } else if self.matches(vec![TokenType::If]) {
             return self.if_expression();
         } else if self.matches(vec![TokenType::LeftBrace]) {
-            return self.block_expression();
+            return self.lambda_expression();
         } else if self.matches(vec![TokenType::Return]) {
             return self.return_expression();
         } else if self.matches(vec![TokenType::Data]) {
@@ -184,6 +189,7 @@ impl Parser {
         if self.curr_token.token_type != token_end {
             while !self.is_end() {
                 if self.check(TokenType::SELF) {
+                    // TODO No need to error when encountering self 
                     return Err(ParserError::Error(
                         "Expected 'self' to be the first parameter in a method".to_string(),
                         self.curr_token.clone(),
@@ -343,16 +349,30 @@ impl Parser {
         })
     }
 
+    /**
+     * When parsing the if,while and loop expression without parenthesis,
+     * The parser might parse the condition/iterator as a lambda expression,
+     * This function lets the parser know that it is parsing one of the expressions above.
+     */
+    fn parse_ambiguous_lambda_expr(&mut self) -> ParserResult {
+        self.parsing_loop_cond = true;
+        let condition = self.expression();
+        self.parsing_loop_cond = false;
+        condition
+    }
+
     fn while_expression(&mut self) -> ParserResult {
         let while_token = self.prev_token.clone();
         let left_paren = self.eat_optional(TokenType::LeftParen);
-        let condition = self.expression()?;
+
+        let condition = self.parse_ambiguous_lambda_expr()?;
 
         if let Some(_) = left_paren {
             self.eat(TokenType::RightParen, "Expected ')'")?;
         }
+        self.eat(TokenType::LeftBrace, "Expected '{'")?;
 
-        let body = self.expression()?;
+        let body = self.block_expression()?;
 
         Ok(Expression::create_while(condition, body, while_token.span))
     }
@@ -364,13 +384,14 @@ impl Parser {
 
         self.eat(TokenType::In, "Expected 'in'")?;
 
-        let iterator = self.expression()?;
+        let iterator = self.parse_ambiguous_lambda_expr()?;
 
         if let Some(_) = left_paren {
             self.eat(TokenType::RightParen, "Expected ')'")?;
         }
 
-        let body = self.expression()?;
+        self.eat(TokenType::LeftBrace, "Expected '{'")?;
+        let body = self.block_expression()?;
 
         Ok(Expression::create_for(
             Identifier::new(ident.value, ident.span),
@@ -389,56 +410,6 @@ impl Parser {
         let body = self.block_expression()?;
 
         Ok(Expression::create_loop(body, loop_token.span))
-    }
-
-    fn data_struct_instantiate(&mut self) -> ParserResult {
-        let identifier_span = self.curr_token.span.clone();
-        let ident = self.eat(TokenType::Identifier, "Expected identifier")?;
-        self.eat(TokenType::LeftBrace, "Expected '{'")?;
-
-        let mut fields = vec![];
-
-        if self.curr_token.token_type != TokenType::RightBrace {
-            while !self.curr_token.is_eof() {
-                let id_span = self.curr_token.span.clone();
-                let id = self.eat(TokenType::Identifier, "Expected identifier")?;
-
-                if self.matches(vec![TokenType::Comma])
-                    || self.curr_token.token_type == TokenType::RightBrace
-                {
-                    let ident = Identifier::new(id.value.to_string(), id.span);
-                    fields.push(DataStructInstanceField::new(
-                        ident.clone(),
-                        Expression::create_let_ref(ident, id_span, None),
-                    ));
-                    if self.curr_token.token_type == TokenType::RightBrace {
-                        break;
-                    }
-                    continue;
-                }
-
-                self.eat(TokenType::Colon, "Expected ':'")?;
-                let expr = self.expression()?;
-                let field = DataStructInstanceField::new(
-                    Identifier::new(id.value.to_string(), id.span),
-                    expr,
-                );
-                fields.push(field);
-
-                if !self.matches(vec![TokenType::Comma])
-                    || self.curr_token.token_type == TokenType::RightBrace
-                {
-                    break;
-                }
-            }
-        }
-
-        self.eat(TokenType::RightBrace, "Expected '}'")?;
-        Ok(Expression::create_data_struct_instance(
-            Identifier::new(ident.value.to_string(), ident.span),
-            fields,
-            identifier_span,
-        ))
     }
 
     fn data_struct_expression(&mut self) -> ParserResult {
@@ -591,6 +562,40 @@ impl Parser {
         ))
     }
 
+    fn lambda_expression(&mut self) -> ParserResult {
+        let span_left_brace = self.prev_token.span.clone();
+        let params = match self.curr_token.token_type {
+            TokenType::Pipe => {
+                self.advance();
+                let params = self.parse_parameters(TokenType::Pipe)?;
+                self.eat(TokenType::Pipe, "Expected '|'")?;
+                Some(params)
+            },
+            TokenType::Or => {
+                self.advance();
+                Some(vec![])
+            },
+            _ => None
+        };
+
+        let expr = if let Some(params) = params {
+            let return_type = if self.matches(vec![TokenType::Colon]) {
+                self.parse_type(true)?
+            } else {
+                Type::unit()
+            };
+
+            self.eat(TokenType::Arrow, "Expected '=>'")?;
+            let body = self.block_expression()?;
+            Expression::create_function(None, params, return_type, true, body, span_left_brace)
+        } else {
+            let body = self.block_expression()?;
+            Expression::create_function(None, vec![], Type::unit(), true, body, span_left_brace)
+        };
+        
+        Ok(expr)
+    }
+
     fn block_expression(&mut self) -> ParserResult {
         let span_left_brace = self.prev_token.span.clone();
         let mut exprs = vec![];
@@ -619,7 +624,7 @@ impl Parser {
     fn if_expression(&mut self) -> ParserResult {
         let if_token = self.prev_token.clone();
         let left_paren = self.eat_optional(TokenType::LeftParen);
-        let expr = self.expression()?;
+        let expr = self.parse_ambiguous_lambda_expr()?;
         let expr_span = expr.get_span();
 
         if left_paren.is_some() {
@@ -680,7 +685,7 @@ impl Parser {
                                 Expression::create_let_ref(
                                     let_ref.name.clone(),
                                     rhs_span.clone(),
-                                    None,
+                                    let_ref.scope_distance,
                                 ),
                                 assignment_tok.to_binary_operator(),
                                 rhs,
@@ -889,6 +894,18 @@ impl Parser {
                     is_callable,
                     ident_span,
                 )
+            } else if self.check(TokenType::LeftBrace) && !self.parsing_loop_cond {
+                self.advance();
+                let lambda_exprs = self.lambda_expression()?;
+                let span = lambda_exprs.get_span();
+                expr = if let Expression::Call(c) = expr {
+                    let mut new_args = c.arguments.clone();
+                    new_args.push(CallArgs(None, lambda_exprs));
+                    Expression::create_call(*c.callee, new_args, span)
+                } else {
+                    Expression::create_call(expr, vec![CallArgs(None, lambda_exprs)], span)
+                }
+
             } else {
                 break;
             }
@@ -940,30 +957,6 @@ impl Parser {
             ));
         }
 
-        if self.check(TokenType::Identifier)
-            && self.check_peek(TokenType::LeftBrace)
-            // TODO data struct instantiation has the same syntax
-            //  When using the In and If expression
-            //  e.g if value {}
-            //        ^^^^^^^^ after the If the parser will try to parse the expression after if as a data struct
-            //  possible solution is the one below checking if the the previous token is one of the keywords: If and In
-            //  there should be a better solution: what if we implement pattern matching / destructuring
-            //  let Person { name } = person; // will be parsed as data struct instantiation
-            //  match person {
-            //      Person { name } => name,
-            //  }
-            //  In the match expression the parser would try to parse the first match arm as
-            //  a data struct instantiation
-            //
-            //  Possible solution is to use the :: token for instantiation
-            //  e.g: Person :: { id: 1 };
-            && self.prev_token.token_type != TokenType::In
-            && self.prev_token.token_type != TokenType::If
-            && self.prev_token.token_type != TokenType::Loop
-        {
-            return self.data_struct_instantiate();
-        }
-
         if self.matches(vec![TokenType::Identifier]) {
             return Ok(Expression::create_let_ref(
                 Identifier::new(token.value.to_string(), token.span),
@@ -1001,13 +994,37 @@ impl Parser {
         }
 
         if self.matches(vec![TokenType::LeftParen]) {
-            let expr = self.expression()?;
-            self.eat(TokenType::RightParen, "Unterminated grouping expression")?;
-            let span: Span = (token.span.start..self.prev_token.span.start).into();
-            return Ok(Expression::create_grouping(expr, span));
+            return self.parse_tuple_or_grouping();
         }
 
         Err(ParserError::UnexpectedToken(self.curr_token.clone()))
+    }
+
+    fn parse_tuple_or_grouping(&mut self) -> ParserResult {
+        let left_paren = self.prev_token.clone(); // (
+        let expr = self.expression()?;
+        let mut tuple = vec![expr];
+        // if there is a comma then we parse it as a tuple expression
+        if self.matches(vec![TokenType::Comma]) && 
+            self.curr_token.token_type != TokenType::RightParen && !self.is_end() {
+            loop {
+                let expr = self.expression()?;
+                tuple.push(expr);
+                if !self.matches(vec![TokenType::Comma, TokenType::SemiColon])
+                    || self.curr_token.token_type == TokenType::RightParen
+                {
+                    break;
+                }
+            }
+        }
+
+        self.eat(TokenType::RightParen, "Expected ')'")?;
+        let span: Span = (left_paren.span.start..self.prev_token.span.start).into();
+        if tuple.len() == 1 {
+            Ok(Expression::create_grouping(tuple[0].clone(), span))
+        } else {
+            Ok(Expression::create_literal(LiteralValue::Tuple(tuple), span))
+        }
     }
 
     fn parse_string(&mut self) -> ParserResult {
@@ -1098,7 +1115,6 @@ impl Parser {
                 span,
             ));
         }
-
         // from here on out there should be more than one expression in the output
         let mut expr = Expression::create_binop(
             out[0].clone(),
@@ -1120,6 +1136,7 @@ impl Parser {
     }
 }
 
+
 #[cfg(test)]
 pub mod parser_tests {
 
@@ -1127,7 +1144,7 @@ pub mod parser_tests {
     use crate::scanner::{Scanner, Token};
     use crate::test_utils::*;
     use crate::ParserError;
-    use ast::{BinaryOperation, LogicOperation, Program, UnaryOperation};
+    use ast::{BinaryOperation, LogicOperation, Program, UnaryOperation, CallArgs};
 
     use span_util::Span;
     use type_core::{FunctionParam, Type};
@@ -1184,15 +1201,13 @@ pub mod parser_tests {
         parse_recover(
             r#"
             let x = 1
-            let y = 2
-            let n = 33;
-            let bb = {}
+            let y = 2;
+            let n = 33
         "#,
             vec![
                 create_let("x", Some(int(1))),
                 create_let("y", Some(int(2))),
                 create_let("n", Some(int(33))),
-                create_let("bb", Some(create_block(vec![]))),
             ],
         )
     }
@@ -1418,35 +1433,35 @@ pub mod parser_tests {
 
     #[test]
     // last expression in a block can implicitly return by not including the semicolon
-    fn parse_last_expr_in_block_return_on_no_semi() {
+    fn parse_implicit_return_expr() {
         parse(
             "
-        {
+        fn {
             let x = 2;
             let y = 3;
             x
         };
-        {
+        fn {
             let x = 2;
             let y = 3;
             x;
         };
-        { x };
-        {x;};
+        fn { x };
+        fn { x; };
         ",
             vec![
-                create_block(vec![
+                create_function_with_body(create_block(vec![
                     create_let("x", Some(int(2))),
                     create_let("y", Some(int(3))),
                     create_implicit_return(create_let_ref("x")),
-                ]),
-                create_block(vec![
+                ])),
+                create_function_with_body(create_block(vec![
                     create_let("x", Some(int(2))),
                     create_let("y", Some(int(3))),
                     create_let_ref("x"),
-                ]),
-                create_block(vec![create_implicit_return(create_let_ref("x"))]),
-                create_block(vec![create_let_ref("x")]),
+                ])),
+                create_function_with_body(create_block(vec![create_implicit_return(create_let_ref("x"))])),
+                create_function_with_body(create_block(vec![create_let_ref("x")])),
             ],
         );
     }
@@ -1615,7 +1630,6 @@ pub mod parser_tests {
         parse(
             r#"
             [1, 3, 4, true, false, "string", 2.0, null];
-            [{}];
             [1,];
             "#,
             vec![
@@ -1629,7 +1643,6 @@ pub mod parser_tests {
                     float(2.0),
                     null(),
                 ]),
-                array(vec![create_block(vec![])]),
                 array(vec![int(1)]),
             ],
         );
@@ -1669,10 +1682,13 @@ pub mod parser_tests {
     }
 
     #[test]
-    fn parse_identifier() {
+    fn parse_let_ref_expr() {
         parse(
             "num; num2;",
-            vec![create_let_ref("num"), create_let_ref("num2")],
+            vec![
+                create_let_ref("num"), 
+                create_let_ref("num2"),
+            ],
         );
     }
 
@@ -1973,6 +1989,7 @@ pub mod parser_tests {
         )
     }
 
+
     #[test]
     fn parse_function_expr() {
         parse(
@@ -2009,19 +2026,124 @@ pub mod parser_tests {
     }
 
     #[test]
+    fn parse_tuple_expr() {
+        parse("
+            (1,2,3)
+            (x,y,z)
+            (1)
+            (1,)
+        ", vec![
+            tuple(vec![int(1), int(2), int(3)]),
+            tuple(vec![create_let_ref("x"), create_let_ref("y"), create_let_ref("z")]),
+            create_grouping(int(1)),
+            create_grouping(int(1))
+        ]);
+    }
+    
+
+    #[test]
     fn parse_shorthand_lambda_expr() {
         parse(
             "
-            fn x => 1
+            { 1 + 2 }
+            { || => 1 }
+            { |x| => 1 }
+            { |x,y,| => 1 }
         ",
-            vec![create_function(
+            vec![
+            create_function(
+                None,
+                vec![],
+                Type::unit(),
+                true,
+                create_block(vec![create_implicit_return(create_binop(int(1), BinaryOperation::Add(Span::fake()), int(2)))]),
+            ),
+            create_function(
+                None,
+                vec![],
+                Type::unit(),
+                true,
+                create_block(vec![create_implicit_return(int(1))]),
+            ),
+            create_function(
                 None,
                 vec![ident("x")],
                 Type::unit(),
                 true,
                 create_block(vec![create_implicit_return(int(1))]),
-            )],
-        )
+            ),
+            create_function(
+                None,
+                vec![ident("x"), ident("y")],
+                Type::unit(),
+                true,
+                create_block(vec![create_implicit_return(int(1))]),
+            ),
+            ],
+        );
+    }
+
+    #[test]
+    fn parse_shorthand_lambda_typed_expr() {
+        parse(
+            "
+            { |x: int, y: int| => 1 }
+            { |x: int, y|: int => 1 }
+        ",
+            vec![
+            create_function(
+                None,
+                vec![ident_type("x", Type::int()), ident_type("y", Type::int())],
+                Type::unit(),
+                true,
+                create_block(vec![create_implicit_return(int(1))]),
+            ),
+            create_function(
+                None,
+                vec![ident_type("x", Type::int()), ident("y")],
+                Type::int(),
+                true,
+                create_block(vec![create_implicit_return(int(1))]),
+            )
+            ],
+        );
+    }
+
+    #[test]
+    fn parse_trailing_lambda_argument_expr() {
+        parse("
+        test { 1 }
+        test() { 1 }
+        test(1,2,3) { 1 }
+        ", vec![
+            create_call(
+                create_let_ref("test"), 
+                vec![
+                    CallArgs(None, create_function_with_body(create_block(vec![
+                        create_implicit_return(int(1))
+                    ])))
+                ]
+            ),
+            create_call(
+                create_let_ref("test"), 
+                vec![
+                    CallArgs(None, create_function_with_body(create_block(vec![
+                        create_implicit_return(int(1))
+                    ])))
+                ]
+            ),
+            create_call(
+                create_let_ref("test"), 
+                vec![
+                    CallArgs(None, int(1)),
+                    CallArgs(None, int(2)),
+                    CallArgs(None, int(3)),
+                    CallArgs(None, create_function_with_body(create_block(vec![
+                        create_implicit_return(int(1))
+                    ])))
+                ]
+            )
+        ])
     }
 
     #[test]
@@ -2072,33 +2194,6 @@ pub mod parser_tests {
         );
     }
 
-    #[test]
-    fn parse_block_expr() {
-        parse(
-            "
-            {};
-            let b = {
-                let x = 1;
-            };
-            let x = { 1; 2; 3; 4; 5; 3345 };
-            ",
-            vec![
-                create_block(vec![]),
-                create_let("b", Some(create_block(vec![create_let("x", Some(int(1)))]))),
-                create_let(
-                    "x",
-                    Some(create_block(vec![
-                        int(1),
-                        int(2),
-                        int(3),
-                        int(4),
-                        int(5),
-                        create_implicit_return(int(3345)),
-                    ])),
-                ),
-            ],
-        );
-    }
 
     #[test]
     fn parse_data_struct_expr() {
