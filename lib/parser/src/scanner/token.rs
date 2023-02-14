@@ -106,13 +106,6 @@ impl Token {
     impl_token!(double_quote, DoubleQuote);
     impl_token!(eof, EOF);
 
-    pub fn auto_semi_colon() -> Token {
-        Token {
-            token_type: TokenType::SemiColon,
-            value: TokenType::SemiColon.to_string(),
-            span: (0..0).into(),
-        }
-    }
 
     pub fn is_eof(&self) -> bool {
         self.token_type == TokenType::EOF
@@ -132,13 +125,6 @@ impl Token {
 
     pub fn is_semi_colon(&self) -> bool {
         self.token_type == TokenType::SemiColon
-    }
-
-    pub fn is_auto_inserted_semi_colon(&self) -> bool {
-        // TODO technically this cant really break shit ¯\_(ツ)_/¯
-        // But there should probably be a way  to check if the semi colon is auto inserted,
-        // maybe a boolean flag in the TokenType enum. 
-        self.is_semi_colon() && self.span.start == 0 && self.span.end == 0
     }
 
     pub fn replace_span(&mut self, new_span: Span) {
