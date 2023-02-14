@@ -611,7 +611,7 @@ impl Parser {
             }
         }
 
-        if !exprs.is_empty() && !self.prev_token.is_semi_colon() {
+        if !exprs.is_empty() && (self.prev_token.is_auto_inserted_semi_colon() || !self.prev_token.is_semi_colon()) {
             let expr = exprs.pop().unwrap();
             let span = expr.get_span();
             exprs.push(Expression::create_implicit_return(expr, span));
