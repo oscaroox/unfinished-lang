@@ -2028,10 +2028,10 @@ pub mod parser_tests {
     #[test]
     fn parse_tuple_expr() {
         parse("
-            (1,2,3)
-            (x,y,z)
-            (1)
-            (1,)
+            (1,2,3);
+            (x,y,z);
+            (1);
+            (1,);
         ", vec![
             tuple(vec![int(1), int(2), int(3)]),
             tuple(vec![create_let_ref("x"), create_let_ref("y"), create_let_ref("z")]),
@@ -2045,10 +2045,10 @@ pub mod parser_tests {
     fn parse_shorthand_lambda_expr() {
         parse(
             "
-            { 1 + 2 }
-            { || => 1 }
-            { |x| => 1 }
-            { |x,y,| => 1 }
+            { 1 + 2 };
+            { || => 1 };
+            { |x| => 1 };
+            { |x,y,| => 1 };
         ",
             vec![
             create_function(
@@ -2087,8 +2087,8 @@ pub mod parser_tests {
     fn parse_shorthand_lambda_typed_expr() {
         parse(
             "
-            { |x: int, y: int| => 1 }
-            { |x: int, y|: int => 1 }
+            { |x: int, y: int| => 1 };
+            { |x: int, y|: int => 1 };
         ",
             vec![
             create_function(
@@ -2112,9 +2112,9 @@ pub mod parser_tests {
     #[test]
     fn parse_trailing_lambda_argument_expr() {
         parse("
-        test { 1 }
-        test() { 1 }
-        test(1,2,3) { 1 }
+        test { 1 };
+        test() { 1 };
+        test(1,2,3) { 1 };
         ", vec![
             create_call(
                 create_let_ref("test"), 

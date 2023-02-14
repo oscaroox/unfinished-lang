@@ -10,7 +10,6 @@ pub enum ScannerMode {
 pub struct Scanner {
     source: Vec<char>,
     mode: ScannerMode,
-    insert_semi: bool,
     line: usize,
     pos: usize,
     ch: char,
@@ -22,7 +21,6 @@ impl Scanner {
         let mut scanner = Scanner {
             source: source.chars().collect(),
             mode: ScannerMode::Default,
-            insert_semi: false,
             line: 0,
             pos: 0,
             ch: '\0',
@@ -177,37 +175,7 @@ impl Scanner {
         }
     }
 
-    fn try_insert_semi_colon(&mut self, token_type: &TokenType) {
-        match self.ch {
-            '\n' | '\r' | '\0' => match token_type {
-                TokenType::IntConst
-                | TokenType::FloatConst
-                | TokenType::True
-                | TokenType::False
-                | TokenType::Break
-                | TokenType::Continue
-                | TokenType::Return
-                | TokenType::RightParen
-                | TokenType::RightBrace
-                | TokenType::Identifier
-                | TokenType::DoubleQuote
-                | TokenType::RightBracket
-                | TokenType::Int
-                | TokenType::Float
-                | TokenType::Bool
-                | TokenType::String
-                | TokenType::Unit => self.insert_semi = true,
-                _ => {}
-            },
-            _ => {}
-        };
-    }
-
     fn scan_normal(&mut self) -> Token {
-        if self.insert_semi {
-            self.insert_semi = false;
-            return Token::auto_semi_colon();
-        }
 
         self.skip_whitespace();
 
@@ -352,7 +320,6 @@ impl Scanner {
                 match token.token_type {
                     TokenType::Illegal => token,
                     _ => {
-                        self.try_insert_semi_colon(&token.token_type);
                         return token;
                     }
                 }
@@ -360,9 +327,6 @@ impl Scanner {
         };
 
         self.advance();
-
-        self.try_insert_semi_colon(&token.token_type);
-
         token
     }
 
@@ -670,7 +634,6 @@ mod tests {
                 (TokenType::Minus, Some("-")),
                 (TokenType::IntConst, Some("1")),
                 (TokenType::IntConst, Some("1234567890")),
-                (TokenType::SemiColon, None),
                 (TokenType::EOF, None),
             ],
         );
@@ -723,7 +686,6 @@ mod tests {
                 (TokenType::Identifier, Some("_test")),
                 (TokenType::Identifier, Some("abcdefghijklmnopqrstuvwxyz")),
                 (TokenType::Identifier, Some("ABCDEFGHIJKLMNOPQRSTUVWXYZ")),
-                (TokenType::SemiColon, None),
                 (TokenType::EOF, None),
             ],
         );
@@ -805,178 +767,5 @@ mod tests {
                 (TokenType::EOF, None),
             ],
         );
-    }
-
-    #[test]
-    fn scan_automatic_semi_insertion() {
-        test_scan(
-            "
-        1
-        2.0
-        x
-        true
-        false
-        break
-        continue
-        return
-        int
-        float
-        bool
-        string
-        unit
-        )
-        }
-        ]
-        ",
-            vec![
-                (TokenType::IntConst, Some("1")),
-                (TokenType::SemiColon, None),
-                (TokenType::FloatConst, Some("2.0")),
-                (TokenType::SemiColon, None),
-                (TokenType::Identifier, Some("x")),
-                (TokenType::SemiColon, None),
-                (TokenType::True, None),
-                (TokenType::SemiColon, None),
-                (TokenType::False, None),
-                (TokenType::SemiColon, None),
-                (TokenType::Break, None),
-                (TokenType::SemiColon, None),
-                (TokenType::Continue, None),
-                (TokenType::SemiColon, None),
-                (TokenType::Return, None),
-                (TokenType::SemiColon, None),
-                (TokenType::Int, None),
-                (TokenType::SemiColon, None),
-                (TokenType::Float, None),
-                (TokenType::SemiColon, None),
-                (TokenType::Bool, None),
-                (TokenType::SemiColon, None),
-                (TokenType::String, None),
-                (TokenType::SemiColon, None),
-                (TokenType::Unit, None),
-                (TokenType::SemiColon, None),
-                (TokenType::RightParen, None),
-                (TokenType::SemiColon, None),
-                (TokenType::RightBrace, None),
-                (TokenType::SemiColon, None),
-                (TokenType::RightBracket, None),
-                (TokenType::SemiColon, None),
-                (TokenType::EOF, None),
-            ],
-        );
-
-        test_scan(
-            "
-        let x = 2
-        x
-        ",
-            vec![
-                (TokenType::Let, None),
-                (TokenType::Identifier, Some("x")),
-                (TokenType::Assign, None),
-                (TokenType::IntConst, Some("2")),
-                (TokenType::SemiColon, None),
-                (TokenType::Identifier, Some("x")),
-                (TokenType::SemiColon, None),
-                (TokenType::EOF, None),
-            ],
-        )
-    }
-
-    #[test]
-    fn scan_automatic_semi_insertion_types() {
-        test_scan(
-            "
-        let x: int
-        let y: int
-        let n: string
-        ",
-            vec![
-                (TokenType::Let, None),
-                (TokenType::Identifier, Some("x")),
-                (TokenType::Colon, None),
-                (TokenType::Int, None),
-                (TokenType::SemiColon, None),
-                (TokenType::Let, None),
-                (TokenType::Identifier, Some("y")),
-                (TokenType::Colon, None),
-                (TokenType::Int, None),
-                (TokenType::SemiColon, None),
-                (TokenType::Let, None),
-                (TokenType::Identifier, Some("n")),
-                (TokenType::Colon, None),
-                (TokenType::String, None),
-                (TokenType::SemiColon, None),
-                (TokenType::EOF, None),
-            ],
-        )
-    }
-
-    #[test]
-    fn scan_automatic_insertion_eof() {
-        test_scan(
-            "
-        let x = 1
-        x",
-            vec![
-                (TokenType::Let, None),
-                (TokenType::Identifier, Some("x")),
-                (TokenType::Assign, None),
-                (TokenType::IntConst, Some("1")),
-                (TokenType::SemiColon, None),
-                (TokenType::Identifier, Some("x")),
-                (TokenType::SemiColon, None),
-                (TokenType::EOF, None),
-            ],
-        );
-    }
-
-    #[test]
-    fn scan_automatic_semi_insertion_strings() {
-        let src = r#"
-        let x = "testing123"
-        x
-        "#;
-
-        let mut scanner = Scanner::new(src.to_string());
-
-        let tok = scanner.next_token(); // let
-        assert_eq!(tok.token_type, TokenType::Let);
-
-        let tok = scanner.next_token(); // x
-        assert_eq!(tok.token_type, TokenType::Identifier);
-
-        let tok = scanner.next_token(); // =
-        assert_eq!(tok.token_type, TokenType::Assign);
-
-        let tok = scanner.next_token(); // "
-        assert_eq!(tok.token_type, TokenType::DoubleQuote);
-
-        // set scanner mode to parse strings
-        if tok.token_type == TokenType::DoubleQuote {
-            scanner.set_mode(ScannerMode::String);
-        }
-
-        let tok = scanner.next_token();
-
-        assert_eq!(tok.token_type, TokenType::StringConst);
-        assert_eq!(tok.value, String::from("testing123"));
-
-        scanner.set_mode(ScannerMode::Default);
-
-        let tok = scanner.next_token(); // "
-        assert_eq!(tok.token_type, TokenType::DoubleQuote);
-
-        let tok = scanner.next_token(); // auto insert semi
-        assert_eq!(tok.token_type, TokenType::SemiColon);
-
-        let tok = scanner.next_token(); // x
-        assert_eq!(tok.token_type, TokenType::Identifier);
-
-        let tok = scanner.next_token();
-        assert_eq!(tok.token_type, TokenType::SemiColon);
-
-        let tok = scanner.next_token();
-        assert_eq!(tok.token_type, TokenType::EOF);
     }
 }
