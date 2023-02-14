@@ -18,3 +18,5 @@ ast = { path = "../ast" }
 span_util = { path = "../span_util" }
 type_core = { path = "../type_core" }
 
+[dev-dependencies]
+pretty_assertions = { version= "1.3.0", default-features = false, features = ["alloc"] }

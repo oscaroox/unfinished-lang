@@ -350,6 +350,7 @@ version = "0.1.0"
 dependencies = [
  "ariadne",
  "ast",
+ "pretty_assertions",
  "span_util",
  "thiserror",
  "type_core",
