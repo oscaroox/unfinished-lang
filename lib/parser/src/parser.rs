@@ -1,9 +1,6 @@
 use crate::scanner::{Scanner, ScannerMode, Token, TokenType};
 use crate::ParserError;
-use ast::{
-    BinaryOperation, CallArgs, Expression, Identifier, LiteralValue,
-    Program, 
-};
+use ast::{BinaryOperation, CallArgs, Expression, Identifier, LiteralValue, Program};
 use span_util::Span;
 use type_core::{FunctionParam, Type};
 
@@ -105,7 +102,7 @@ impl Parser {
         self.peek().token_type == token_type
     }
     /**
-     * Limit the use of peek since the parser only knows the current token, 
+     * Limit the use of peek since the parser only knows the current token,
      * peeking ahead requires the scanner to backtrack.
      */
     fn peek(&mut self) -> Token {
@@ -189,7 +186,7 @@ impl Parser {
         if self.curr_token.token_type != token_end {
             while !self.is_end() {
                 if self.check(TokenType::SELF) {
-                    // TODO No need to error when encountering self 
+                    // TODO No need to error when encountering self
                     return Err(ParserError::Error(
                         "Expected 'self' to be the first parameter in a method".to_string(),
                         self.curr_token.clone(),
@@ -570,12 +567,12 @@ impl Parser {
                 let params = self.parse_parameters(TokenType::Pipe)?;
                 self.eat(TokenType::Pipe, "Expected '|'")?;
                 Some(params)
-            },
+            }
             TokenType::Or => {
                 self.advance();
                 Some(vec![])
-            },
-            _ => None
+            }
+            _ => None,
         };
 
         let expr = if let Some(params) = params {
@@ -592,7 +589,7 @@ impl Parser {
             let body = self.block_expression()?;
             Expression::create_function(None, vec![], Type::unit(), true, body, span_left_brace)
         };
-        
+
         Ok(expr)
     }
 
@@ -905,7 +902,6 @@ impl Parser {
                 } else {
                     Expression::create_call(expr, vec![CallArgs(None, lambda_exprs)], span)
                 }
-
             } else {
                 break;
             }
@@ -1005,8 +1001,10 @@ impl Parser {
         let expr = self.expression()?;
         let mut tuple = vec![expr];
         // if there is a comma then we parse it as a tuple expression
-        if self.matches(vec![TokenType::Comma]) && 
-            self.curr_token.token_type != TokenType::RightParen && !self.is_end() {
+        if self.matches(vec![TokenType::Comma])
+            && self.curr_token.token_type != TokenType::RightParen
+            && !self.is_end()
+        {
             loop {
                 let expr = self.expression()?;
                 tuple.push(expr);
@@ -1136,7 +1134,6 @@ impl Parser {
     }
 }
 
-
 #[cfg(test)]
 pub mod parser_tests {
 
@@ -1144,7 +1141,7 @@ pub mod parser_tests {
     use crate::scanner::{Scanner, Token};
     use crate::test_utils::*;
     use crate::ParserError;
-    use ast::{BinaryOperation, LogicOperation, Program, UnaryOperation, CallArgs};
+    use ast::{BinaryOperation, CallArgs, LogicOperation, Program, UnaryOperation};
 
     use span_util::Span;
     use type_core::{FunctionParam, Type};
@@ -1460,7 +1457,9 @@ pub mod parser_tests {
                     create_let("y", Some(int(3))),
                     create_let_ref("x"),
                 ])),
-                create_function_with_body(create_block(vec![create_implicit_return(create_let_ref("x"))])),
+                create_function_with_body(create_block(vec![create_implicit_return(
+                    create_let_ref("x"),
+                )])),
                 create_function_with_body(create_block(vec![create_let_ref("x")])),
             ],
         );
@@ -1685,10 +1684,7 @@ pub mod parser_tests {
     fn parse_let_ref_expr() {
         parse(
             "num; num2;",
-            vec![
-                create_let_ref("num"), 
-                create_let_ref("num2"),
-            ],
+            vec![create_let_ref("num"), create_let_ref("num2")],
         );
     }
 
@@ -1989,7 +1985,6 @@ pub mod parser_tests {
         )
     }
 
-
     #[test]
     fn parse_function_expr() {
         parse(
@@ -2027,19 +2022,25 @@ pub mod parser_tests {
 
     #[test]
     fn parse_tuple_expr() {
-        parse("
+        parse(
+            "
             (1,2,3);
             (x,y,z);
             (1);
             (1,);
-        ", vec![
-            tuple(vec![int(1), int(2), int(3)]),
-            tuple(vec![create_let_ref("x"), create_let_ref("y"), create_let_ref("z")]),
-            create_grouping(int(1)),
-            create_grouping(int(1))
-        ]);
+        ",
+            vec![
+                tuple(vec![int(1), int(2), int(3)]),
+                tuple(vec![
+                    create_let_ref("x"),
+                    create_let_ref("y"),
+                    create_let_ref("z"),
+                ]),
+                create_grouping(int(1)),
+                create_grouping(int(1)),
+            ],
+        );
     }
-    
 
     #[test]
     fn parse_shorthand_lambda_expr() {
@@ -2051,34 +2052,38 @@ pub mod parser_tests {
             { |x,y,| => 1 };
         ",
             vec![
-            create_function(
-                None,
-                vec![],
-                Type::unit(),
-                true,
-                create_block(vec![create_implicit_return(create_binop(int(1), BinaryOperation::Add(Span::fake()), int(2)))]),
-            ),
-            create_function(
-                None,
-                vec![],
-                Type::unit(),
-                true,
-                create_block(vec![create_implicit_return(int(1))]),
-            ),
-            create_function(
-                None,
-                vec![ident("x")],
-                Type::unit(),
-                true,
-                create_block(vec![create_implicit_return(int(1))]),
-            ),
-            create_function(
-                None,
-                vec![ident("x"), ident("y")],
-                Type::unit(),
-                true,
-                create_block(vec![create_implicit_return(int(1))]),
-            ),
+                create_function(
+                    None,
+                    vec![],
+                    Type::unit(),
+                    true,
+                    create_block(vec![create_implicit_return(create_binop(
+                        int(1),
+                        BinaryOperation::Add(Span::fake()),
+                        int(2),
+                    ))]),
+                ),
+                create_function(
+                    None,
+                    vec![],
+                    Type::unit(),
+                    true,
+                    create_block(vec![create_implicit_return(int(1))]),
+                ),
+                create_function(
+                    None,
+                    vec![ident("x")],
+                    Type::unit(),
+                    true,
+                    create_block(vec![create_implicit_return(int(1))]),
+                ),
+                create_function(
+                    None,
+                    vec![ident("x"), ident("y")],
+                    Type::unit(),
+                    true,
+                    create_block(vec![create_implicit_return(int(1))]),
+                ),
             ],
         );
     }
@@ -2091,59 +2096,67 @@ pub mod parser_tests {
             { |x: int, y|: int => 1 };
         ",
             vec![
-            create_function(
-                None,
-                vec![ident_type("x", Type::int()), ident_type("y", Type::int())],
-                Type::unit(),
-                true,
-                create_block(vec![create_implicit_return(int(1))]),
-            ),
-            create_function(
-                None,
-                vec![ident_type("x", Type::int()), ident("y")],
-                Type::int(),
-                true,
-                create_block(vec![create_implicit_return(int(1))]),
-            )
+                create_function(
+                    None,
+                    vec![ident_type("x", Type::int()), ident_type("y", Type::int())],
+                    Type::unit(),
+                    true,
+                    create_block(vec![create_implicit_return(int(1))]),
+                ),
+                create_function(
+                    None,
+                    vec![ident_type("x", Type::int()), ident("y")],
+                    Type::int(),
+                    true,
+                    create_block(vec![create_implicit_return(int(1))]),
+                ),
             ],
         );
     }
 
     #[test]
     fn parse_trailing_lambda_argument_expr() {
-        parse("
+        parse(
+            "
         test { 1 };
         test() { 1 };
         test(1,2,3) { 1 };
-        ", vec![
-            create_call(
-                create_let_ref("test"), 
-                vec![
-                    CallArgs(None, create_function_with_body(create_block(vec![
-                        create_implicit_return(int(1))
-                    ])))
-                ]
-            ),
-            create_call(
-                create_let_ref("test"), 
-                vec![
-                    CallArgs(None, create_function_with_body(create_block(vec![
-                        create_implicit_return(int(1))
-                    ])))
-                ]
-            ),
-            create_call(
-                create_let_ref("test"), 
-                vec![
-                    CallArgs(None, int(1)),
-                    CallArgs(None, int(2)),
-                    CallArgs(None, int(3)),
-                    CallArgs(None, create_function_with_body(create_block(vec![
-                        create_implicit_return(int(1))
-                    ])))
-                ]
-            )
-        ])
+        ",
+            vec![
+                create_call(
+                    create_let_ref("test"),
+                    vec![CallArgs(
+                        None,
+                        create_function_with_body(create_block(vec![create_implicit_return(int(
+                            1,
+                        ))])),
+                    )],
+                ),
+                create_call(
+                    create_let_ref("test"),
+                    vec![CallArgs(
+                        None,
+                        create_function_with_body(create_block(vec![create_implicit_return(int(
+                            1,
+                        ))])),
+                    )],
+                ),
+                create_call(
+                    create_let_ref("test"),
+                    vec![
+                        CallArgs(None, int(1)),
+                        CallArgs(None, int(2)),
+                        CallArgs(None, int(3)),
+                        CallArgs(
+                            None,
+                            create_function_with_body(create_block(vec![create_implicit_return(
+                                int(1),
+                            )])),
+                        ),
+                    ],
+                ),
+            ],
+        )
     }
 
     #[test]
@@ -2193,7 +2206,6 @@ pub mod parser_tests {
             ],
         );
     }
-
 
     #[test]
     fn parse_data_struct_expr() {

@@ -202,7 +202,6 @@ pub fn create_function(
     Expression::create_function(name, params, return_type, is_static, body, Span::fake())
 }
 
-
 pub fn create_function_with_body(body: Expression) -> Expression {
     Expression::create_function(None, vec![], Type::unit(), true, body, Span::fake())
 }

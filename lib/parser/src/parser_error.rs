@@ -53,13 +53,11 @@ impl ParserError {
             | ParserError::InvalidUseOfUnitType(tok)
             | ParserError::InvalidType(tok)
             | ParserError::UnterminatedString(tok) => {
-                let label = Label::new(tok.span.to_range())
-                    .with_message(msg);
+                let label = Label::new(tok.span.to_range()).with_message(msg);
                 self.build_report(label)
-            },
+            }
             ParserError::ExpectedParameter(span) => {
-                let label = Label::new(span.to_range())
-                    .with_message(msg);
+                let label = Label::new(span.to_range()).with_message(msg);
                 self.build_report(label)
             }
         }
@@ -67,8 +65,8 @@ impl ParserError {
 
     fn build_report(&mut self, label: Label) -> Report {
         Report::build(ReportKind::Error, (), 99)
-        .with_message("Parser Error")
-        .with_label(label)
-        .finish()
+            .with_message("Parser Error")
+            .with_label(label)
+            .finish()
     }
 }

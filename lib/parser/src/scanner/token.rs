@@ -106,7 +106,6 @@ impl Token {
     impl_token!(double_quote, DoubleQuote);
     impl_token!(eof, EOF);
 
-
     pub fn is_eof(&self) -> bool {
         self.token_type == TokenType::EOF
     }

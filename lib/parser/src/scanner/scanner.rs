@@ -176,7 +176,6 @@ impl Scanner {
     }
 
     fn scan_normal(&mut self) -> Token {
-
         self.skip_whitespace();
 
         let curr_ch = self.ch;
