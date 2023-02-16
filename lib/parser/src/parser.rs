@@ -182,27 +182,23 @@ impl Parser {
 
     fn parse_parameters(&mut self, token_end: TokenType) -> Result<Vec<Identifier>, ParserError> {
         let mut params = vec![];
-
         if self.curr_token.token_type != token_end {
             while !self.is_end() {
                 if self.check(TokenType::SELF) {
-                    // TODO No need to error when encountering self
-                    return Err(ParserError::Error(
-                        "Expected 'self' to be the first parameter in a method".to_string(),
-                        self.curr_token.clone(),
-                    ));
-                }
-
-                let ident = self.eat(TokenType::Identifier, "Expected 'identifier'")?;
-
-                let ident = if self.eat_optional(TokenType::Colon).is_none() {
-                    Identifier::new(ident.value, ident.span)
+                    let token = self.advance();
+                    params.push(Identifier::new("self".to_string(), token.span))
                 } else {
-                    let ttype = self.parse_type(false)?;
-                    Identifier::with_value_type(ident.value, Some(ttype), ident.span)
-                };
+                    let ident = self.eat(TokenType::Identifier, "Expected 'identifier'")?;
 
-                params.push(ident);
+                    let ident = if self.eat_optional(TokenType::Colon).is_none() {
+                        Identifier::new(ident.value, ident.span)
+                    } else {
+                        let ttype = self.parse_type(false)?;
+                        Identifier::with_value_type(ident.value, Some(ttype), ident.span)
+                    };
+    
+                    params.push(ident);
+                }
 
                 if !self.matches(vec![TokenType::Comma, TokenType::SemiColon])
                     || self.curr_token.token_type == token_end
@@ -466,7 +462,7 @@ impl Parser {
         let fun_span: Span = self.prev_token.span.clone();
         let mut name = None;
         let mut params = vec![];
-        let mut is_static = true;
+        let is_static = true;
         let mut return_type = Type::unit();
 
         if let FunctionKind::Method(_) = kind {
@@ -477,29 +473,7 @@ impl Parser {
         let left_paren = self.eat_optional(TokenType::LeftParen);
 
         if let Some(_) = left_paren {
-            match (kind.clone(), self.check(TokenType::SELF)) {
-                (FunctionKind::Method(data_struct_identifier), true) => {
-                    let token = self.eat(TokenType::SELF, "Expected 'self'")?;
-                    self.eat_optional(TokenType::Comma);
-                    is_static = false;
-                    params.push(Identifier::with_all(
-                        token.value,
-                        // token.token_type,
-                        Type::Identifier(data_struct_identifier),
-                        token.span,
-                    ));
-                }
-                (FunctionKind::Function, true) => {
-                    return Err(ParserError::Error(
-                        "Keyword 'self' can only be used in methods not functions".to_string(),
-                        self.curr_token.clone(),
-                    ))
-                }
-                _ => {}
-            }
-
             params.append(&mut self.parse_parameters(TokenType::RightParen)?);
-
             self.eat(TokenType::RightParen, "Expected ')' after parameters")?;
         } else if self.check(TokenType::Identifier) && matches!(kind, FunctionKind::Function) {
             // Allow functions without parens to have one identifier e.g
@@ -1141,6 +1115,7 @@ pub mod parser_tests {
     use crate::scanner::{Scanner, Token};
     use crate::test_utils::*;
     use crate::ParserError;
+    use pretty_assertions::{assert_eq};
     use ast::{BinaryOperation, CallArgs, LogicOperation, Program, UnaryOperation};
 
     use span_util::Span;
@@ -1655,7 +1630,10 @@ pub mod parser_tests {
     #[test]
     fn parse_self_keyword() {
         parse(
-            "let main = fn { self; };",
+            "
+            let main = fn { self; };
+            fn(self) {};
+            ",
             vec![create_let(
                 "main",
                 Some(create_function(
@@ -1665,7 +1643,15 @@ pub mod parser_tests {
                     true,
                     create_block(vec![create_self("self")]),
                 )),
-            )],
+            ),
+            create_function(
+                None,
+                vec![ident("self")],
+                Type::unit(),
+                true,
+                create_block(vec![])
+            )
+            ],
         );
     }
 
@@ -2296,9 +2282,9 @@ pub mod parser_tests {
                     ),
                     create_function(
                         Some("name".to_string()),
-                        vec![ident_self("Person")],
+                        vec![ident_self()],
                         Type::unit(),
-                        false,
+                        true,
                         create_block(vec![]),
                     ),
                 ],
@@ -2327,9 +2313,9 @@ pub mod parser_tests {
                 vec![
                     create_function(
                         Some("name".to_string()),
-                        vec![ident_self("Person")],
+                        vec![ident_self()],
                         Type::unit(),
-                        false,
+                        true,
                         create_block(vec![create_get_property(
                             create_self("self"),
                             ident("first_name"),
@@ -2338,9 +2324,9 @@ pub mod parser_tests {
                     ),
                     create_function(
                         Some("set_name".to_string()),
-                        vec![ident_self("Person"), ident_type("name", Type::string())],
+                        vec![ident_self(), ident_type("name", Type::string())],
                         Type::unit(),
-                        false,
+                        true,
                         create_block(vec![create_set_property(
                             create_self("self"),
                             ident("first_name"),

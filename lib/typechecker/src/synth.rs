@@ -166,7 +166,8 @@ impl TypeChecker {
             Expression::Function(expr) => {
                 let fn_type = self.synth_function_signature(expr, &env)?;
                 let env = Rc::new(RefCell::new(Env::with_parent(Rc::clone(&env))));
-
+                // TODO check if function is in method and static
+                // TODO check if self parameter
                 let ret_type = match &fn_type {
                     Type::Function(fn_expr) => {
                         for (e, param) in expr.params.iter().zip(&fn_expr.params) {
@@ -619,43 +620,44 @@ impl TypeChecker {
                 Ok(then)
             }
             Expression::LoopExpr(expr) => {
-                if let Some(e) = &expr.iterator {
-                    let it = self.synth(e, env)?;
-                    let env = Rc::new(RefCell::new(Env::with_parent(env.clone())));
-                    let iterator_type = match it {
-                        Type::Array(arr) => match *arr {
-                            Type::Unknown => {
-                                return Err(TypeError::AnnotationNeeded(e.get_span()));
-                            }
-                            _ => *arr,
-                        },
-                        _ => {
-                            return Err(TypeError::CannotIterate(it, e.get_span()));
-                        }
-                    };
+                // TODO fix
+                // if let Some(e) = &expr.iterator {
+                //     let it = self.synth(e, env)?;
+                //     let env = Rc::new(RefCell::new(Env::with_parent(env.clone())));
+                //     let iterator_type = match it {
+                //         Type::Array(arr) => match *arr {
+                //             Type::Unknown => {
+                //                 return Err(TypeError::AnnotationNeeded(e.get_span()));
+                //             }
+                //             _ => *arr,
+                //         },
+                //         _ => {
+                //             return Err(TypeError::CannotIterate(it, e.get_span()));
+                //         }
+                //     };
 
-                    let name = match &*expr.condition {
-                        Expression::Let(l) => l.name.value.to_string(),
-                        _ => unreachable!(),
-                    };
+                //     let name = match &*expr.condition {
+                //         Expression::Let(l) => l.name.value.to_string(),
+                //         _ => unreachable!(),
+                //     };
 
-                    // set let expression to unknown value
-                    self.synth(&expr.condition, &env)?;
+                //     // set let expression to unknown value
+                //     self.synth(&expr.condition, &env)?;
 
-                    // update let expression with iterator type
-                    env.borrow_mut().set(&name, iterator_type);
+                //     // update let expression with iterator type
+                //     env.borrow_mut().set(&name, iterator_type);
 
-                    self.synth(&expr.body, &env)?;
-                } else {
-                    let cond = self.synth(&expr.condition, env)?;
-                    if !cond.is_bool() {
-                        return Err(TypeError::Expected(
-                            Type::bool(),
-                            cond,
-                            expr.condition.get_span(),
-                        ));
-                    }
-                }
+                //     self.synth(&expr.body, &env)?;
+                // } else {
+                //     let cond = self.synth(&expr.condition, env)?;
+                //     if !cond.is_bool() {
+                //         return Err(TypeError::Expected(
+                //             Type::bool(),
+                //             cond,
+                //             expr.condition.get_span(),
+                //         ));
+                //     }
+                // }
 
                 Ok(Type::Unit)
             }

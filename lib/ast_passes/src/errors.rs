@@ -7,7 +7,6 @@ pub enum PassesError {
     // name resolver errors
     #[error("cannot find value '{0}'")]
     CannotFindValue(String, Span),
-
     // semantic analyzer errors
     #[error("Cannot use return in top-level code")]
     NoTopLevelReturn(Span),
@@ -23,7 +22,11 @@ pub enum PassesError {
     TypeAnnotationNeeded(Span),
 }
 
+
+
 impl PassesError {
+
+
     pub fn into_report(&mut self) -> Report {
         let msg = self.to_string();
         match self {

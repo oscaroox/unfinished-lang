@@ -46,7 +46,7 @@ impl SemanticAnalyzer {
         false
     }
 
-    fn is_in_loop_scope(&self) -> bool {
+    fn adjacent_loop_scope(&self) -> bool {
         match self.scopes.len() {
             0 => false,
             n => self.scopes[n - 1] == Scope::Loop,
@@ -64,13 +64,6 @@ impl Visitor for SemanticAnalyzer {
 
     fn visit_function(&mut self, e: &ast::Function) {
         self.scopes.push(Scope::Function);
-
-        e.params
-            .iter()
-            .filter(|p| p.value_type.is_none() && !p.is_self()) // skip self parameter
-            .map(|p| p.span.clone())
-            .for_each(|s| self.add_error(PassesError::TypeAnnotationNeeded(s.clone())));
-
         walk_function(self, e);
         self.scopes.pop();
     }
@@ -82,13 +75,13 @@ impl Visitor for SemanticAnalyzer {
     }
 
     fn visit_break(&mut self, e: &ast::BreakExpr) {
-        if !self.is_in_loop_scope() {
+        if !self.adjacent_loop_scope() {
             self.add_error(PassesError::NoBreakOutsideLoop(e.span.clone()))
         }
     }
 
     fn visit_continue(&mut self, e: &ast::ContinueExpr) {
-        if !self.is_in_loop_scope() {
+        if !self.adjacent_loop_scope() {
             self.add_error(PassesError::NoContinueOutsideLoop(e.span.clone()))
         }
     }

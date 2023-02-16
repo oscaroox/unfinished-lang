@@ -60,11 +60,11 @@ pub fn ident_type(val: &str, value_type: Type) -> Identifier {
     Identifier::with_value_type(val.into(), Some(value_type), Span::fake())
 }
 
-pub fn ident_self(r#type: &str) -> Identifier {
+pub fn ident_self() -> Identifier {
     Identifier {
         value: "self".to_string(),
         // token_type: Some(TokenType::SELF),
-        value_type: Some(Type::Identifier(r#type.into())),
+        value_type: None,
         span: Span::fake(),
     }
 }

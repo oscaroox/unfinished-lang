@@ -132,6 +132,8 @@ impl Interpreter {
             Expression::LoopExpr(expr) => self.eval_loop_expr(&expr),
             Expression::BreakExpr(_) => Ok(Value::Break),
             Expression::ContinueExpr(_) => Ok(Value::Continue),
+            Expression::WhileExpr(_) => todo!(),
+            Expression::ForExpr(_) => todo!(),
         }
     }
 
@@ -147,33 +149,35 @@ impl Interpreter {
     }
 
     fn eval_loop_expr(&mut self, loop_expr: &LoopExpr) -> InterpreterResult {
-        let env = Rc::new(RefCell::new(Environment::with_outer(Rc::clone(&self.env))));
-        let mut out = Value::Unit;
-        if let Some(iter) = &loop_expr.iterator {
-            let iter = self.expression(iter)?;
+        // TODO fix
+        // let env = Rc::new(RefCell::new(Environment::with_outer(Rc::clone(&self.env))));
+        // let mut out = Value::Unit;
+        // if let Some(iter) = &loop_expr.iterator {
+        //     let iter = self.expression(iter)?;
 
-            // condition is a let expr
-            self.expression(&loop_expr.condition)?;
-            let let_expr = loop_expr.condition.to_let();
+        //     // condition is a let expr
+        //     self.expression(&loop_expr.condition)?;
+        //     let let_expr = loop_expr.condition.to_let();
 
-            let values = match iter {
-                Value::Array(arr) => arr.borrow().values.clone(),
-                Value::Range(start, end) => (start..end).map(|i| Value::Int(i)).collect(),
-                _ => panic!("Can only iterate over arrays"),
-            };
+        //     let values = match iter {
+        //         Value::Array(arr) => arr.borrow().values.clone(),
+        //         Value::Range(start, end) => (start..end).map(|i| Value::Int(i)).collect(),
+        //         _ => panic!("Can only iterate over arrays"),
+        //     };
 
-            for x in values {
-                env.borrow_mut()
-                    .assign(let_expr.name.value.to_string(), x.clone());
-                eval_loop_body!(self, env.clone(), out, expression, &*loop_expr.body);
-            }
-        } else {
-            while (self.expression(&loop_expr.condition)?).is_truthy() {
-                eval_loop_body!(self, env.clone(), out, expression, &*loop_expr.body);
-            }
-        }
+        //     for x in values {
+        //         env.borrow_mut()
+        //             .assign(let_expr.name.value.to_string(), x.clone());
+        //         eval_loop_body!(self, env.clone(), out, expression, &*loop_expr.body);
+        //     }
+        // } else {
+        //     while (self.expression(&loop_expr.condition)?).is_truthy() {
+        //         eval_loop_body!(self, env.clone(), out, expression, &*loop_expr.body);
+        //     }
+        // }
 
-        Ok(out)
+        // Ok(out)
+        todo!()
     }
 
     fn eval_self_expr(&mut self, self_expr: &SelfExpr) -> InterpreterResult {
@@ -324,7 +328,7 @@ impl Interpreter {
     }
 
     fn eval_return(&mut self, ret: &ReturnExpr) -> InterpreterResult {
-        match &*ret.value {
+        match &ret.value {
             Some(op) => Ok(Value::return_val(self.expression(op)?)),
             None => Ok(Value::return_val(Value::Unit)),
         }
@@ -524,6 +528,7 @@ impl Interpreter {
             LiteralValue::Int(v) => Value::Int(*v),
             LiteralValue::Float(v) => Value::Float(*v),
             LiteralValue::Bool(v) => Value::Bool(*v),
+            LiteralValue::Tuple(_) => todo!(),
             LiteralValue::String(v) => Value::String(v.to_string()),
             LiteralValue::Array(v) => {
                 let mut res = vec![];
