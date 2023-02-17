@@ -1,10 +1,3 @@
-let Result = enum<T>(
-    Some(T)
-    None
-) impl Training {
-
-}
-
 let Person! = data[T](
     id: int,
     name!: string,
@@ -23,41 +16,11 @@ let Person! = data[T](
     }
 }
 
+let main = fn:unit  {
 
-let get_count = fn: promise[int] => promise.from(1)
+    let p1 = Person(name: "John", last_name: "Doe");
+    let p2 = Person(name: "Jane", last_name: "Doe");
 
-let main = async fn: promise[unit]   {
-    let count = await get_count()
-
-    let p: int;
-
-    let person: Person;
-
-    let sql = $sql(
-        SELECT * FROM table WHERE id = :id
-    );
-
-    $view(
-        <div>
-            { person.id }
-        </div>
-    )
-
-    $css(
-
-    )
-
-    let p1 = Person(name: "oscar", last_name: "druiventak")
-    let p2 = Person(name: "oscar", last_name: "druiventak")
-
-    p1 == p2
-}
-
-
-
-type Training = {
-    fn get_count(self) {
-
-    }
+    p1 == p2;
 }
 

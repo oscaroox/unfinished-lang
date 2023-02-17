@@ -1,8 +1,8 @@
-data ListNode {
-    value,
-    next,
-} :: {
-    fun new (value) {
+data ListNode[T](
+    value: T,
+    next?: ListNode<T>,
+) {
+    fn new (value) {
         ListNode {
             value,
             next: null,
@@ -11,15 +11,15 @@ data ListNode {
 };
 
 
-data LinkedList {
-    head,
-} :: {
-    fun new(head) => LinkedList {
+data LinkedList[T](
+    head: ListNode<T>,
+ ) {
+    fn new(head: T) => LinkedList {
         head
     }
     
 
-    fun size(self) {
+    fn size(self) {
         let count = 0;
         let node = self.head;
         loop node != null {
@@ -29,11 +29,11 @@ data LinkedList {
         count
     }
 
-    fun clear(self) {
+    fn clear(self) {
         self.head = null;
     }
 
-    fun get_last(self) {
+    fn get_last(self) {
         let last_node = self.head;
         if last_node != null {
             loop last_node.next != null {
@@ -43,7 +43,7 @@ data LinkedList {
         last_node
     }
 
-    fun get_first(self) => self.head
+    fn get_first(self) => self.head
 };
 
 let node1 = ListNode.new(2);

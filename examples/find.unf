@@ -12,12 +12,11 @@ let find = fun(arr, f) {
 };
 
 let id = 0;
-
-data Person {
-    id,
-    name
-} :: {
-    fun new(name) => Person {
+data Person (
+    id: int,
+    name: string
+) {
+    fn new(name) => Person {
         id: id += 1,
         name, 
     }
@@ -25,10 +24,8 @@ data Person {
 
 
 
-let person = [Person.new("Jane"), Person.new("John"), Person.new("Carlos")];
+let people = [Person.new("Jane"), Person.new("John"), Person.new("Carlos")];
 
-let found = find(person, fun(p, idx) => p.id == 3);
+let found = people.find { $0.id == 3 }
 
 println(found);
-
-println("test");
