@@ -41,12 +41,7 @@ impl Scanner {
 
     fn advance(&mut self) {
         self.pos += 1;
-        if self.is_end() {
-            self.ch = '\0';
-            return;
-        }
-
-        self.ch = self.source[self.pos];
+        self.ch = *self.source.get(self.pos).unwrap_or(&'\0');
     }
 
     /**
@@ -55,7 +50,8 @@ impl Scanner {
      * backtracking is possible by only one token
      */
     pub fn backtrack(&mut self) {
-        if self.checkpoint > 0 && self.checkpoint < self.source.len() {
+        // if self.checkpoint > 0 && self.checkpoint < self.source.len() {
+        if self.checkpoint < self.source.len() {
             self.pos = self.checkpoint;
             self.ch = self.source[self.pos];
         }
@@ -82,15 +78,11 @@ impl Scanner {
     }
 
     fn is_whitespace(&self, ch: char) -> bool {
-        ch == ' ' || ch == '\t'
+        ch.is_whitespace()
     }
 
     fn peek(&self) -> char {
-        let pos = self.pos + 1;
-        if pos >= self.source.len() {
-            return '\0';
-        }
-        self.source[pos]
+        *self.source.get(self.pos + 1).unwrap_or(&'\0')
     }
 
     fn skip_whitespace(&mut self) {
@@ -358,12 +350,10 @@ impl Scanner {
 
     fn read_interpolation(&mut self, first_ch: char) -> Token {
         let mut out = vec![first_ch];
-        let pos = self.pos;
+        let start = self.pos;
         loop {
             match self.peek() {
-                '"' => break,
-                '$' => break,
-                '\0' => break,
+                '"' | '$' | '\0' => break,
                 '\\' => {
                     self.advance();
                     self.advance();
@@ -375,7 +365,7 @@ impl Scanner {
                 }
             }
         }
-        Token::string_const(out.into_iter().collect(), pos..self.pos)
+        Token::string_const(out.into_iter().collect(), start..self.pos)
     }
 
     fn normalize_escape(&self, ch: char) -> char {
