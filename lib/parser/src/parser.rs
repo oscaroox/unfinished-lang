@@ -196,7 +196,7 @@ impl Parser {
                         let ttype = self.parse_type(false)?;
                         Identifier::with_value_type(ident.value, Some(ttype), ident.span)
                     };
-    
+
                     params.push(ident);
                 }
 
@@ -1114,9 +1114,10 @@ pub mod parser_tests {
     use super::Parser;
     use crate::scanner::{Scanner, Token};
     use crate::test_utils::*;
+
     use crate::ParserError;
-    use pretty_assertions::{assert_eq};
     use ast::{BinaryOperation, CallArgs, LogicOperation, Program, UnaryOperation};
+    use pretty_assertions::assert_eq;
 
     use span_util::Span;
     use type_core::{FunctionParam, Type};
@@ -1634,23 +1635,24 @@ pub mod parser_tests {
             let main = fn { self; };
             fn(self) {};
             ",
-            vec![create_let(
-                "main",
-                Some(create_function(
-                    Some("main".to_string()),
-                    vec![],
+            vec![
+                create_let(
+                    "main",
+                    Some(create_function(
+                        Some("main".to_string()),
+                        vec![],
+                        Type::unit(),
+                        true,
+                        create_block(vec![create_self("self")]),
+                    )),
+                ),
+                create_function(
+                    None,
+                    vec![ident("self")],
                     Type::unit(),
                     true,
-                    create_block(vec![create_self("self")]),
-                )),
-            ),
-            create_function(
-                None,
-                vec![ident("self")],
-                Type::unit(),
-                true,
-                create_block(vec![])
-            )
+                    create_block(vec![]),
+                ),
             ],
         );
     }

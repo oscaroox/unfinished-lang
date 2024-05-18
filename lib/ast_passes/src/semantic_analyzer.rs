@@ -159,10 +159,10 @@ mod analyzer_test {
     fn check_return() {
         analyze(
             "
-        return
+        return;
         let x = fn {
-            return
-        }
+            return;
+        };
         ",
             vec![PassesError::NoTopLevelReturn(Span::fake())],
         );
@@ -172,13 +172,13 @@ mod analyzer_test {
     fn check_continue() {
         analyze(
             "
-            continue
+            continue;
             loop {
-                continue
+                continue;
                 fn {
-                    continue
-                }
-            }
+                    continue;
+                };
+            };
             
         ",
             vec![
@@ -190,8 +190,8 @@ mod analyzer_test {
         analyze(
             "
         loop {
-            continue
-        }
+            continue;
+        };
         
     ",
             vec![],
@@ -202,13 +202,13 @@ mod analyzer_test {
     fn check_break() {
         analyze(
             "
-        break
+        break;
         loop {
-            continue
+            continue;
             fn {
                 break
             }
-        }
+        };
         
         ",
             vec![
@@ -224,11 +224,11 @@ mod analyzer_test {
             "
             fn(a,x: int) {
 
-            }
+            };
 
             let main = fn(a,b,c) {
 
-            }
+            };
         ",
             vec![
                 PassesError::TypeAnnotationNeeded(Span::fake()),
@@ -246,7 +246,7 @@ mod analyzer_test {
             let x;
             fn {
                 let y;
-            }
+            };
         ",
             vec![
                 PassesError::TypeAnnotationNeeded(Span::fake()),
@@ -254,7 +254,7 @@ mod analyzer_test {
             ],
         );
 
-        analyze("let x = 1", vec![]);
+        analyze("let x = 1;", vec![]);
     }
 
     #[test]

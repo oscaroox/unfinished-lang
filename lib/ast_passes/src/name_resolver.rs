@@ -98,7 +98,7 @@ mod name_resolver_test {
             let y = 3;
             let main = fn {
                 y = x;
-            }
+            };
         ",
             vec![
                 create_let("x", Some(int(2))),
@@ -130,9 +130,9 @@ mod name_resolver_test {
             {
                 {
                     let y = x;
-                }
-            }
-        }
+                };
+            };
+        };
         ",
             vec![
                 create_let("x", Some(int(2))),
@@ -158,12 +158,12 @@ mod name_resolver_test {
         {
             {
                 let y = x;
-            }
+            };
             let x = 3;
             {
                 let y = x;
-            }
-        }
+            };
+        };
         ",
             vec![
                 create_let("x", Some(int(2))),
